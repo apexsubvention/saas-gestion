@@ -1,0 +1,38 @@
+-- 0017_indexes.sql
+
+create index on clients(organization_id);
+create index on grant_projects(organization_id, client_id);
+create index on grant_projects(program_id);
+create index on grant_projects(status);
+create index on tasks(organization_id, assigned_to, status);
+create index on tasks(due_date) where status not in ('done','cancelled');
+create index on milestones(grant_project_id, internal_due_date);
+create index on documents(client_id);
+create index on documents(grant_project_id);
+create index on document_links(entity_type, entity_id);
+create index on document_requests(client_id, status);
+create index on document_requests(grant_project_id, status);
+create index on expenses(grant_project_id, status);
+create index on expenses(budget_line_id);
+create index on claim_expenses(claim_id);
+create index on claim_expenses(expense_id);
+create index on claims(grant_project_id, status, due_date);
+create index on expected_invoices(supplier_id, status);
+create index on activities(client_id, created_at desc);
+create index on activities(grant_project_id, created_at desc);
+create index on emails(gmail_connection_id, received_at desc);
+create index on emails(client_id) where client_id is not null;
+create index on opportunities(organization_id, stage);
+create index on client_access(user_id);
+create index on application_sections(application_id);
+create index on application_questions(section_id);
+create index on application_answers(question_id);
+create index on document_versions(document_id);
+create index on meeting_insights(meeting_id);
+create index on notifications(user_id, read);
+create index on contacts(client_id);
+create index on project_suppliers(grant_project_id);
+create index on budget_lines(grant_project_id);
+create index on grant_applications(grant_project_id);
+create index on grant_agreements(grant_project_id);
+create index on claim_requirements(claim_id);
