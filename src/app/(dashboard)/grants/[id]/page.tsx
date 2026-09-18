@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { grantProjectsService } from "@/server/services/grantProjects.service";
+import { StatusSelect } from "./StatusSelect";
 
 export default async function GrantProjectPage({ params }: { params: { id: string } }) {
   const supabase = await createClient();
@@ -44,7 +45,12 @@ export default async function GrantProjectPage({ params }: { params: { id: strin
         <h1 className="mt-1 text-lg font-semibold text-neutral-900">{project.name}</h1>
 
         <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <Metric label="Statut" value={project.status} />
+          <div>
+            <p className="text-xs text-neutral-400">Statut de la subvention</p>
+            <div className="mt-1">
+              <StatusSelect grantProjectId={project.id} status={project.status} />
+            </div>
+          </div>
           <Metric label="Approuvé" value={money(approved)} />
           <Metric label="Dépensé" value={money(totals.spent)} />
           <Metric label="Réclamé" value={money(totals.claimed)} />

@@ -48,18 +48,45 @@ export function grantProjectsRepository(supabase: SupabaseClient) {
       return data;
     },
 
+    async findExisting(clientId: string, programId: string, name: string) {
+      const { data, error } = await supabase
+        .from("grant_projects")
+        .select("*")
+        .eq("client_id", clientId)
+        .eq("program_id", programId)
+        .ilike("name", name.trim())
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data as GrantProjectRow | null;
+    },
+
     async create(input: {
       organization_id: string;
       client_id: string;
       program_id: string;
       name: string;
       owner_id?: string | null;
+      status?: string;
+      description?: string | null;
       total_project_cost?: number | null;
       approved_grant_amount?: number | null;
+      grant_rate?: number | null;
       official_start_date?: string | null;
       official_end_date?: string | null;
     }): Promise<GrantProjectRow> {
       const { data, error } = await supabase.from("grant_projects").insert(input).select().single();
+      if (error) throw error;
+      return data as GrantProjectRow;
+    },
+
+    async updateStatus(id: string, status: string): Promise<GrantProjectRow> {
+      const { data, error } = await supabase
+        .from("grant_projects")
+        .update({ status, updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .select()
+        .single();
       if (error) throw error;
       return data as GrantProjectRow;
     },

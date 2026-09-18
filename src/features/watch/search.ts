@@ -39,7 +39,49 @@ const SYNONYM_GROUPS: string[][] = [
   ["export", "exportation", "commercialisation", "international", "internationalisation", "hors quebec", "marche etranger", "marches etrangers"],
   ["innovation", "recherche", "developpement", "rd", "r d", "r&d", "technologique", "pari", "irap"],
   ["environnement", "environnemental", "environnementale", "vert", "verte", "ecologique", "eco canada", "ecocanada", "cleantech", "transition energetique"],
+  // Ajoutés le 18 sept. 2026 : ces univers n'avaient aucun groupe de synonymes (recherche
+  // "IA", "cybersécurité", "défense" ou "manufacturier" ne retombait alors que sur la
+  // correspondance de mots bruts, sans expansion). "ia" est un token court volontairement
+  // inclus malgré le risque de faux positifs par sous-chaîne, comme "rd" l'est déjà pour
+  // le groupe innovation ci-dessus.
+  ["intelligence artificielle", "ia", "machine learning", "apprentissage automatique", "apprentissage machine", "algorithme", "algorithmes", "donnees massives", "big data"],
+  ["cybersecurite", "cyber securite", "securite informatique", "securite des donnees", "protection des donnees", "cyberattaque", "cyberattaques", "cybersecurity"],
+  ["defense", "double usage", "dual use", "securite nationale", "technologies militaires", "defence"],
+  ["manufacturier", "manufacturiere", "manufacturiers", "manufacturieres", "usine", "usines", "production", "chaine de production", "automatisation industrielle", "robotique", "robotisation", "industrie 4 0"],
 ];
+
+// Étiquette lisible par univers, alignée sur l'ordre de SYNONYM_GROUPS ci-dessus.
+// Sert à afficher à l'utilisateur QUELS univers son texte a déclenchés (ex. dans
+// "Parle-moi de ton projet"), plutôt que la liste brute et peu lisible des tokens
+// étendus que renvoie expandedSearchTerms().
+const GROUP_LABELS = [
+  "Stage / emploi étudiant",
+  "Formation de la main-d’œuvre",
+  "Embauche / subvention salariale",
+  "Transformation numérique",
+  "Export / international",
+  "Innovation / R-D",
+  "Environnement / technologies propres",
+  "Intelligence artificielle",
+  "Cybersécurité",
+  "Défense / double usage",
+  "Manufacturier / automatisation",
+];
+
+/** Univers métiers (groupes de synonymes) déclenchés par un texte libre. */
+export function matchedIntentGroups(query: string): string[] {
+  const normalizedQuery = normalizeSearchText(query);
+  const base = baseTokens(query);
+  const labels: string[] = [];
+  SYNONYM_GROUPS.forEach((group, index) => {
+    const normalizedGroup = group.map(normalizeSearchText);
+    const groupMatches = normalizedGroup.some((term) =>
+      normalizedQuery.includes(term) || base.some((token) => term.includes(token) || token.includes(term)),
+    );
+    if (groupMatches) labels.push(GROUP_LABELS[index] ?? group[0] ?? "");
+  });
+  return labels.filter(Boolean);
+}
 
 const FUNDING_TYPE_ALIASES: Record<string, string[]> = {
   internship: ["stage", "stagiaire", "etudiant", "placement", "wil", "coop", "internship"],

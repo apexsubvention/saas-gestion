@@ -1,0 +1,1775 @@
+{
+  "clients": [
+    {
+      "name": "ADI Laval",
+      "name_alt": "LES INDUSTRIES ALBERT DAVIDSON LTÉE",
+      "status": "active",
+      "projects": [
+        {
+          "source_folder": "Demande faite en 2026/Plan de facturation - Adi + willsup/Réclamation PSCE/ADI LAVAL",
+          "category": "faite_2026",
+          "program_name": "PSCE (Programme de soutien à la commercialisation et à l'exportation), Volet 2 — diversification et consolidation sur les marchés hors Québec — Investissement Québec",
+          "name": "Diversification et consolidation des marchés du Canada hors Québec",
+          "status": "approved",
+          "description": "Offre de contribution financière non remboursable signée par les deux parties le 2026-03-30 (dossier PSCE76195 / 100017806). Un plan de facturation mensuel a été préparé par Apex pour le suivi du projet. Les Annexes B (demande de versement), C (fiche d'évaluation) et D (rapport final) présentes dans le dossier sont toutes des gabarits vierges (non remplis, non signés, non datés) — aucune réclamation n'a encore été effectivement soumise à IQ pour ADI Laval d'après les fichiers .txt disponibles. | NEQ 1172710791, SCIAN 332410. Signataire autorisé de l'entreprise : François-Xavier Edger-Sauvé (Président). Signataire IQ : Guy Langis (Conseiller spécialisé, Aides financières). Dépenses admissibles totales prévues à l'offre : 69 750 $ (coût total du projet 107 850 $, dont 72 975 $ de fonds de roulement); chaque déboursement = 50% des dépenses admissibles réellement encourues (grant_rate=0.5), avec rétention possible de 20% sur le dernier versement. Le fichier « Facture 1326 (1).txt » trouvé dans ce dossier ADI LAVAL est en réalité une facture Sitegrow adressée à Bobby Papadopoulos / WILLSUP INC. (confirmé par comparaison avec le fichier équivalent du dossier WILLSUP) — il s'agit d'un fichier mal classé, pas d'une dépense propre à ADI Laval; aucune expense n'a donc été ajoutée pour ADI Laval faute de facture qui lui soit réellement destinée. Le fichier « Offre de service Sitegrow _ Adi Laval.txt » est un devis/offre de service Sitegrow (portée : 30 janvier 2026 au 30 janvier 2027, sous-totaux honoraires 52 200$ + études de marché 34 750$ + publicité 20 900$ = 107 850$) qui sert de base à la ventilation des dépenses de l'offre PSCE mais n'est pas lui-même une facture. Le plan de facturation Apex (Plan_Facturation_PSCE-ADILAVAL) prévoit une réclamation mi-projet possible au mois 6 (« NOUS POUVONS FAIRE LA RÉCLAMATION MI-PROJET ICI = 36 000$ AURA ÉTÉ DÉPENSÉ ») avec un remboursement anticipé de 18K$, mais ceci est une note de planification interne Apex, pas une réclamation confirmée. | Documents non lus automatiquement (à consulter manuellement) : Preuve paiement.png",
+          "official_start_date": "2026-03-01",
+          "official_end_date": "2027-02-28",
+          "total_project_cost": null,
+          "approved_grant_amount": 34875.0,
+          "grant_rate": 0.5,
+          "agreement": {
+            "project_start": "2026-03-01",
+            "project_end": "2027-02-28",
+            "eligible_expense_period_start": "2026-03-01",
+            "eligible_expense_period_end": "2027-02-28",
+            "grant_amount": 34875.0,
+            "grant_rate": 0.5,
+            "special_conditions": "NEQ 1172710791, SCIAN 332410. Signataire autorisé de l'entreprise : François-Xavier Edger-Sauvé (Président). Signataire IQ : Guy Langis (Conseiller spécialisé, Aides financières). Dépenses admissibles totales prévues à l'offre : 69 750 $ (coût total du projet 107 850 $, dont 72 975 $ de fonds de roulement); chaque déboursement = 50% des dépenses admissibles réellement encourues (grant_rate=0.5), avec rétention possible de 20% sur le dernier versement. Le fichier « Facture 1326 (1).txt » trouvé dans ce dossier ADI LAVAL est en réalité une facture Sitegrow adressée à Bobby Papadopoulos / WILLSUP INC. (confirmé par comparaison avec le fichier équivalent du dossier WILLSUP) — il s'agit d'un fichier mal classé, pas d'une dépense propre à ADI Laval; aucune expense n'a donc été ajoutée pour ADI Laval faute de facture qui lui soit réellement destinée. Le fichier « Offre de service Sitegrow _ Adi Laval.txt » est un devis/offre de service Sitegrow (portée : 30 janvier 2026 au 30 janvier 2027, sous-totaux honoraires 52 200$ + études de marché 34 750$ + publicité 20 900$ = 107 850$) qui sert de base à la ventilation des dépenses de l'offre PSCE mais n'est pas lui-même une facture. Le plan de facturation Apex (Plan_Facturation_PSCE-ADILAVAL) prévoit une réclamation mi-projet possible au mois 6 (« NOUS POUVONS FAIRE LA RÉCLAMATION MI-PROJET ICI = 36 000$ AURA ÉTÉ DÉPENSÉ ») avec un remboursement anticipé de 18K$, mais ceci est une note de planification interne Apex, pas une réclamation confirmée. | Documents non lus automatiquement (à consulter manuellement) : Preuve paiement.png"
+          },
+          "suppliers": [
+            {
+              "name": "Sitegrow",
+              "contact": "Consultant marketing/export (stratégie marketing, diagnostic, plan d'exportation)"
+            },
+            {
+              "name": "Google Ads",
+              "contact": "Fournisseur — publicité en ligne"
+            },
+            {
+              "name": "LinkedIn Ads",
+              "contact": "Fournisseur — publicité en ligne"
+            },
+            {
+              "name": "Semrush",
+              "contact": "Fournisseur — accès base de données/étude de marché"
+            },
+            {
+              "name": "Ahrefs",
+              "contact": "Fournisseur — accès base de données/étude de marché"
+            },
+            {
+              "name": "LinkedIn Sales Navigator",
+              "contact": "Fournisseur — accès base de données"
+            },
+            {
+              "name": "IBISWorld / Statista",
+              "contact": "Fournisseur — rapports sectoriels spécialisés"
+            },
+            {
+              "name": "Similarweb",
+              "contact": "Fournisseur — accès base de données"
+            }
+          ],
+          "expenses": [],
+          "claims": [],
+          "contacts": []
+        }
+      ]
+    },
+    {
+      "name": "Agence Nomade",
+      "name_alt": "Agence Nomade inc.",
+      "status": "active",
+      "projects": [
+        {
+          "source_folder": "Demande faite en 2026/MFOR - NOMADE",
+          "category": "faite_2026",
+          "program_name": "MFOR",
+          "name": "MFOR - Formation SEO & GEO avancée",
+          "status": "active",
+          "description": "Entente de subvention signée (numéro 1053752-1, signée le 15 juin 2026) et en phase de réclamation : rapport d'activités de formation complété le 2026-08-24 (formation jugée réussie), 3 factures du fournisseur émises (juin, juillet, août 2026) dont au moins une marquée payée. Registre de présence et demande de versement présents en xlsx (non convertis). | NEQ Agence Nomade inc. : 1174803693 ; adresse 96 rue Milot, Beaupré (Québec) G0A 1E0. Entente MFOR-entreprises n° 1053752-1, mesure de formation, volet 'Formation employeur'. Coût total de la formation : 100 h x 150 $/h = 15 000 $, financé à 50 % par le subventionné (7 500 $) et 50 % par le ministère (7 500 $) — cohérent avec le total des 3 factures fournisseur (3 300 $ + 3 300 $ + 8 400 $ = 15 000 $ avant taxes). Le formulaire de l'entente indique 'Nombre d'employés visés : 5', alors que le nom du fichier du registre de présence non converti mentionne '3 participants' — écart à vérifier. Un fichier 'Évaluation d'activité de formation.txt' vierge (gabarit non rempli) existe aussi à la racine du dossier NOMADE, distinct de la version remplie et datée du 2026-08-24 dans le sous-dossier Réclamation ; les deux ont le même nom de fichier source. La clause de l'entente précise qu'un travailleur étranger temporaire (TET) ne peut participer aux activités financées. | Documents non lus automatiquement (à consulter manuellement) : Demande de versement.xlsx, Réclamation/Demande de versement.xlsx, Réclamation/Registre de présence_3 participants_Signatures.xlsx",
+          "official_start_date": "2026-06-15",
+          "official_end_date": "2026-08-24",
+          "total_project_cost": null,
+          "approved_grant_amount": 7500.0,
+          "grant_rate": 0.5,
+          "agreement": {
+            "project_start": "2026-06-15",
+            "project_end": "2026-08-24",
+            "eligible_expense_period_start": "2026-06-15",
+            "eligible_expense_period_end": "2026-08-24",
+            "grant_amount": 7500.0,
+            "grant_rate": 0.5,
+            "special_conditions": "NEQ Agence Nomade inc. : 1174803693 ; adresse 96 rue Milot, Beaupré (Québec) G0A 1E0. Entente MFOR-entreprises n° 1053752-1, mesure de formation, volet 'Formation employeur'. Coût total de la formation : 100 h x 150 $/h = 15 000 $, financé à 50 % par le subventionné (7 500 $) et 50 % par le ministère (7 500 $) — cohérent avec le total des 3 factures fournisseur (3 300 $ + 3 300 $ + 8 400 $ = 15 000 $ avant taxes). Le formulaire de l'entente indique 'Nombre d'employés visés : 5', alors que le nom du fichier du registre de présence non converti mentionne '3 participants' — écart à vérifier. Un fichier 'Évaluation d'activité de formation.txt' vierge (gabarit non rempli) existe aussi à la racine du dossier NOMADE, distinct de la version remplie et datée du 2026-08-24 dans le sous-dossier Réclamation ; les deux ont le même nom de fichier source. La clause de l'entente précise qu'un travailleur étranger temporaire (TET) ne peut participer aux activités financées. | Documents non lus automatiquement (à consulter manuellement) : Demande de versement.xlsx, Réclamation/Demande de versement.xlsx, Réclamation/Registre de présence_3 participants_Signatures.xlsx"
+          },
+          "suppliers": [
+            {
+              "name": "Sitegrow (Consultation Sitegrow Inc.)",
+              "contact": "Fournisseur de formation (SEO & GEO avancée) — formatrice Marie-Josée Lacoursière ; 300-204 Rue Du Saint-Sacrement, Montréal QC H2Y 1W8 ; TPS 700520422RT0001, TVQ 1232681370TQ0001"
+            }
+          ],
+          "expenses": [
+            {
+              "invoice_number": "1317",
+              "invoice_date": "2026-06-30",
+              "total": 3794.18,
+              "supplier": "Consultation Sitegrow Inc."
+            },
+            {
+              "invoice_number": "1376",
+              "invoice_date": "2026-07-20",
+              "total": 3794.18,
+              "supplier": "Consultation Sitegrow Inc."
+            },
+            {
+              "invoice_number": "1408",
+              "invoice_date": "2026-08-20",
+              "total": 9657.9,
+              "supplier": "Consultation Sitegrow Inc."
+            }
+          ],
+          "claims": [
+            {
+              "label": "Réclamation MFOR (demande de versement) - entente 1053752-1",
+              "period_start": "2026-06-15",
+              "period_end": "2026-08-24",
+              "status_hint": "Rapport d'activités de formation (évaluation) complété et signé le 2026-08-24 ; facture 1317 (30/06/2026) marquée PAYÉ (solde 0,00 $) ; factures 1376 (20/07/2026) et 1408 (20/08/2026) affichent un solde à payer non nul sur les copies disponibles. Le formulaire officiel 'Demande de versement' (EQ-6329) est en xlsx et n'a pas pu être lu ; statut exact de dépôt/acceptation par Services Québec non confirmé dans les documents texte disponibles."
+            }
+          ],
+          "contacts": [
+            {
+              "full_name": "Aymeric Côté-Gadoua",
+              "role": "Président, Agence Nomade inc. (représentant du subventionné)",
+              "email": "aymeric@placementagencenomade.ca",
+              "phone": "438 998-0258"
+            },
+            {
+              "full_name": "Fatna Chater",
+              "role": "Conseillère aux entreprises, Services Québec (représentante du ministère / personne-ressource)",
+              "email": "Fatna.Chater@servicesquebec.gouv.qc.ca",
+              "phone": "418 643-6875"
+            },
+            {
+              "full_name": "Marie-Josée Lacoursière",
+              "role": "Formatrice (Sitegrow)",
+              "email": null,
+              "phone": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Caracol",
+      "name_alt": null,
+      "status": "active",
+      "projects": [
+        {
+          "source_folder": "Demande faite en 2026/MFOR - CARACOL",
+          "category": "faite_2026",
+          "program_name": "MFOR",
+          "name": "MFOR",
+          "status": "submitted",
+          "description": "Formulaire de demande de subvention général en cours de rédaction : plusieurs champs marqués 'À COMPLÉTER' (situation à l'origine de la demande, fonction de deux participants) et signature du représentant autorisé non apposée (champs Nom/Date vides). Ne semble pas encore déposé. | Le formulaire mentionne une durée de projet de 6 mois, date de début '3 août' et date de fin '6 décembre', SANS année précisée dans le texte extrait — laissées à null plutôt que de supposer 2026. Montant global du projet indiqué : 10 500 $ CAD taxes en sus (70 h de formation à 150 $/h) — non explicitement qualifié de montant de subvention (taux de subvention MFOR non précisé dans ce document), donc grant_amount laissé à null. Le PDF 'OFFRE_FORMATION_PRODUCTIVITE_CARACOL (1).pdf' (offre de formation détaillée, probable source du titre du projet et des dates) n'a pas été converti en texte et n'a donc pas pu être lu. Point d'attention : à la question sur un lien financier/familial/professionnel/organisationnel avec le fournisseur proposé, la réponse cochée est 'Oui' (avec 'Non' barré) — à vérifier, aucune précision fournie dans le champ correspondant. Autre point d'attention : à la question sur des salariés ayant le statut de travailleur étranger temporaire (TET), la réponse cochée est également 'Oui' — à vérifier car le formulaire rappelle que les TET ne sont plus admissibles aux mesures actives d'emploi depuis le 1er février 2025. | Documents non lus automatiquement (à consulter manuellement) : OFFRE_FORMATION_PRODUCTIVITE_CARACOL (1).pdf",
+          "official_start_date": null,
+          "official_end_date": null,
+          "total_project_cost": null,
+          "approved_grant_amount": null,
+          "grant_rate": null,
+          "agreement": null,
+          "suppliers": [
+            {
+              "name": "Technologies Sitescore Inc.",
+              "contact": "Consultant / formateur (SEO, GEO, IA, marketing numérique, productivité) — NEQ 1180776578, contact Marie-Josée Lacoursière, tél. (450) 358-0888"
+            }
+          ],
+          "expenses": [],
+          "claims": [],
+          "contacts": [
+            {
+              "full_name": "Gabrielle Couillard",
+              "role": "Participante - Marketing",
+              "email": null,
+              "phone": null
+            },
+            {
+              "full_name": "Geneviève Grégoire",
+              "role": "Participante (fonction à compléter dans le document)",
+              "email": null,
+              "phone": null
+            },
+            {
+              "full_name": "Nick Labrecque",
+              "role": "Participant (fonction à compléter dans le document)",
+              "email": null,
+              "phone": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Château Saint-Antoine",
+      "name_alt": "Création d'évènements Château",
+      "status": "active",
+      "projects": [
+        {
+          "source_folder": "Demande faite en 2026/Château St-Antoine - Career Ready",
+          "category": "faite_2026",
+          "program_name": "Career Ready",
+          "name": "Stage Career Ready — Emma Lavoie (coordination d'événements)",
+          "status": "active",
+          "description": "Dossier fusionné à partir de deux sources : plan d'apprentissage / relevé de paie initial (Stagiaire) et fiche de poste / relevé de paie de réclamation finale (Career Ready) — même stagiaire, même employeur. | Fiche de poste de stage complète (dates, répartition des heures, salaire) présente à la racine du dossier, et un relevé de paie pour la période se terminant le 15 août 2026 est classé dans le sous-dossier 'Réclamation finale' — suggère que ce dossier correspond à l'étape de réclamation finale du programme Career Ready pour ce stage. | DOUBLON PROBABLE avec le dossier 'Demande faite en 2026/Stagiaire - Chateau St Antoine': même stagiaire (Emma Lavoie), même employeur ('Création d'évènements Château' / Château Saint-Antoine), même matricule (000000032) et même NO CIE (00274091) sur les relevés de paie des deux dossiers — il s'agit très probablement du MÊME stage documenté à deux endroits différents (fiche de poste + réclamation finale ici, vs plan d'apprentissage + relevé de paie de début de stage dans l'autre dossier), à fusionner ou clairement lier dans le CRM. Écart à noter: la fiche de poste indique un salaire de 20 $/heure, alors que le champ 'SALAIRE/TAUX HOR.' du relevé de paie indique 13,3000 $ (mais le taux effectivement payé sur la ligne 'Hres régu' du relevé est bien 20,00 $/h, cohérent avec la fiche de poste). Date d'embauche au relevé de paie: 2025/03/26 (antérieure au début du stage indiqué, 18 mai 2026) — Emma Lavoie semble déjà être une employée de l'entreprise (poste 'Serveuse') avant/en plus du stage Career Ready.",
+          "official_start_date": "2026-05-18",
+          "official_end_date": "2026-09-06",
+          "total_project_cost": null,
+          "approved_grant_amount": null,
+          "grant_rate": null,
+          "agreement": {
+            "project_start": "2026-05-18",
+            "project_end": "2026-09-06",
+            "eligible_expense_period_start": null,
+            "eligible_expense_period_end": null,
+            "grant_amount": null,
+            "grant_rate": null,
+            "special_conditions": "DOUBLON PROBABLE avec le dossier 'Demande faite en 2026/Stagiaire - Chateau St Antoine': même stagiaire (Emma Lavoie), même employeur ('Création d'évènements Château' / Château Saint-Antoine), même matricule (000000032) et même NO CIE (00274091) sur les relevés de paie des deux dossiers — il s'agit très probablement du MÊME stage documenté à deux endroits différents (fiche de poste + réclamation finale ici, vs plan d'apprentissage + relevé de paie de début de stage dans l'autre dossier), à fusionner ou clairement lier dans le CRM. Écart à noter: la fiche de poste indique un salaire de 20 $/heure, alors que le champ 'SALAIRE/TAUX HOR.' du relevé de paie indique 13,3000 $ (mais le taux effectivement payé sur la ligne 'Hres régu' du relevé est bien 20,00 $/h, cohérent avec la fiche de poste). Date d'embauche au relevé de paie: 2025/03/26 (antérieure au début du stage indiqué, 18 mai 2026) — Emma Lavoie semble déjà être une employée de l'entreprise (poste 'Serveuse') avant/en plus du stage Career Ready."
+          },
+          "suppliers": [],
+          "expenses": [],
+          "claims": [
+            {
+              "label": "Relevé de paie (Emma Lavoie) - période 2026/05/10 au 2026/05/16, payable le 2026/05/21 : gains courants 110,00 $ (5,5 h à 20,00 $/h), paie nette 105,41 $",
+              "period_start": "2026-05-10",
+              "period_end": "2026-05-16",
+              "status_hint": "Relevé de paie correspondant probablement au tout début du stage (peu d'heures travaillées cette période)."
+            },
+            {
+              "label": "Relevé de paie (Emma Lavoie) - période 2026/08/09 au 2026/08/15, payable le 2026/08/20 : gains courants 1 090,00 $ (dont 600,00 $ heures régulières à 20,00 $/h pour 30 h + 490,00 $ de pourboires), paie nette 832,81 $",
+              "period_start": "2026-08-09",
+              "period_end": "2026-08-15",
+              "status_hint": "Document trouvé dans le sous-dossier 'Réclamation finale' de ce dossier Career Ready — probable pièce justificative de la réclamation finale."
+            }
+          ],
+          "contacts": [
+            {
+              "full_name": "Emma Lavoie",
+              "role": "Stagiaire (fonction 'Serveuse' au relevé de paie ; poste réel = coordination d'évènements)",
+              "email": null,
+              "phone": null
+            },
+            {
+              "full_name": "Ariane",
+              "role": "Superviseure/contact interne présumé chez Château Saint-Antoine (nom de famille non précisé dans les documents)",
+              "email": null,
+              "phone": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Christine",
+      "name_alt": null,
+      "status": "active",
+      "projects": [
+        {
+          "source_folder": "Demande à faire/CANEXPORT - CHRISTINE",
+          "category": "a_faire",
+          "program_name": "CanExport PME",
+          "name": "CanExport PME",
+          "status": "prospect",
+          "description": "Dossier non commencé : tous les documents sont des gabarits/questionnaires vierges (aucune réponse remplie). Le seul indice d'identité client est le titre du fichier de dépenses admissibles qui mentionne « ImmoCoaching », mais rien ne confirme que c'est le nom commercial exact de l'entreprise. | Les 3 fichiers .txt lus sont identiques (ou quasi identiques) au contenu du dossier générique 'Trousse Canexport', ce qui confirme qu'il s'agit d'un gabarit CanExport standard non rempli pour ce client, plutôt que d'un dossier avec des données réelles saisies. Le fichier de dépenses admissibles mentionne un exemple pour le marché 'Floride' et cite 'ImmoCoaching' dans son titre — possible nom du client ou du secteur d'activité (coaching immobilier), mais aucune confirmation explicite dans le texte lu. Aucune information sur l'entreprise, les dates de projet, le budget, les contacts ou toute dépense n'est présente. À valider avec le client/l'équipe avant tout import de données factuelles. | Documents encore au stade de gabarit/argumentaire — aucune donnée confirmée. | Documents non lus automatiquement (à consulter manuellement) :  💰 Dépenses admissibles – CanExport PME - ImmoCoaching.docx, CANEXPORT - REMPLISSAGE AUTONOME.docx, Grandes lignes du projet d_exportation - CANEXPORT.docx",
+          "official_start_date": null,
+          "official_end_date": null,
+          "total_project_cost": null,
+          "approved_grant_amount": null,
+          "grant_rate": null,
+          "agreement": null,
+          "suppliers": [],
+          "expenses": [],
+          "claims": [],
+          "contacts": []
+        }
+      ]
+    },
+    {
+      "name": "Collect Edition",
+      "name_alt": null,
+      "status": "active",
+      "projects": [
+        {
+          "source_folder": "Demande à faire/CANEXPORT - COLLECT EDITION",
+          "category": "a_faire",
+          "program_name": "CanExport PME",
+          "name": "CanExport PME",
+          "status": "prospect",
+          "description": "Dossier en préparation : le questionnaire officiel CanExport (REMPLISSAGE AUTONOME) est encore vierge, mais un document de découverte/qualification ('Collect edition - CANEXPORT.txt') a été rempli avec des réponses du client sur ses produits et son marché, et une note d'appel téléphonique existe. Aucune demande n'a encore été soumise. | Entreprise vendant des cartes de sport/jeux (à l'unité et scellées), achetées chez des distributeurs aux États-Unis, en Belgique, au Japon, etc. A déjà vendu à l'international (ventes eBay ~75 000$/an aux États-Unis et en Europe). Le fichier 'Note appel collect edition.txt' mentionne un projet de voyage en 'Floride + Californie' pour rencontrer un 'Certified domain dealer', 2 personnes ('gab + pat'), 500$ US/personne, hôtel+hébergement, un 'Booth + display' à 15k$, ainsi qu'une ligne 'Sitegrow 30k' — cette dernière mention semble incohérente avec le dossier Collect Edition (Sitegrow est un autre client CanExport du portefeuille) et pourrait être une note prise par erreur pendant l'appel, ou une comparaison de budget entre deux dossiers discutés le même jour. À clarifier avec l'équipe avant import. Le fichier 'doc depot/collect_edition_registre.txt' est vide (le PDF source semble être une image scannée non océrisée) — contenu non extrait/illisible. Aucune date de projet, aucun montant de subvention, aucun contact nommé (signataire, responsable réclamations) n'a été trouvé dans les fichiers lus. | Documents encore au stade de gabarit/argumentaire — aucune donnée confirmée. | Documents non lus automatiquement (à consulter manuellement) : CANEXPORT - REMPLISSAGE AUTONOME.docx, Collect edition - CANEXPORT.docx, Dépenses admissibles – CanExport PME.docx, Note appel collect edition.docx, doc depot/collect_edition_registre.pdf",
+          "official_start_date": null,
+          "official_end_date": null,
+          "total_project_cost": null,
+          "approved_grant_amount": null,
+          "grant_rate": null,
+          "agreement": null,
+          "suppliers": [],
+          "expenses": [],
+          "claims": [],
+          "contacts": []
+        },
+        {
+          "source_folder": "Demande faite en 2026/MFOR - COLLECT EDITION",
+          "category": "faite_2026",
+          "program_name": "MFOR",
+          "name": "MFOR",
+          "status": "submitted",
+          "description": "Fiche d'information entreprise (profil client / questionnaire pré-demande) complétée. Aucune offre de formation, entente, date ni montant de subvention ne figure dans ce document. | NEQ de l'entreprise : 1171077945. Adresse : 17 Bd Montcalm N, Candiac, QC J5R 3L4. Secteur SCIAN 459120 (vente au détail de cartes de collection). Besoin exprimé : développer en interne une expertise SEO/GEO/IA marketing pour réduire une dépendance à des agences externes (>100 000 $/an). Données financières de l'entreprise (2023-2025) présentes dans le document mais non incluses dans ce schéma (hors du périmètre client/entente). Ce document ne contient aucune information sur l'offre de formation, le fournisseur, les dates ou le montant du projet MFOR — un dossier 'CANEXPORT - COLLECT EDITION' existe également dans 'Demande à faire', indiquant que ce client est aussi suivi pour le programme CANEXPORT.",
+          "official_start_date": null,
+          "official_end_date": null,
+          "total_project_cost": null,
+          "approved_grant_amount": null,
+          "grant_rate": null,
+          "agreement": null,
+          "suppliers": [],
+          "expenses": [],
+          "claims": [],
+          "contacts": [
+            {
+              "full_name": "Patrick Brisson",
+              "role": "Président et propriétaire ; personne autorisée à signer l'entente",
+              "email": null,
+              "phone": "(450) 659-2424"
+            },
+            {
+              "full_name": "Jade Trépanier",
+              "role": "Développement des affaires",
+              "email": null,
+              "phone": null
+            },
+            {
+              "full_name": "Pierre",
+              "role": "Équipe de gestion des ventes et des opérations (nom de famille non précisé)",
+              "email": null,
+              "phone": null
+            },
+            {
+              "full_name": "Gabriel",
+              "role": "Équipe de gestion des ventes et des opérations (nom de famille non précisé)",
+              "email": null,
+              "phone": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Elite Immo Coaching",
+      "name_alt": null,
+      "status": "active",
+      "projects": [
+        {
+          "source_folder": "Demande faite en 2026/DEMANDE ESSOR - CHRISTINE",
+          "category": "faite_2026",
+          "program_name": "Essor",
+          "name": "Étude de faisabilité pour le développement d'un cours structuré d'adjointe immobilière",
+          "status": "active",
+          "description": "Texte de dépôt rédigé (structure complète: présentation entreprise, projet, justification, ressources, échéancier, budget) mais les champs NEQ, adresse du siège social, date de fondation et nombre d'employés sont vides dans le document — gabarit encore en cours de complétion, pas de trace de dépôt confirmé ni de lettre d'offre. | Les 5 montants listés dans 'expenses' sont des postes de dépenses BUDGÉTÉS tirés du tableau du document de dépôt (Sous-traitant 1: 45 000 $; Sous-traitant 2: 25 000 $; Collecte de données et consultations: 8 000 $; Analyse financière préliminaire: 7 000 $; Coordination et intégration des livrables: 5 000 $), totalisant 90 000 $ (coût total de l'étude de faisabilité) — ce ne sont PAS des factures réelles, aucun numéro ni date de facture n'est fourni. Aucun montant ni taux d'aide financière d'Investissement Québec n'est mentionné explicitement (seul le coût total du projet est donné). Le nom du sous-volet Essor (1A, 1B, etc.) n'est pas précisé dans les documents lus. Le nom 'Christine' apparaît uniquement dans le nom du dossier, jamais comme nom complet dans le texte des documents — aucune coordonnée de contact n'a donc été extraite. Durée du projet: 12 mois à partir du 5 janvier 2026 (date de fin non donnée explicitement, seulement la durée).",
+          "official_start_date": "2026-01-05",
+          "official_end_date": null,
+          "total_project_cost": null,
+          "approved_grant_amount": null,
+          "grant_rate": null,
+          "agreement": {
+            "project_start": "2026-01-05",
+            "project_end": null,
+            "eligible_expense_period_start": null,
+            "eligible_expense_period_end": null,
+            "grant_amount": null,
+            "grant_rate": null,
+            "special_conditions": "Les 5 montants listés dans 'expenses' sont des postes de dépenses BUDGÉTÉS tirés du tableau du document de dépôt (Sous-traitant 1: 45 000 $; Sous-traitant 2: 25 000 $; Collecte de données et consultations: 8 000 $; Analyse financière préliminaire: 7 000 $; Coordination et intégration des livrables: 5 000 $), totalisant 90 000 $ (coût total de l'étude de faisabilité) — ce ne sont PAS des factures réelles, aucun numéro ni date de facture n'est fourni. Aucun montant ni taux d'aide financière d'Investissement Québec n'est mentionné explicitement (seul le coût total du projet est donné). Le nom du sous-volet Essor (1A, 1B, etc.) n'est pas précisé dans les documents lus. Le nom 'Christine' apparaît uniquement dans le nom du dossier, jamais comme nom complet dans le texte des documents — aucune coordonnée de contact n'a donc été extraite. Durée du projet: 12 mois à partir du 5 janvier 2026 (date de fin non donnée explicitement, seulement la durée)."
+          },
+          "suppliers": [
+            {
+              "name": "Sous-traitant 1 (nom non précisé) - Consultant en analyse de marché et étude de faisabilité",
+              "contact": "Analyse de la demande, étude de la concurrence, segmentation des clientèles, évaluation du potentiel commercial"
+            },
+            {
+              "name": "Sous-traitant 2 (nom non précisé) - Consultant sectoriel en pratiques immobilières",
+              "contact": "Analyse des pratiques opérationnelles, identification des compétences clés, validation de la cohérence du concept"
+            }
+          ],
+          "expenses": [
+            {
+              "invoice_number": null,
+              "invoice_date": null,
+              "total": 45000.0,
+              "supplier": "Sous-traitant 1 - Consultant en analyse de marché et étude de faisabilité"
+            },
+            {
+              "invoice_number": null,
+              "invoice_date": null,
+              "total": 25000.0,
+              "supplier": "Sous-traitant 2 - Consultant sectoriel en pratiques immobilières"
+            },
+            {
+              "invoice_number": null,
+              "invoice_date": null,
+              "total": 8000.0,
+              "supplier": null
+            },
+            {
+              "invoice_number": null,
+              "invoice_date": null,
+              "total": 7000.0,
+              "supplier": null
+            },
+            {
+              "invoice_number": null,
+              "invoice_date": null,
+              "total": 5000.0,
+              "supplier": null
+            }
+          ],
+          "claims": [],
+          "contacts": []
+        }
+      ]
+    },
+    {
+      "name": "Gestion Service Auto+",
+      "name_alt": null,
+      "status": "active",
+      "projects": [
+        {
+          "source_folder": "Demande à faire/MFOR - Gestion Service Auto+",
+          "category": "a_faire",
+          "program_name": "MFOR",
+          "name": "Maîtrise de la plateforme numérique de gestion et de vente automobile",
+          "status": "preparing",
+          "description": "Offre de formation et plan de formation sur 6 mois préparés par le fournisseur (ADWS). Aucune entente signée ni demande de subvention visible dans les documents disponibles ; dossier au stade de l'offre. | Aucun nom de participant, aucune date de début précise, aucun numéro d'entente ni montant de subvention (seul le coût total de la formation, 6 000 $, est mentionné dans l'offre et le plan — non confirmé comme montant subventionné). Durée: 6 mois, 40 h, taux 150 $/h, 2 participants. Deux documents (offre + plan de formation) décrivent le même projet avec un contenu très similaire.",
+          "official_start_date": null,
+          "official_end_date": null,
+          "total_project_cost": null,
+          "approved_grant_amount": null,
+          "grant_rate": null,
+          "agreement": null,
+          "suppliers": [
+            {
+              "name": "ADWS – Auto Dealer Web Services",
+              "contact": "Organisme/fournisseur de formation (plateforme numérique de gestion et vente automobile)"
+            }
+          ],
+          "expenses": [],
+          "claims": [],
+          "contacts": []
+        }
+      ]
+    },
+    {
+      "name": "Groupe Patrimoine",
+      "name_alt": null,
+      "status": "active",
+      "projects": [
+        {
+          "source_folder": "Demande sur hold/DEMANDE ESSOR VOLET 1A - GROUPE PATRIMOINE",
+          "category": "sur_hold",
+          "program_name": "Essor volet 1A",
+          "name": "Essor volet 1A",
+          "status": "prospect",
+          "description": "Document proposant DEUX angles de dépôt distincts, aucun n'a encore été retenu: Angle 1 = étude de faisabilité pour la structuration et le regroupement des plateformes Web du Groupe Patrimoine; Angle 2 = étude de faisabilité stratégique pour le lancement numérique d'une nouvelle résidence du Groupe Patrimoine. Aucun formulaire Essor, aucune date ni aucun montant. Dossier explicitement sur hold. | Deux titres de projet possibles trouvés, aucun n'étant confirmé comme retenu: (1) 'Étude de faisabilité pour la structuration et le regroupement des plateformes Web du Groupe Patrimoine'; (2) 'Étude de faisabilité stratégique pour le lancement numérique d'une nouvelle résidence du Groupe Patrimoine'. Sitegrow n'est mentionné explicitement que dans l'Angle 2. Aucune donnée financière ou de calendrier dans le document. Cohérent avec le statut 'sur hold' du dossier. | SUR HOLD (dossier mis en pause par Apex)",
+          "official_start_date": null,
+          "official_end_date": null,
+          "total_project_cost": null,
+          "approved_grant_amount": null,
+          "grant_rate": null,
+          "agreement": null,
+          "suppliers": [
+            {
+              "name": "Sitegrow",
+              "contact": "Sous-traitant pressenti (Angle 2 uniquement) - analyse des clientèles/comportements de recherche, scénarios de présence numérique, analyse SEO et potentiel d'acquisition"
+            }
+          ],
+          "expenses": [],
+          "claims": [],
+          "contacts": []
+        }
+      ]
+    },
+    {
+      "name": "Indigo Soda",
+      "name_alt": "Indigo Soda Ltée",
+      "status": "active",
+      "projects": [
+        {
+          "source_folder": "Demande faite en 2026/INDIGO - ESSOR VOLET 1A",
+          "category": "faite_2026",
+          "program_name": "Essor volet 1A",
+          "name": "Étude stratégique de croissance et de ciblage des marchés pour Indigo Soda",
+          "status": "active",
+          "description": "Formulaire Essor (remplissage autonome) rempli avec dates de projet et montage financier précisés, offre de services signée du sous-traitant Sitegrow présente, ainsi qu'une description détaillée du projet et un document de préparation à l'appel IQ. Sous-volet 1A (études de faisabilité) explicitement sélectionné dans le formulaire. Dossier qui semble prêt pour dépôt ou déjà déposé. | Montage financier (formulaire Essor): coût total du projet 102 000 $ — Investissement de l'entreprise (fonds de roulement, financement confirmé) 51 000 $ + Investissement Québec (contribution non remboursable) 51 000 $, d'où grant_rate = 0,5 calculé (non énoncé littéralement comme '%'). Le montant de 102 000 $ dans 'expenses' correspond au montant TOTAL de la soumission Sitegrow (soumission/offre de services, pas une facture — aucun numéro ni date de facture disponible), détaillé par phase dans l'offre: Phase 1 Cadrage et collecte (févr. 2026) 12 000 $; Phase 2 Analyse de la demande et des comportements de recherche (mars-avril 2026) 28 000 $; Phase 3 Analyse concurrentielle numérique (mai-juin 2026) 22 000 $; Phase 4 Analyse comparative des marchés et scénarios (juillet-août 2026) 22 000 $; Phase 5 Cadre décisionnel et priorisation (sept.-oct. 2026) 18 000 $. Adresse d'Indigo Soda (bénéficiaire): 794 boul. Arthur-Sauvé, Saint-Eustache (QC) J7R 4K3 (mentionnée dans l'offre de services, non stockée dans le schéma). NEQ, téléphone et courriel général d'Indigo Soda non renseignés (champs vides dans le formulaire). Sitegrow, ici sous-traitant, est par ailleurs client demandeur pour sa propre subvention Essor 1A dans un autre dossier de ce lot ('DEMANDE ESSOR VOLET 1A - SITEGROW') — attention à ne pas confondre les deux rôles dans le CRM.",
+          "official_start_date": "2026-02-15",
+          "official_end_date": "2026-10-14",
+          "total_project_cost": null,
+          "approved_grant_amount": 51000.0,
+          "grant_rate": 0.5,
+          "agreement": {
+            "project_start": "2026-02-15",
+            "project_end": "2026-10-14",
+            "eligible_expense_period_start": null,
+            "eligible_expense_period_end": null,
+            "grant_amount": 51000.0,
+            "grant_rate": 0.5,
+            "special_conditions": "Montage financier (formulaire Essor): coût total du projet 102 000 $ — Investissement de l'entreprise (fonds de roulement, financement confirmé) 51 000 $ + Investissement Québec (contribution non remboursable) 51 000 $, d'où grant_rate = 0,5 calculé (non énoncé littéralement comme '%'). Le montant de 102 000 $ dans 'expenses' correspond au montant TOTAL de la soumission Sitegrow (soumission/offre de services, pas une facture — aucun numéro ni date de facture disponible), détaillé par phase dans l'offre: Phase 1 Cadrage et collecte (févr. 2026) 12 000 $; Phase 2 Analyse de la demande et des comportements de recherche (mars-avril 2026) 28 000 $; Phase 3 Analyse concurrentielle numérique (mai-juin 2026) 22 000 $; Phase 4 Analyse comparative des marchés et scénarios (juillet-août 2026) 22 000 $; Phase 5 Cadre décisionnel et priorisation (sept.-oct. 2026) 18 000 $. Adresse d'Indigo Soda (bénéficiaire): 794 boul. Arthur-Sauvé, Saint-Eustache (QC) J7R 4K3 (mentionnée dans l'offre de services, non stockée dans le schéma). NEQ, téléphone et courriel général d'Indigo Soda non renseignés (champs vides dans le formulaire). Sitegrow, ici sous-traitant, est par ailleurs client demandeur pour sa propre subvention Essor 1A dans un autre dossier de ce lot ('DEMANDE ESSOR VOLET 1A - SITEGROW') — attention à ne pas confondre les deux rôles dans le CRM."
+          },
+          "suppliers": [
+            {
+              "name": "Sitegrow",
+              "contact": "Sous-traitant - étude stratégique de marché, analyse des comportements de recherche web et intelligence concurrentielle numérique par territoire"
+            }
+          ],
+          "expenses": [
+            {
+              "invoice_number": null,
+              "invoice_date": null,
+              "total": 102000.0,
+              "supplier": "Sitegrow"
+            }
+          ],
+          "claims": [],
+          "contacts": [
+            {
+              "full_name": "Charles-Alex Goyer",
+              "role": "Propriétaire, Indigo Soda Ltée (signataire de l'offre de services)",
+              "email": null,
+              "phone": null
+            },
+            {
+              "full_name": "Francis Paquet",
+              "role": "CEO, Sitegrow (fournisseur)",
+              "email": "francis@sitegrow.co",
+              "phone": "(514) 704-2760"
+            },
+            {
+              "full_name": "Marie-Josée Lacoursière",
+              "role": "Co-fondatrice, Sitegrow (fournisseur, signataire de l'offre de services)",
+              "email": "mj@sitegrow.co",
+              "phone": "(450) 358-0888"
+            }
+          ]
+        },
+        {
+          "source_folder": "Demande sur hold/DEMANDE PARI-CNRC - INDIGO",
+          "category": "sur_hold",
+          "program_name": "PARI CNRC / IRAP",
+          "name": "PARI CNRC / IRAP",
+          "status": "prospect",
+          "description": "Dossier vide — le sous-dossier « DEMANDE PARI-CNRC - INDIGO » sous « Demande sur hold » existe bien dans l'arborescence originale (scratchpad/demande_sub) mais ne contient AUCUN fichier (0 fichier, dossier vide), et n'a donc aucune contrepartie dans l'arborescence extracted (aucun .txt converti). Aucune information sur le projet, le mandat, le budget ou une entente PARI-CNRC n'est disponible pour ce client sous ce dossier. | Dossier PARI-CNRC totalement vide pour Indigo — probablement un dossier créé en prévision d'une demande PARI-CNRC mais jamais alimenté, cohérent avec son statut « sur hold ». Un client apparemment lié (« Indigo Soda ») existe ailleurs dans les dossiers Apex sous un AUTRE programme : « Demande faite en 2026/INDIGO - ESSOR VOLET 1A/DEMANDE ESSOR VOLET 1A - INDIGO SODA » (programme ESSOR Volet 1A, pas PARI-CNRC) — à vérifier s'il s'agit du même client lors du rapprochement dans le CRM, mais ce dossier ESSOR est hors du périmètre de cette extraction PARI-CNRC et n'a pas été lu en détail. Aucune donnée n'a été inventée pour combler l'absence de documents. | SUR HOLD (dossier mis en pause par Apex)",
+          "official_start_date": null,
+          "official_end_date": null,
+          "total_project_cost": null,
+          "approved_grant_amount": null,
+          "grant_rate": null,
+          "agreement": null,
+          "suppliers": [],
+          "expenses": [],
+          "claims": [],
+          "contacts": []
+        }
+      ]
+    },
+    {
+      "name": "Mandate",
+      "name_alt": "Benjamin David Group",
+      "status": "active",
+      "projects": [
+        {
+          "source_folder": "Demande à faire/PARI CNRC - CAREN MANDATE",
+          "category": "a_faire",
+          "program_name": "PARI CNRC / IRAP",
+          "name": "Development of an Intelligent Recommendation Engine for the Selection and Coordination of Specialized Email Marketing Experts (Développement d'un moteur de recommandation intelligent pour la sélection et la coordination d'experts spécialisés en email marketing)",
+          "status": "preparing",
+          "description": "Dossier en préparation, pas encore déposé. Documents présents : description de projet type PARI (contexte, solution, différenciation, incertitude technologique, commercialisation, équipe, situation financière) et un document de préparation à l'appel avec le PARI-CNRC daté du 13 mars 2026 (« Préparation à l'appel - Mandate »), structuré en 8 points à mettre de l'avant. Aucune trace d'un numéro de projet PARI-CNRC ni d'une entente signée. | « Mandate » (mandatecrm.com) est une plateforme/collectif de talents en email marketing fondée par Caren Carrasco, opérée sous la raison sociale « Benjamin David Group » (nom apparaissant en en-tête des fichiers budgétaires BDG 2026). Le budget 2026 (Budget Summary / Budget Detailed) est un budget d'exploitation prévisionnel global de l'entreprise (revenus, sous-traitants, salaires, frais généraux) et non un budget de projet PARI-CNRC spécifique — il n'a donc pas été utilisé comme agreement.grant_amount. Aucun montant de subvention, taux de contribution ni date d'entente n'apparaît dans les documents : le dossier est au stade de préparation de la demande (pitch/argumentaire pour l'appel avec le PARI-CNRC), pas encore une entente en vigueur. Adresse email générique de contact trouvée sur le deck : hello@mandatecrm.com.",
+          "official_start_date": null,
+          "official_end_date": null,
+          "total_project_cost": null,
+          "approved_grant_amount": null,
+          "grant_rate": null,
+          "agreement": null,
+          "suppliers": [],
+          "expenses": [],
+          "claims": [],
+          "contacts": [
+            {
+              "full_name": "Caren Carrasco",
+              "role": "CEO and Founder de Mandate",
+              "email": null,
+              "phone": null
+            },
+            {
+              "full_name": "Roberto Papiri",
+              "role": "Membre de l'équipe (ligne salariale au budget 2026, rôle précis non spécifié)",
+              "email": null,
+              "phone": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Menuiserie MRL Inc.",
+      "name_alt": "MENUISERIE ROGER LUSSIER INC.",
+      "status": "active",
+      "projects": [
+        {
+          "source_folder": "MRL - MFOR",
+          "category": "faite_2026",
+          "program_name": "MFOR",
+          "name": "Développement de l'autonomie numérique et marketing de Menuiserie MRL Inc. — génération de leads qualifiés par l'intelligence artificielle et marketing organique",
+          "status": "approved",
+          "description": "Formulaire de demande générique à Services Québec (Form_Dem_Generique) rempli et daté du 24 mai 2026, accompagné de l'offre de service conforme de Boutik Marketing et d'un plan de formation détaillé. Formation prévue du 1 juin 2026 au 1 septembre 2026 (120h) pour 2 participantes. | NEQ de Menuiserie MRL Inc. : 1144233237. Adresse : 850 3e Rang O, Sainte-Cécile-de-Milton (Québec) J0E2C0. Code SCIAN 321919, secteur menuiserie, 6 employés. Le formulaire de demande (Form_Dem_Generique) indique un coût total estimé de 21 000 $ CAD, décomposé en 'Honoraires professionnels' 15 000 $ (correspondant au devis de Boutik Marketing : 120h à un taux moyen de 125 $/h) et 'Autres dépenses' 6 000 $ (décrites comme '2 personnes suivront la formation de 120h. 120 x 25$/h = 3000$ ch pers.', probablement le coût salarial des heures de formation, typique du programme MFOR). Ce total de 21 000 $ n'est pas explicitement qualifié de 'montant de subvention MFOR' dans les documents lus, donc grant_amount est laissé à null plutôt que de le déduire. Le numéro de téléphone de Marina Laperle est tronqué dans le document source ('(450) 378-8782 poste' sans numéro de poste). Aucun fichier xlsx/png/jpg non converti n'a été trouvé dans ce dossier (uniquement des docx/pdf, tous convertis en texte).",
+          "official_start_date": "2026-06-01",
+          "official_end_date": "2026-09-01",
+          "total_project_cost": null,
+          "approved_grant_amount": null,
+          "grant_rate": null,
+          "agreement": {
+            "project_start": "2026-06-01",
+            "project_end": "2026-09-01",
+            "eligible_expense_period_start": null,
+            "eligible_expense_period_end": null,
+            "grant_amount": null,
+            "grant_rate": null,
+            "special_conditions": "NEQ de Menuiserie MRL Inc. : 1144233237. Adresse : 850 3e Rang O, Sainte-Cécile-de-Milton (Québec) J0E2C0. Code SCIAN 321919, secteur menuiserie, 6 employés. Le formulaire de demande (Form_Dem_Generique) indique un coût total estimé de 21 000 $ CAD, décomposé en 'Honoraires professionnels' 15 000 $ (correspondant au devis de Boutik Marketing : 120h à un taux moyen de 125 $/h) et 'Autres dépenses' 6 000 $ (décrites comme '2 personnes suivront la formation de 120h. 120 x 25$/h = 3000$ ch pers.', probablement le coût salarial des heures de formation, typique du programme MFOR). Ce total de 21 000 $ n'est pas explicitement qualifié de 'montant de subvention MFOR' dans les documents lus, donc grant_amount est laissé à null plutôt que de le déduire. Le numéro de téléphone de Marina Laperle est tronqué dans le document source ('(450) 378-8782 poste' sans numéro de poste). Aucun fichier xlsx/png/jpg non converti n'a été trouvé dans ce dossier (uniquement des docx/pdf, tous convertis en texte)."
+          },
+          "suppliers": [
+            {
+              "name": "Boutik Marketing (formatrice : Shana Vincelette)",
+              "contact": "Formateur / fournisseur de la formation en génération de leads par IA et marketing organique — téléphone 579-488-8654, boutikmarketing.com"
+            }
+          ],
+          "expenses": [],
+          "claims": [],
+          "contacts": [
+            {
+              "full_name": "Marina Laperle",
+              "role": "Agente administrative ; personne contact, personne autorisée à signer le contrat et responsable des demandes de versement ; participante à la formation (coordination des activités marketing et des communications)",
+              "email": "menuiserie@m-rl.net",
+              "phone": "(450) 378-8782 poste [numéro de poste tronqué dans le document source]"
+            },
+            {
+              "full_name": "Lauriève Laperle",
+              "role": "Designer, agente administrative ; participante à la formation (soutien aux opérations marketing et au développement des affaires)",
+              "email": null,
+              "phone": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Mind Blow Energy",
+      "name_alt": null,
+      "status": "active",
+      "projects": [
+        {
+          "source_folder": "Demande à faire/PARI CNRC - MINDBLOW",
+          "category": "a_faire",
+          "program_name": "PARI CNRC / IRAP",
+          "name": "Développement d'une boisson nootropique fonctionnelle visant la performance cognitive, la stabilité des actifs et l'équilibre du goût",
+          "status": "preparing",
+          "description": "Dossier en préparation, pas encore déposé. Document principal = argumentaire/points à mettre de l'avant pour le PARI-CNRC (innovation, incertitudes technologiques, problématique, potentiel commercial, phase de prototypage, vision long terme, capacité financière, retombées) + un pitch court. Le sous-dossier « DOCS À TRANSFÉRER DANS LE PORTAIL » contient des documents marketing/commerciaux (présentation produit FR et deck bilingue EN/FR) destinés à être versés au portail de l'innovation du PARI-CNRC, mais ce sont des documents de vente/marketing du produit Mind Blow Energy, pas des documents financiers ou d'entente. Aucun numéro de projet ni entente signée visible. | Mind Blow Energy est une entreprise de boissons énergisantes/nootropiques déjà commercialisée (vente en ligne depuis 2021, #1 vendeur Amazon Canada catégorie Énergie, présente dans environ 250 points de vente en 2024, visant 1000 magasins fin 2025 selon le deck). Le projet PARI vise le développement d'une nouvelle formulation nootropique optimisée (stabilité des actifs, biodisponibilité, dosage, goût). Aucun montant de subvention, taux, ni date de début/fin de projet n'apparaît explicitement dans les documents disponibles — uniquement des documents de préparation de la demande.",
+          "official_start_date": null,
+          "official_end_date": null,
+          "total_project_cost": null,
+          "approved_grant_amount": null,
+          "grant_rate": null,
+          "agreement": null,
+          "suppliers": [],
+          "expenses": [],
+          "claims": [],
+          "contacts": [
+            {
+              "full_name": "Samuel Beaudry",
+              "role": "Fondateur, Mind Blow Energy",
+              "email": "info@mindblowenergy.com",
+              "phone": "+14508229096"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Réseau Psy",
+      "name_alt": null,
+      "status": "active",
+      "projects": [
+        {
+          "source_folder": "MFOR Réseau PSY",
+          "category": "faite_2026",
+          "program_name": "MFOR",
+          "name": "Formation SEO & GEO (référencement naturel et optimisation pour moteurs IA) pour les salariées de Réseau Psy, dispensée par Sitegrow",
+          "status": "approved",
+          "description": "Demande d'aide financière à Services Québec en préparation : une proposition initiale plus large (v2, 'formation-sitegrow-reseau-psy_v2', 120h/18 000$, incluant l'équipe interne + les 54 psychologues autonomes du réseau, période 15 juill. 2026 → 10 janv. 2027) a été remplacée par une 'Demande modifiée' plus restreinte ne visant que les 2 salariées et le volet subventionnable (75h/11 250$, période 4 sept. 2026 → 8 janv. 2027). Le formulaire générique de demande à Services Québec (Presentation_demande_Reseau_Psy_completee) a été rempli avec les informations de l'entreprise, la description du projet et les 2 employées visées. | NEQ de Réseau Psy : 1173357675 (le champ 'raison sociale' du formulaire indique seulement 'Société par actions', sans nom légal explicite — d'où client_name_alt=null). Structure de dossier particulière : le sous-dossier 'Demande modifiée' se trouve À L'INTÉRIEUR du sous-dossier 'Demande intiale' (et non à côté), contrairement à ce qu'on pourrait attendre. Point notable pour le CRM : dans ce dossier, SITEGROW (Technologies Sitescore Inc.) apparaît comme FOURNISSEUR/formateur pour Réseau Psy, alors que Sitegrow est par ailleurs un CLIENT d'Apex dans d'autres dossiers (MFOR - SITEGROW, CANEXPORT - SITEGROW, ESSOR, PARI CNRC) — à ne pas confondre lors de l'import. Aucun montant de subvention MFOR explicite n'a été trouvé ; seul le coût total de la formation (11 250 $ CAD pour la version modifiée, ou 18 000 $ CAD pour la version initiale plus large) est mentionné — ces montants sont donc absents du champ grant_amount et documentés ici. Le document 'Presentation_demande_Reseau_Psy_completee' précise aussi que des coûts de licences logicielles (ChatGPT Plus, Cursor) ont déjà été acquis par l'entreprise, sans montant chiffré. Aucun fichier xlsx/png/jpg non converti n'a été trouvé dans ce dossier (uniquement des docx/pdf, tous convertis en texte).",
+          "official_start_date": "2026-09-04",
+          "official_end_date": "2027-01-08",
+          "total_project_cost": null,
+          "approved_grant_amount": null,
+          "grant_rate": null,
+          "agreement": {
+            "project_start": "2026-09-04",
+            "project_end": "2027-01-08",
+            "eligible_expense_period_start": null,
+            "eligible_expense_period_end": null,
+            "grant_amount": null,
+            "grant_rate": null,
+            "special_conditions": "NEQ de Réseau Psy : 1173357675 (le champ 'raison sociale' du formulaire indique seulement 'Société par actions', sans nom légal explicite — d'où client_name_alt=null). Structure de dossier particulière : le sous-dossier 'Demande modifiée' se trouve À L'INTÉRIEUR du sous-dossier 'Demande intiale' (et non à côté), contrairement à ce qu'on pourrait attendre. Point notable pour le CRM : dans ce dossier, SITEGROW (Technologies Sitescore Inc.) apparaît comme FOURNISSEUR/formateur pour Réseau Psy, alors que Sitegrow est par ailleurs un CLIENT d'Apex dans d'autres dossiers (MFOR - SITEGROW, CANEXPORT - SITEGROW, ESSOR, PARI CNRC) — à ne pas confondre lors de l'import. Aucun montant de subvention MFOR explicite n'a été trouvé ; seul le coût total de la formation (11 250 $ CAD pour la version modifiée, ou 18 000 $ CAD pour la version initiale plus large) est mentionné — ces montants sont donc absents du champ grant_amount et documentés ici. Le document 'Presentation_demande_Reseau_Psy_completee' précise aussi que des coûts de licences logicielles (ChatGPT Plus, Cursor) ont déjà été acquis par l'entreprise, sans montant chiffré. Aucun fichier xlsx/png/jpg non converti n'a été trouvé dans ce dossier (uniquement des docx/pdf, tous convertis en texte)."
+          },
+          "suppliers": [
+            {
+              "name": "Sitegrow (Technologies Sitescore Inc., NEQ 1180776578)",
+              "contact": "Formateur / fournisseur de la formation SEO & GEO — courriel mj@sitegrow.co, téléphone (450) 358-0888, Montréal, Québec"
+            }
+          ],
+          "expenses": [],
+          "claims": [],
+          "contacts": [
+            {
+              "full_name": "Ilona Lafitte",
+              "role": "Directrice des opérations / Direction générale (personne responsable, participante à la formation)",
+              "email": "administration@reseaupsy.ca",
+              "phone": "843-513-3959 (indiqué comme 'tel perso' dans le formulaire)"
+            },
+            {
+              "full_name": "Alice Lemay",
+              "role": "Répartitrice (participante à la formation)",
+              "email": null,
+              "phone": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Sana",
+      "name_alt": null,
+      "status": "active",
+      "projects": [
+        {
+          "source_folder": "Demande à faire/MFOR - SANA",
+          "category": "a_faire",
+          "program_name": "MFOR",
+          "name": "Formation Shopify (administration, thème e-commerce, fonctionnalités avancées et IA - Shopify Magic/Sidekick/ChatGPT)",
+          "status": "preparing",
+          "description": "Offre de service (OS) du fournisseur Woodez rédigée, décrivant contexte, contenu et budget. Aucune trace d'entente signée ni de dépôt de demande de subvention dans les documents disponibles. | Coût total de la formation: 80 h à 120 $/h = 9 600 $ + taxes (montant du projet, non confirmé comme montant de subvention). Format: 10 semaines, 2 séances de 4h/semaine, à distance ; aucune date de calendrier précise (jour/mois/année) n'est donnée, seulement une durée en semaines. Le document mentionne explicitement une autre formation Woodez 'précédemment approuvée' pour Sana (ChatGPT/Claude/Gemini, automatisation) — indice que ce client a un autre dossier/projet MFOR antérieur non présent dans ce lot de dossiers.",
+          "official_start_date": null,
+          "official_end_date": null,
+          "total_project_cost": null,
+          "approved_grant_amount": null,
+          "grant_rate": null,
+          "agreement": null,
+          "suppliers": [
+            {
+              "name": "Woodez",
+              "contact": "Fournisseur de formation (Shopify, IA)"
+            }
+          ],
+          "expenses": [],
+          "claims": [],
+          "contacts": []
+        }
+      ]
+    },
+    {
+      "name": "Scholer Industriel",
+      "name_alt": "Scholer Industriel Inc.",
+      "status": "active",
+      "projects": [
+        {
+          "source_folder": "Demande à faire/SCHOLER - MFOR",
+          "category": "a_faire",
+          "program_name": "MFOR",
+          "name": "Accompagnement stratégique en gestion des ressources humaines",
+          "status": "prospect",
+          "description": "Offre de services du fournisseur (STERNA) rédigée, avec section 'Acceptation de l'offre' non signée (champs Nom/Signature/Date vides pour les deux parties). Aucune entente MFOR ni demande de subvention visible dans les documents disponibles. | Période prévue mentionnée seulement en mois/année ('juillet 2026 à octobre 2026'), sans jour précis — project_start/project_end laissés à null pour éviter d'inventer une date exacte. Mandat de 100 h à 150 $/h = 15 000 $ + taxes (coût total du mandat ; non confirmé comme montant de subvention). 7 volets d'accompagnement décrits (planification MO, profils de compétences, entrevues, recrutement international, prise de décision, intégration/rétention, autonomie des gestionnaires). | Documents encore au stade de gabarit/argumentaire — aucune donnée confirmée.",
+          "official_start_date": null,
+          "official_end_date": null,
+          "total_project_cost": null,
+          "approved_grant_amount": null,
+          "grant_rate": null,
+          "agreement": null,
+          "suppliers": [
+            {
+              "name": "STERNA",
+              "contact": "Fournisseur / consultant en gestion des ressources humaines"
+            }
+          ],
+          "expenses": [],
+          "claims": [],
+          "contacts": []
+        }
+      ]
+    },
+    {
+      "name": "Sitegrow",
+      "name_alt": "Technologies Sitescore inc.",
+      "status": "active",
+      "projects": [
+        {
+          "source_folder": "Demande faite en 2026/CANEXPORT - SITEGROW",
+          "category": "faite_2026",
+          "program_name": "CanExport PME",
+          "name": "Expansion internationale de la plateforme SaaS Project FR Rank sur le marché français",
+          "status": "active",
+          "description": "Accord de contribution signé (No de projet CNRC 1043063), projet en cours d'exécution. Un sous-dossier 'Réclamation pour déboursé' contient des factures de deux consultants (David Desroches, Marie-Claude Halde) couvrant mars/avril à août 2026, en vue d'une réclamation de remboursement au CNRC. | IMPORTANT — Le nom du sous-dossier 'FACTURES À MODIFIER' et les fichiers 'Factures d'origines' révèlent que les factures Marie-Claude Halde existent en deux versions avec des descriptions de service différentes pour la même facture : la version d'origine décrit un service récurrent 'Chargée de projets SITEGROW — Service mensuel — Gestion de projets et coordination opérationnelle' facturé à des dates différentes (ex. EFB93302-0069 datée 2026-03-19), alors que la version 'à modifier' (dans le dossier de réclamation) décrit des activités alignées sur les catégories admissibles CanExport (ex. 'Analyse préliminaire du marché français...') et porte une date différente (EFB93302-0069 datée 2026-04-15, une semaine après la date de début du projet). Les montants restent identiques entre les deux versions. C'est un point à faire vérifier par l'équipe/le client avant tout import ou soumission de réclamation — ce document se contente de rapporter le fait tel quel, sans conclusion sur sa conformité. Autres écarts de dates de projet observés entre documents : le questionnaire 'REMPLISSAGE AUTONOME' indique 2026-09-01 au 2027-08-31, tandis que la capture du portail CNRC ('Nouvelle-demande-CanExport-CNRC-NRC (3)') indique 2026-04-15 au 2026-12-15 — seule la date de l'accord signé (2026-04-02 au 2027-01-31) a été retenue comme faisant foi dans ce fichier. Écart d'adresse également : l'accord de financement indique '626 rue Denise-Collette, Sainte-Julie, QC J3E 0H7' pour Technologies Sitescore inc., alors que les factures des consultants indiquent '204 rue du Saint-Sacrement, espace 300, Montréal QC H2Y1W8' pour Sitegrow — à clarifier (peut-être deux adresses différentes, siège social vs bureau). Le résumé du financement dans le portail CNRC affiche des montants ('EF 26-27 : 77 874,00 $' et 'Sommaire du financement : 38 937,00 $') qui diffèrent du plafond de contribution de 32 000,00 $ inscrit dans l'accord signé — probablement des chiffres de budget total de projet vs montant de contribution, à ne pas confondre. Ce client Sitegrow apparaît aussi dans d'autres dossiers du portefeuille Apex non traités ici (ex. 'PARI CNRC - SITEGROW', 'MFOR - SITEGROW', 'DEMANDE ESSOR VOLET 1A - SITEGROW', 'Stagiaire SITEGROW'), suggérant plusieurs programmes de subvention actifs simultanément pour cette même entreprise. | Documents non lus automatiquement (à consulter manuellement) : #L01f4b0 Dépenses admissibles – CanExport PME.docx, CANEXPORT - REMPLISSAGE AUTONOME.docx, Grandes lignes CanExport.docx, Réclamation pour déboursé/DÉPÔT INITIAL/Accord de financement (2).pdf, Réclamation pour déboursé/DÉPÔT INITIAL/Nouvelle-demande-CanExport-CNRC-NRC (3).pdf, Réclamation pour déboursé/DÉPÔT INITIAL/budget_déposé.png, Réclamation pour déboursé/FACTURES À MODIFIER/David Desroches/2026-119.pdf, Réclamation pour déboursé/FACTURES À MODIFIER/David Desroches/2026-121.pdf, Réclamation pour déboursé/FACTURES À MODIFIER/David Desroches/2026-123.pdf, Réclamation pour déboursé/FACTURES À MODIFIER/David Desroches/2026-124.pdf, Réclamation pour déboursé/FACTURES À MODIFIER/David Desroches/2026-126.pdf, Réclamation pour déboursé/FACTURES À MODIFIER/David Desroches/2026-129.pdf",
+          "official_start_date": "2026-04-02",
+          "official_end_date": "2027-01-31",
+          "total_project_cost": null,
+          "approved_grant_amount": 32000.0,
+          "grant_rate": 0.5,
+          "agreement": {
+            "project_start": "2026-04-02",
+            "project_end": "2027-01-31",
+            "eligible_expense_period_start": "2026-04-02",
+            "eligible_expense_period_end": "2027-01-31",
+            "grant_amount": 32000.0,
+            "grant_rate": 0.5,
+            "special_conditions": "IMPORTANT — Le nom du sous-dossier 'FACTURES À MODIFIER' et les fichiers 'Factures d'origines' révèlent que les factures Marie-Claude Halde existent en deux versions avec des descriptions de service différentes pour la même facture : la version d'origine décrit un service récurrent 'Chargée de projets SITEGROW — Service mensuel — Gestion de projets et coordination opérationnelle' facturé à des dates différentes (ex. EFB93302-0069 datée 2026-03-19), alors que la version 'à modifier' (dans le dossier de réclamation) décrit des activités alignées sur les catégories admissibles CanExport (ex. 'Analyse préliminaire du marché français...') et porte une date différente (EFB93302-0069 datée 2026-04-15, une semaine après la date de début du projet). Les montants restent identiques entre les deux versions. C'est un point à faire vérifier par l'équipe/le client avant tout import ou soumission de réclamation — ce document se contente de rapporter le fait tel quel, sans conclusion sur sa conformité. Autres écarts de dates de projet observés entre documents : le questionnaire 'REMPLISSAGE AUTONOME' indique 2026-09-01 au 2027-08-31, tandis que la capture du portail CNRC ('Nouvelle-demande-CanExport-CNRC-NRC (3)') indique 2026-04-15 au 2026-12-15 — seule la date de l'accord signé (2026-04-02 au 2027-01-31) a été retenue comme faisant foi dans ce fichier. Écart d'adresse également : l'accord de financement indique '626 rue Denise-Collette, Sainte-Julie, QC J3E 0H7' pour Technologies Sitescore inc., alors que les factures des consultants indiquent '204 rue du Saint-Sacrement, espace 300, Montréal QC H2Y1W8' pour Sitegrow — à clarifier (peut-être deux adresses différentes, siège social vs bureau). Le résumé du financement dans le portail CNRC affiche des montants ('EF 26-27 : 77 874,00 $' et 'Sommaire du financement : 38 937,00 $') qui diffèrent du plafond de contribution de 32 000,00 $ inscrit dans l'accord signé — probablement des chiffres de budget total de projet vs montant de contribution, à ne pas confondre. Ce client Sitegrow apparaît aussi dans d'autres dossiers du portefeuille Apex non traités ici (ex. 'PARI CNRC - SITEGROW', 'MFOR - SITEGROW', 'DEMANDE ESSOR VOLET 1A - SITEGROW', 'Stagiaire SITEGROW'), suggérant plusieurs programmes de subvention actifs simultanément pour cette même entreprise. | Documents non lus automatiquement (à consulter manuellement) : #L01f4b0 Dépenses admissibles – CanExport PME.docx, CANEXPORT - REMPLISSAGE AUTONOME.docx, Grandes lignes CanExport.docx, Réclamation pour déboursé/DÉPÔT INITIAL/Accord de financement (2).pdf, Réclamation pour déboursé/DÉPÔT INITIAL/Nouvelle-demande-CanExport-CNRC-NRC (3).pdf, Réclamation pour déboursé/DÉPÔT INITIAL/budget_déposé.png, Réclamation pour déboursé/FACTURES À MODIFIER/David Desroches/2026-119.pdf, Réclamation pour déboursé/FACTURES À MODIFIER/David Desroches/2026-121.pdf, Réclamation pour déboursé/FACTURES À MODIFIER/David Desroches/2026-123.pdf, Réclamation pour déboursé/FACTURES À MODIFIER/David Desroches/2026-124.pdf, Réclamation pour déboursé/FACTURES À MODIFIER/David Desroches/2026-126.pdf, Réclamation pour déboursé/FACTURES À MODIFIER/David Desroches/2026-129.pdf"
+          },
+          "suppliers": [
+            {
+              "name": "David Desroches",
+              "contact": "Consultant indépendant – Catégorie G (recherche de personnes-ressources clés, facilitation de rencontres interentreprises, marché français)"
+            },
+            {
+              "name": "Marie-Claude Halde / Agence Allez up (allezupweb.ca)",
+              "contact": "Consultante – Catégorie G (étude de marché France) et gestion de projet ('Chargée de projets SITEGROW' selon les factures d'origine)"
+            },
+            {
+              "name": "Dominique Massoka / Agence Comeup",
+              "contact": "Mentionné dans la demande CNRC (portail) comme chargé de projet pour l'adaptation du matériel promotionnel et du site web au marché français — Catégorie C. Aucune facture trouvée dans les fichiers lus."
+            },
+            {
+              "name": "Altalex",
+              "contact": "Cabinet juridique mentionné dans la demande CNRC (portail) pour conseils réglementaires/contractuels France — Catégorie F. Aucune facture trouvée dans les fichiers lus."
+            },
+            {
+              "name": "Axceptio",
+              "contact": "Partenaire technologique en France (mission commerciale à Montpellier) mentionné dans la demande — pas un fournisseur facturé."
+            }
+          ],
+          "expenses": [
+            {
+              "invoice_number": "2026-119",
+              "invoice_date": "2026-04-17",
+              "total": 729.71,
+              "supplier": "David Desroches"
+            },
+            {
+              "invoice_number": "2026-121",
+              "invoice_date": "2026-05-01",
+              "total": 1892.69,
+              "supplier": "David Desroches"
+            },
+            {
+              "invoice_number": "2026-123",
+              "invoice_date": "2026-05-15",
+              "total": 2088.14,
+              "supplier": "David Desroches"
+            },
+            {
+              "invoice_number": "2026-124",
+              "invoice_date": "2026-05-29",
+              "total": 1553.89,
+              "supplier": "David Desroches"
+            },
+            {
+              "invoice_number": "2026-126",
+              "invoice_date": "2026-06-12",
+              "total": 1695.91,
+              "supplier": "David Desroches"
+            },
+            {
+              "invoice_number": "2026-129",
+              "invoice_date": "2026-06-26",
+              "total": 1409.25,
+              "supplier": "David Desroches"
+            },
+            {
+              "invoice_number": "2026-131",
+              "invoice_date": "2026-07-10",
+              "total": 1840.83,
+              "supplier": "David Desroches"
+            },
+            {
+              "invoice_number": "2026-133",
+              "invoice_date": "2026-07-24",
+              "total": 2300.31,
+              "supplier": "David Desroches"
+            },
+            {
+              "invoice_number": "2026-135",
+              "invoice_date": "2026-08-07",
+              "total": 2333.07,
+              "supplier": "David Desroches"
+            },
+            {
+              "invoice_number": "2026-136",
+              "invoice_date": "2026-08-15",
+              "total": 1237.9,
+              "supplier": "David Desroches"
+            },
+            {
+              "invoice_number": "EFB93302-0069 (version à modifier)",
+              "invoice_date": "2026-04-15",
+              "total": 6706.49,
+              "supplier": "Marie-Claude Halde"
+            },
+            {
+              "invoice_number": "EFB93302-0069 (version d'origine)",
+              "invoice_date": "2026-03-19",
+              "total": 6706.49,
+              "supplier": "Marie-Claude Halde"
+            },
+            {
+              "invoice_number": "EFB93302-0071 (version à modifier)",
+              "invoice_date": "2026-04-24",
+              "total": 6706.49,
+              "supplier": "Marie-Claude Halde"
+            },
+            {
+              "invoice_number": "EFB93302-0071 (version d'origine)",
+              "invoice_date": "2026-04-17",
+              "total": 6706.49,
+              "supplier": "Marie-Claude Halde"
+            },
+            {
+              "invoice_number": "EFB93302-0073 (version à modifier)",
+              "invoice_date": "2026-05-19",
+              "total": 4191.56,
+              "supplier": "Marie-Claude Halde"
+            },
+            {
+              "invoice_number": "EFB93302-0073 (version d'origine)",
+              "invoice_date": "2026-05-19",
+              "total": 4191.56,
+              "supplier": "Marie-Claude Halde"
+            },
+            {
+              "invoice_number": "EFB93302-0077 (version à modifier)",
+              "invoice_date": "2026-06-22",
+              "total": 2095.79,
+              "supplier": "Marie-Claude Halde"
+            },
+            {
+              "invoice_number": "EFB93302-0077 (version d'origine)",
+              "invoice_date": "2026-06-22",
+              "total": 2095.79,
+              "supplier": "Marie-Claude Halde"
+            },
+            {
+              "invoice_number": "EFB93302-0078",
+              "invoice_date": "2026-07-17",
+              "total": 1767.26,
+              "supplier": "Marie-Claude Halde"
+            }
+          ],
+          "claims": [
+            {
+              "label": "Réclamation pour déboursé (dépôt initial)",
+              "period_start": null,
+              "period_end": null,
+              "status_hint": "Constitution du dossier de réclamation en cours : factures de consultants (David Desroches, Marie-Claude Halde) datées de mars/avril à août 2026 rassemblées dans 'FACTURES À MODIFIER'; preuves de paiement (fichiers .png non extraits) également présentes dans le dossier. Aucun numéro ou date de dépôt de réclamation officiel trouvé dans les fichiers lus."
+            }
+          ],
+          "contacts": [
+            {
+              "full_name": "Marie-Josée Lacoursière",
+              "role": "CEO - Cofondatrice ; signataire de l'accord de financement CNRC ; identifiée comme 'Gestionnaire de projet' dans le portail CanExport",
+              "email": "mj@sitegrow.co",
+              "phone": null
+            },
+            {
+              "full_name": "Francis Paquet",
+              "role": "Identifié comme 'Signataire autorisé de projet' dans le portail CanExport ; également le contact facturé ('Facturé à') sur toutes les factures de consultants",
+              "email": null,
+              "phone": null
+            },
+            {
+              "full_name": "Carolane Rocheleau",
+              "role": "Identifiée comme 'Personne des remboursements' dans le portail CanExport",
+              "email": null,
+              "phone": null
+            }
+          ]
+        },
+        {
+          "source_folder": "Demande faite en 2026/DEMANDE ESSOR VOLET 1A - SITEGROW",
+          "category": "faite_2026",
+          "program_name": "Essor volet 1A",
+          "name": "Étude de faisabilité sur la capacité organisationnelle et opérationnelle à soutenir la croissance de SiteGrow",
+          "status": "submitted",
+          "description": "Documents de préparation à l'appel avec Investissement Québec (points de discussion) et proposition d'angle de dépôt rédigée. Aucun formulaire Essor rempli, aucune lettre d'offre ni convention retrouvée dans ce dossier. | Aucun montant, aucune date de projet et aucun taux d'aide n'est mentionné explicitement dans les 2 documents lus. Sitegrow est ici le CLIENT demandeur de sa propre subvention Essor 1A, mais apparaît par ailleurs comme SOUS-TRAITANT/fournisseur dans d'autres dossiers de ce même lot (Indigo Soda, Groupe Patrimoine) et est aussi l'entreprise pour laquelle un poste de stagiaire est décrit dans 'Demande à faire/Stagiaire SITEGROW' — à noter pour éviter toute confusion dans le CRM entre ces différents rôles/dossiers du même nom.",
+          "official_start_date": null,
+          "official_end_date": null,
+          "total_project_cost": null,
+          "approved_grant_amount": null,
+          "grant_rate": null,
+          "agreement": null,
+          "suppliers": [
+            {
+              "name": "Allez Up Web",
+              "contact": "Sous-traitant - stratégie d'affaires, analyse de performance, structuration de modèles d'affaires numériques (analyse de rentabilité des mandats par industrie, modélisation de scénarios de croissance)"
+            }
+          ],
+          "expenses": [],
+          "claims": [],
+          "contacts": []
+        },
+        {
+          "source_folder": "MFOR - SITEGROW",
+          "category": "faite_2026",
+          "program_name": "MFOR",
+          "name": "Structuration organisationnelle et développement de projets numériques avec HubSpot",
+          "status": "submitted",
+          "description": "Une offre de formation Apex × Sitegrow a été signée (signatures présentes dans Entente_Apex datées du 2026-07-03 et 2026-07-17) et une première facture de formation existe. Le contenu détaillé de l'entente (montant subvention MFOR, taux, dates précises du projet) n'a pas pu être extrait car le PDF de l'entente ne contient, dans le texte converti, que la page de signatures. | Le contenu de l'offre de formation (Offre_formation_Apex_Sitegrow_hubspot-croissance) décrit un budget total de 15 000 $ CAD (100 h × 150 $/h, avant taxes) pour une formation de 6 modules/100h sur 20 semaines, mais ce document est une offre/devis Apex, pas nécessairement l'entente MFOR avec Services Québec — aucun montant de subvention ni taux de subvention explicite n'a été trouvé. Le fichier facture1_formation.txt est vide (le PDF facture1_formation.pdf semble être une image scannée non OCRisée) — impossible de lire le contenu de la facture. Sitegrow apparaît aussi comme client dans d'autres programmes du même dossier client Apex : CANEXPORT - SITEGROW, DEMANDE ESSOR VOLET 1A - SITEGROW, et PARI CNRC - SITEGROW. Par ailleurs, dans le dossier 'MFOR Réseau PSY', Sitegrow (sous sa raison sociale Technologies Sitescore Inc.) apparaît cette fois comme FOURNISSEUR/formateur pour un autre client d'Apex (Réseau Psy), et non comme client — à valider pour éviter toute confusion dans le CRM entre 'Sitegrow client d'Apex' et 'Sitegrow formateur pour Réseau Psy'. | Documents non lus automatiquement (à consulter manuellement) : DM_Remboursement.xlsx, Registre de présence_3 participants_Signatures.xlsx",
+          "official_start_date": null,
+          "official_end_date": null,
+          "total_project_cost": null,
+          "approved_grant_amount": null,
+          "grant_rate": null,
+          "agreement": null,
+          "suppliers": [
+            {
+              "name": "Apex Consultation",
+              "contact": "Formateur / fournisseur de la formation (préparateur de l'offre de formation)"
+            }
+          ],
+          "expenses": [],
+          "claims": [],
+          "contacts": [
+            {
+              "full_name": "Marie-Josée Lacoursière",
+              "role": "Signataire pour Sitegrow (Entente_Apex, signé 2026-07-17)",
+              "email": null,
+              "phone": null
+            },
+            {
+              "full_name": "Mélanie Lampron",
+              "role": "Signataire pour Apex Consultation (Entente_Apex, signature numérique datée 2026-07-03)",
+              "email": null,
+              "phone": null
+            },
+            {
+              "full_name": "Francis Paquet",
+              "role": "Participant visé par la formation (direction et équipe stratégique, mentionné dans l'offre de formation)",
+              "email": null,
+              "phone": null
+            },
+            {
+              "full_name": "Kelly-Anne Charuest",
+              "role": "Participante visée par la formation (direction et équipe stratégique, mentionnée dans l'offre de formation)",
+              "email": null,
+              "phone": null
+            }
+          ]
+        },
+        {
+          "source_folder": "Demande faite en 2026/PARI CNRC - SITEGROW",
+          "category": "faite_2026",
+          "program_name": "PARI CNRC / IRAP",
+          "name": "Projet FR Rank — L'intelligence SEO/GEO francophone du Canada (Numéro de projet PARI-CNRC 1039188) — plateforme de suivi de mots-clés SEO/GEO adaptée au marché québécois francophone",
+          "status": "active",
+          "description": "Demande déposée et en cours d'exécution avec réclamations en cours (2 projets PARI-CNRC distincts actifs en parallèle pour ce client) : (1) Projet « FR Rank » (n° 1039188), dossier « Réclamation », 5 DDR soumises (DDR1 à DDR5) couvrant du 6 avril au 10 septembre 2026, avancement déclaré passant de 10-15% à 40-45%. (2) Deuxième projet « PRA-2 » = « Optimisation et structuration d'un modèle de croissance basé sur des stratégies SEO, IA et performance numérique » (n° de projet PARI-CNRC 1043898), dossier « PRA - 2/Réclamations », 3 DDR soumises (DDR1 à DDR3) couvrant du 8 juin au 11 septembre 2026, avancement déclaré ~10-12%. | Ce dossier client contient en réalité DEUX projets PARI-CNRC distincts et actifs simultanément pour Sitegrow, avec deux numéros de projet différents (1039188 pour « FR Rank » et 1043898 pour « PRA-2 / Optimisation croissance »). Le schéma imposé ne prévoit qu'un seul objet 'agreement'/'project_title' par client : le projet principal 'FR Rank' (le premier chronologiquement, débutant le 1er avril 2026, durée 27 semaines selon le document projet, mais date de fin non déclarée explicitement) a été retenu comme projet principal ; le second projet PRA-2 (budget déclaré de 30 000$ sur 22 semaines selon 'Description de projet.txt' — mais ce montant n'est pas explicitement qualifié de 'montant de subvention PARI' distinct du coût total du projet, donc non repris comme grant_amount) est documenté intégralement dans project_status_hint et les claims. Au moment de l'import CRM, il faudra probablement créer DEUX projets/dossiers PARI-CNRC distincts pour ce client. Aucun montant de subvention accordée ni taux de contribution PARI n'apparaît explicitement dans les documents lus pour l'un ou l'autre projet. | Documents non lus automatiquement (à consulter manuellement) : PRA - 2/Opportunité de financement_ Funding Opportunity - Copie.xlsm, PRA - 2/Réclamations/DDR1/Feuille_temps_Hela_8juin_8juillet_2026 (2).xlsx, PRA - 2/Réclamations/DDR1/Feuille_temps_Hela_8juin_8juillet_2026.xlsx, PRA - 2/Réclamations/DDR 3/Feuille_temps_Hela_11aout_11septembre_2026.xlsx, PRA - 2/Réclamations/DDR2/Feuille_temps_Hela_9juillet_10août_2026.xlsx, PRA - 2/Couts Projet-Gantt-client-annee_2026-04-06_f&e.xlsx, Réclamation/DDR 3/Feuille_temps_PARI_CNRC_FR_Rank_8juin_8juillet.xlsx, Réclamation/DDR 5/Feuille_temps_PARI_CNRC_FR_Rank_10aout_10septembre.xlsx, Réclamation/DDR 4/Feuille_temps_PARI_CNRC_FR_Rank_9juillet_9août.xlsx, Réclamation/DDR 1/Honoraires internes _ externes.xlsx, Réclamation/DDR 1/Feuille_temps_PARI_CNRC_FR_Rank_1039188.xlsx, Réclamation/DDR 2/Feuille_temps_PARI_CNRC_FR_Rank_1039188_7mai_7juin_repartition.xlsx",
+          "official_start_date": "2026-04-01",
+          "official_end_date": null,
+          "total_project_cost": null,
+          "approved_grant_amount": null,
+          "grant_rate": null,
+          "agreement": {
+            "project_start": "2026-04-01",
+            "project_end": null,
+            "eligible_expense_period_start": null,
+            "eligible_expense_period_end": null,
+            "grant_amount": null,
+            "grant_rate": null,
+            "special_conditions": "Ce dossier client contient en réalité DEUX projets PARI-CNRC distincts et actifs simultanément pour Sitegrow, avec deux numéros de projet différents (1039188 pour « FR Rank » et 1043898 pour « PRA-2 / Optimisation croissance »). Le schéma imposé ne prévoit qu'un seul objet 'agreement'/'project_title' par client : le projet principal 'FR Rank' (le premier chronologiquement, débutant le 1er avril 2026, durée 27 semaines selon le document projet, mais date de fin non déclarée explicitement) a été retenu comme projet principal ; le second projet PRA-2 (budget déclaré de 30 000$ sur 22 semaines selon 'Description de projet.txt' — mais ce montant n'est pas explicitement qualifié de 'montant de subvention PARI' distinct du coût total du projet, donc non repris comme grant_amount) est documenté intégralement dans project_status_hint et les claims. Au moment de l'import CRM, il faudra probablement créer DEUX projets/dossiers PARI-CNRC distincts pour ce client. Aucun montant de subvention accordée ni taux de contribution PARI n'apparaît explicitement dans les documents lus pour l'un ou l'autre projet. | Documents non lus automatiquement (à consulter manuellement) : PRA - 2/Opportunité de financement_ Funding Opportunity - Copie.xlsm, PRA - 2/Réclamations/DDR1/Feuille_temps_Hela_8juin_8juillet_2026 (2).xlsx, PRA - 2/Réclamations/DDR1/Feuille_temps_Hela_8juin_8juillet_2026.xlsx, PRA - 2/Réclamations/DDR 3/Feuille_temps_Hela_11aout_11septembre_2026.xlsx, PRA - 2/Réclamations/DDR2/Feuille_temps_Hela_9juillet_10août_2026.xlsx, PRA - 2/Couts Projet-Gantt-client-annee_2026-04-06_f&e.xlsx, Réclamation/DDR 3/Feuille_temps_PARI_CNRC_FR_Rank_8juin_8juillet.xlsx, Réclamation/DDR 5/Feuille_temps_PARI_CNRC_FR_Rank_10aout_10septembre.xlsx, Réclamation/DDR 4/Feuille_temps_PARI_CNRC_FR_Rank_9juillet_9août.xlsx, Réclamation/DDR 1/Honoraires internes _ externes.xlsx, Réclamation/DDR 1/Feuille_temps_PARI_CNRC_FR_Rank_1039188.xlsx, Réclamation/DDR 2/Feuille_temps_PARI_CNRC_FR_Rank_1039188_7mai_7juin_repartition.xlsx"
+          },
+          "suppliers": [
+            {
+              "name": "Hela Abidi",
+              "contact": "Consultante SEO/GEO (contact: hella.abidi@gmail.com, 514-248-2705) — porteuse principale du projet PRA-2, également ressource sur le projet FR Rank"
+            },
+            {
+              "name": "David Desroches",
+              "contact": "Développeur logiciel — architecture et données (externe), module GEO du projet FR Rank"
+            }
+          ],
+          "expenses": [],
+          "claims": [
+            {
+              "label": "DDR 1 (Projet FR Rank, n°1039188)",
+              "period_start": "2026-04-06",
+              "period_end": "2026-05-06",
+              "status_hint": "Avancement global ~10-15%. Feuille de temps jointe : Marie-Josée Lacoursière 80h, Francis Paquet 80h, Alexandre Cusson 90h, Hela Abidi 90h (total 340h)."
+            },
+            {
+              "label": "DDR 2 (Projet FR Rank, n°1039188)",
+              "period_start": "2026-05-07",
+              "period_end": "2026-06-07",
+              "status_hint": "Avancement global ~10-15%."
+            },
+            {
+              "label": "DDR 3 (Projet FR Rank, n°1039188)",
+              "period_start": "2026-06-08",
+              "period_end": "2026-07-08",
+              "status_hint": "Avancement global ~20-25%."
+            },
+            {
+              "label": "DDR 4 (Projet FR Rank, n°1039188)",
+              "period_start": "2026-07-09",
+              "period_end": "2026-08-09",
+              "status_hint": "Avancement global ~30-35%."
+            },
+            {
+              "label": "DDR 5 (Projet FR Rank, n°1039188)",
+              "period_start": "2026-08-10",
+              "period_end": "2026-09-10",
+              "status_hint": "Avancement global ~40-45%."
+            },
+            {
+              "label": "DDR 1 (Projet PRA-2 — Optimisation croissance, n°1043898)",
+              "period_start": "2026-06-08",
+              "period_end": "2026-07-08",
+              "status_hint": "Avancement global ~10-12%."
+            },
+            {
+              "label": "DDR 2 (Projet PRA-2 — Optimisation croissance, n°1043898)",
+              "period_start": "2026-07-09",
+              "period_end": "2026-08-10",
+              "status_hint": "Non détaillé (résumé du pattern uniquement, conformément à la consigne de synthèse)."
+            },
+            {
+              "label": "DDR 3 (Projet PRA-2 — Optimisation croissance, n°1043898)",
+              "period_start": "2026-08-11",
+              "period_end": "2026-09-11",
+              "status_hint": "Non détaillé (résumé du pattern uniquement, conformément à la consigne de synthèse)."
+            }
+          ],
+          "contacts": [
+            {
+              "full_name": "Francis Paquet",
+              "role": "Cofondateur, Sitegrow — signataire des rapports d'état du projet FR Rank ; également développeur logiciel senior sur ce projet",
+              "email": null,
+              "phone": null
+            },
+            {
+              "full_name": "Marie-Josée Lacoursière",
+              "role": "Coordonnatrice de projet (interne)",
+              "email": null,
+              "phone": null
+            },
+            {
+              "full_name": "Alexandre Cusson",
+              "role": "Chargé de projet / développeur (interne)",
+              "email": null,
+              "phone": null
+            },
+            {
+              "full_name": "Hela Abidi",
+              "role": "Optimisation GEO/SEO — porteuse du projet PRA-2 (Directrice de projets et Stratège SEO, District Web depuis 2020)",
+              "email": "hella.abidi@gmail.com",
+              "phone": "514-248-2705"
+            }
+          ]
+        },
+        {
+          "source_folder": "Demande à faire/Stagiaire SITEGROW",
+          "category": "a_faire",
+          "program_name": "Stage / Career Ready",
+          "name": "Stagiaire en marketing numérique et administration des affaires (Sitegrow)",
+          "status": "preparing",
+          "description": "Seule une fiche de description d'emploi/stage est présente (sommaire du poste, responsabilités, outils, compétences développées, profil recherché). Aucun formulaire de programme, aucune date de stage, aucun salaire, aucun nom de stagiaire. Dossier à un stade très préliminaire, cohérent avec le statut 'à faire'. | Le document ne nomme explicitement aucun programme de subvention (ni 'Career Ready' ni autre) — le nom de programme indiqué ici ('Stage / Career Ready') est une hypothèse de travail à valider, basée sur l'analogie avec le dossier Château Saint-Antoine du même lot. Aucune date de début/fin de stage, aucun taux horaire, aucun nom de stagiaire n'apparaît dans le document lu.",
+          "official_start_date": null,
+          "official_end_date": null,
+          "total_project_cost": null,
+          "approved_grant_amount": null,
+          "grant_rate": null,
+          "agreement": null,
+          "suppliers": [],
+          "expenses": [],
+          "claims": [],
+          "contacts": []
+        }
+      ]
+    },
+    {
+      "name": "The Pretty Ugly Company",
+      "name_alt": null,
+      "status": "active",
+      "projects": [
+        {
+          "source_folder": "Demande faite en 2026/PRETTY UGLY",
+          "category": "faite_2026",
+          "program_name": "PARI CNRC",
+          "name": "Développement d'un Queso végan à base de chou-fleur issu de l'économie circulaire",
+          "status": "active",
+          "description": "Projet PARI-CNRC no 1035103 en cours de réalisation. Un premier rapport de demande de remboursement (DDR 1) a réellement été soumis (période du 2025-09-15 au 2025-10-17, préparé le 2025-10-22 par Pierre-Olivier Gendron, co-propriétaire). Les DDR 2 à 9 présentes dans le dossier semblent être des gabarits/projections rédigés à l'avance (progression narrative crescendo de 25% à 100%, en-têtes non remplis : numéro/date/période de fin absents ou vides sauf « Du 2025-09-01 »), plutôt que des demandes réellement soumises et datées — à valider avant import comme réclamations réelles. | Le fichier de détails du projet indique un début de projet le 1er septembre 2025 pour une durée de 42 semaines (soit environ jusqu'à mi-2026), mais le texte mentionne aussi ailleurs « projet d'une durée de 8 mois » et « au terme de ces neuf mois » (DDR_9) — les durées annoncées sont incohérentes entre les documents, donc project_end reste null faute de date ISO explicite et univoque. Aucun montant de subvention (grant_amount) ni taux n'a été trouvé dans les .txt lus — les informations financières du projet sont dans « Couts Projet-Gantt-client-annee...xlsx » et « Opportunité de financement...xlsm », non convertis en texte. Seul DDR_1 comporte un en-tête complet et daté; DDR_2 à DDR_9 n'ont été que survolés (résumé, pas lecture intégrale ligne à ligne) conformément à la consigne de synthèse pour les sous-dossiers très répétitifs. | Documents non lus automatiquement (à consulter manuellement) : Couts Projet-Gantt-client-annee_2025-07-20_f&e.xlsx, PrettyUgly_Weekly_Time_Tracker (1) (1) - Copie.xlsx, Opportunité de financement_ Funding Opportunity (1) (1).xlsm",
+          "official_start_date": "2025-09-01",
+          "official_end_date": null,
+          "total_project_cost": null,
+          "approved_grant_amount": null,
+          "grant_rate": null,
+          "agreement": {
+            "project_start": "2025-09-01",
+            "project_end": null,
+            "eligible_expense_period_start": null,
+            "eligible_expense_period_end": null,
+            "grant_amount": null,
+            "grant_rate": null,
+            "special_conditions": "Le fichier de détails du projet indique un début de projet le 1er septembre 2025 pour une durée de 42 semaines (soit environ jusqu'à mi-2026), mais le texte mentionne aussi ailleurs « projet d'une durée de 8 mois » et « au terme de ces neuf mois » (DDR_9) — les durées annoncées sont incohérentes entre les documents, donc project_end reste null faute de date ISO explicite et univoque. Aucun montant de subvention (grant_amount) ni taux n'a été trouvé dans les .txt lus — les informations financières du projet sont dans « Couts Projet-Gantt-client-annee...xlsx » et « Opportunité de financement...xlsm », non convertis en texte. Seul DDR_1 comporte un en-tête complet et daté; DDR_2 à DDR_9 n'ont été que survolés (résumé, pas lecture intégrale ligne à ligne) conformément à la consigne de synthèse pour les sous-dossiers très répétitifs. | Documents non lus automatiquement (à consulter manuellement) : Couts Projet-Gantt-client-annee_2025-07-20_f&e.xlsx, PrettyUgly_Weekly_Time_Tracker (1) (1) - Copie.xlsx, Opportunité de financement_ Funding Opportunity (1) (1).xlsm"
+          },
+          "suppliers": [
+            {
+              "name": "CINTEQ",
+              "contact": "Partenaire pour les analyses microbiologiques / tests de conservation"
+            },
+            {
+              "name": "Épicurienne",
+              "contact": "Usine / coemballeur pressenti pour les tests pilotes de production"
+            }
+          ],
+          "expenses": [],
+          "claims": [
+            {
+              "label": "DDR 1 (réelle)",
+              "period_start": "2025-09-15",
+              "period_end": "2025-10-17",
+              "status_hint": "Rapport d'état préparé et daté le 2025-10-22 par Pierre-Olivier Gendron (co-propriétaire); progression déclarée: Objectif 1 = 10%, Objectif 2 = 5%, Objectif 3 = 10%; aucun écart budgétaire ni changement d'échéancier signalé"
+            },
+            {
+              "label": "DDR 2 (gabarit/projection)",
+              "period_start": "2025-09-01",
+              "period_end": null,
+              "status_hint": "En-tête non daté ni numéroté de dossier; contenu narratif de progression (Obj.1=25%, Obj.2=10%) — probablement un brouillon préparé à l'avance, pas une soumission confirmée"
+            },
+            {
+              "label": "DDR 3 (gabarit/projection)",
+              "period_start": "2025-09-01",
+              "period_end": null,
+              "status_hint": "En-tête non daté; contenu narratif de progression (Obj.1=40%) — probablement un brouillon"
+            },
+            {
+              "label": "DDR 4 (gabarit/projection)",
+              "period_start": "2025-09-01",
+              "period_end": null,
+              "status_hint": "En-tête non daté — probablement un brouillon, non résumé en détail"
+            },
+            {
+              "label": "DDR 5 (gabarit/projection)",
+              "period_start": "2025-09-01",
+              "period_end": null,
+              "status_hint": "En-tête non daté — probablement un brouillon, non résumé en détail"
+            },
+            {
+              "label": "DDR 6 (gabarit/projection)",
+              "period_start": "2025-09-01",
+              "period_end": null,
+              "status_hint": "En-tête non daté — probablement un brouillon, non résumé en détail"
+            },
+            {
+              "label": "DDR 7 (gabarit/projection)",
+              "period_start": "2025-09-01",
+              "period_end": null,
+              "status_hint": "En-tête non daté — probablement un brouillon, non résumé en détail"
+            },
+            {
+              "label": "DDR 8 (gabarit/projection)",
+              "period_start": "2025-09-01",
+              "period_end": null,
+              "status_hint": "En-tête non daté — probablement un brouillon, non résumé en détail"
+            },
+            {
+              "label": "DDR 9 (gabarit/projection, bilan final)",
+              "period_start": "2025-09-01",
+              "period_end": null,
+              "status_hint": "Contenu narratif de type bilan final (Obj.2=100%, Obj.3=100%, contrats signés avec fournisseur et coemballeur) mais en-tête non daté/numéroté de dossier — probablement un gabarit de rapport final anticipé, pas une soumission confirmée"
+            }
+          ],
+          "contacts": [
+            {
+              "full_name": "Lysanne Bourret",
+              "role": "Co-fondatrice / co-propriétaire (marketing, communications)",
+              "email": null,
+              "phone": null
+            },
+            {
+              "full_name": "Pierre-Olivier Gendron",
+              "role": "Co-fondatrice / co-propriétaire, signataire du rapport DDR 1",
+              "email": null,
+              "phone": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Ubee",
+      "name_alt": "Les Entreprises UBEE inc.",
+      "status": "active",
+      "projects": [
+        {
+          "source_folder": "Demande faite en 2026/PARI CNRC - UBEE",
+          "category": "faite_2026",
+          "program_name": "PARI CNRC / IRAP — Innovation des processus d'affaires (IPA)",
+          "name": "Transformation du processus de conversion client d'un modèle assisté manuellement vers un modèle de conversion autonome optimisé (hiérarchisation algorithmique des soumissions, personnalisation par persona) — Numéro de projet PARI-CNRC 1044499",
+          "status": "active",
+          "description": "Demande déposée et en cours d'exécution, 1 demande de remboursement (DDR1) soumise couvrant du 1er juin au 10 septembre 2026, avec avancement déclaré de 65% à 75% selon les 4 objectifs. De nombreuses factures de sous-traitants (Groupe Abbatiello, 9492-7969 Québec inc./Up-X Inc., Junifia) ont été rattachées à cette réclamation, avec un taux de contribution PARI confirmé de 50% sur les coûts admissibles (mentionné explicitement sur chaque facture). | Adresse de l'entreprise: 2e étage, 980 rue Bouvier, Québec QC G2J 1A3. Chiffres d'affaires/effectifs déclarés dans le document projet: revenus actuels 200 000$ (12 derniers mois), 78 courtiers payants, 13 employés temps plein + 3 temps partiel. Projections déclarées (non des montants de subvention): revenus avec projet PARI 350 000$ (2026), 650 000$ (2027), 1 000 000$ (2028). Le dossier « docs manquants » contient de nombreux CV de ressources internes (Antoine, Christophe, Emilien, Gabriel, Karim, Reda, Xavier, Youssef) et des documents « OS » (offres de service/ententes de sous-traitance) pour 9492-7969 Québec inc., Groupe Abbatiello et Junifia — non détaillés individuellement ici conformément à la consigne de synthèse (contenu répétitif de type CV/gabarit). Le taux de contribution PARI de 50% est cohérent et répété sur toutes les factures examinées. Le montant total de la subvention PARI accordée (grant_amount) n'apparaît explicitement dans aucun document lu — seule la contribution par facture est connue. | Documents non lus automatiquement (à consulter manuellement) : Réclamations/Registre_auxiliaire_PARI_CNRC_1044499 (fichier Excel sans extension visible), docs manquants/CV/DOC_DEMANDÉS_VF/Distribution des ressources.xlsx, Détails postes externes.xlsx, 02a-IPA_BPI EXEMPLE_GANTT Planif Activités IPA V6.1.xlsx",
+          "official_start_date": "2026-04-01",
+          "official_end_date": "2026-09-01",
+          "total_project_cost": null,
+          "approved_grant_amount": null,
+          "grant_rate": 0.5,
+          "agreement": {
+            "project_start": "2026-04-01",
+            "project_end": "2026-09-01",
+            "eligible_expense_period_start": null,
+            "eligible_expense_period_end": null,
+            "grant_amount": null,
+            "grant_rate": 0.5,
+            "special_conditions": "Adresse de l'entreprise: 2e étage, 980 rue Bouvier, Québec QC G2J 1A3. Chiffres d'affaires/effectifs déclarés dans le document projet: revenus actuels 200 000$ (12 derniers mois), 78 courtiers payants, 13 employés temps plein + 3 temps partiel. Projections déclarées (non des montants de subvention): revenus avec projet PARI 350 000$ (2026), 650 000$ (2027), 1 000 000$ (2028). Le dossier « docs manquants » contient de nombreux CV de ressources internes (Antoine, Christophe, Emilien, Gabriel, Karim, Reda, Xavier, Youssef) et des documents « OS » (offres de service/ententes de sous-traitance) pour 9492-7969 Québec inc., Groupe Abbatiello et Junifia — non détaillés individuellement ici conformément à la consigne de synthèse (contenu répétitif de type CV/gabarit). Le taux de contribution PARI de 50% est cohérent et répété sur toutes les factures examinées. Le montant total de la subvention PARI accordée (grant_amount) n'apparaît explicitement dans aucun document lu — seule la contribution par facture est connue. | Documents non lus automatiquement (à consulter manuellement) : Réclamations/Registre_auxiliaire_PARI_CNRC_1044499 (fichier Excel sans extension visible), docs manquants/CV/DOC_DEMANDÉS_VF/Distribution des ressources.xlsx, Détails postes externes.xlsx, 02a-IPA_BPI EXEMPLE_GANTT Planif Activités IPA V6.1.xlsx"
+          },
+          "suppliers": [
+            {
+              "name": "Groupe Abbatiello",
+              "contact": "Sous-traitant — main d'œuvre principale du projet, officiellement payée par Groupe Abbatiello et affectée à Ubee (contrat ~6 mois, coût total estimé 155 200$ selon le document projet)"
+            },
+            {
+              "name": "Junifia informatique autonome inc.",
+              "contact": "Sous-traitant — création de parcours clients ultra-personnalisés / développement web (contrat ~3 mois, coût estimé 25 000$ selon le document projet); contact vincent.martel@junifia.ca"
+            },
+            {
+              "name": "9492-7969 Québec inc. (Up-X Inc.)",
+              "contact": "Sous-traitant — coordination de projet (Antoine Routhier, ~6 mois, coût estimé 12 500$ selon le document projet); contact antoine@up-x.ca"
+            }
+          ],
+          "expenses": [
+            {
+              "invoice_number": "1338",
+              "invoice_date": "2026-06-30",
+              "total": 1086.51,
+              "supplier": "Junifia informatique autonome inc."
+            },
+            {
+              "invoice_number": "1112",
+              "invoice_date": "2026-06-30",
+              "total": 9581.25,
+              "supplier": "9492-7969 Québec inc. (Up-X Inc.)"
+            },
+            {
+              "invoice_number": "1114",
+              "invoice_date": "2026-07-31",
+              "total": 9581.25,
+              "supplier": "9492-7969 Québec inc. (Up-X Inc.)"
+            },
+            {
+              "invoice_number": "1116",
+              "invoice_date": "2026-08-31",
+              "total": 9581.25,
+              "supplier": "9492-7969 Québec inc. (Up-X Inc.)"
+            },
+            {
+              "invoice_number": "2026-36",
+              "invoice_date": "2026-06-19",
+              "total": 46181.27,
+              "supplier": "Groupe Abbatiello"
+            },
+            {
+              "invoice_number": "2026-37",
+              "invoice_date": "2026-07-03",
+              "total": null,
+              "supplier": "Groupe Abbatiello"
+            },
+            {
+              "invoice_number": "2026-38",
+              "invoice_date": "2026-07-17",
+              "total": null,
+              "supplier": "Groupe Abbatiello"
+            },
+            {
+              "invoice_number": "2026-39",
+              "invoice_date": "2026-07-31",
+              "total": null,
+              "supplier": "Groupe Abbatiello"
+            },
+            {
+              "invoice_number": "2026-40",
+              "invoice_date": "2026-08-14",
+              "total": null,
+              "supplier": "Groupe Abbatiello"
+            },
+            {
+              "invoice_number": "2026-41",
+              "invoice_date": "2026-08-28",
+              "total": null,
+              "supplier": "Groupe Abbatiello"
+            }
+          ],
+          "claims": [
+            {
+              "label": "DDR 1",
+              "period_start": "2026-06-01",
+              "period_end": "2026-09-10",
+              "status_hint": "Avancement estimé par objectif: Obj.1 (conversion autonome) 75%, Obj.2 (engagement initial) 70%, Obj.3 (temps de support manuel) 75%, Obj.4 (délai de sélection finale) 65%. Préparée par Antoine Routhier, Cofondateur, le 10 septembre 2026. Rattachée aux factures Junifia (1338), 9492-7969 Québec inc. (1112, 1114, 1116) et Groupe Abbatiello (2026-36 à 2026-41)."
+            }
+          ],
+          "contacts": [
+            {
+              "full_name": "Antoine Routhier",
+              "role": "Cofondateur, Les Entreprises UBEE inc. — signataire du document projet et du rapport d'état DDR1",
+              "email": null,
+              "phone": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "UpUp",
+      "name_alt": null,
+      "status": "active",
+      "projects": [
+        {
+          "source_folder": "Demande à faire/upup - pari cnrc",
+          "category": "a_faire",
+          "program_name": "PARI CNRC / IRAP",
+          "name": "Développement d'un procédé intelligent de caractérisation, de mélange et de transformation de matières textiles et mousses résiduelles en bourres recyclées à performance contrôlée",
+          "status": "preparing",
+          "description": "Dossier en préparation, pas encore déposé. Un seul document présent : un argumentaire/brief PARI (titre proposé, problématique, incertitudes technologiques #1 à #4, hypothèse de R-D, plan de travail en 4 phases, livrables technologiques, et 8 points à mettre de l'avant pour le PARI-CNRC). Aucune entente, numéro de projet, budget chiffré du projet PARI ni date de début/fin n'apparaît (seule une mention d'un investissement déjà réalisé dans une ligne industrielle spécialisée « ~150 000 $ », qui est un investissement de l'entreprise et non un montant de subvention). | UpUp transforme des résidus textiles et de mousses en bourre recyclée pour le secteur du meuble/coussin/décoration. Étude de faisabilité complétée, validation préliminaire du marché réalisée, machinerie industrielle déjà acquise selon le document ; phase de développement/optimisation/validation restant à réaliser dans le cadre du projet PARI. Aucun contact nommé n'apparaît dans le document disponible.",
+          "official_start_date": null,
+          "official_end_date": null,
+          "total_project_cost": null,
+          "approved_grant_amount": null,
+          "grant_rate": null,
+          "agreement": null,
+          "suppliers": [],
+          "expenses": [],
+          "claims": [],
+          "contacts": []
+        }
+      ]
+    },
+    {
+      "name": "Velozone",
+      "name_alt": "Boutique VéloZone inc.",
+      "status": "active",
+      "projects": [
+        {
+          "source_folder": "Demande faite en 2026/CANEXPORT - VELOZONE",
+          "category": "faite_2026",
+          "program_name": "CanExport PME",
+          "name": "Développement du marché français pour Velozone",
+          "status": "approved",
+          "description": "Dossier de demande rédigé (questionnaire 'REMPLISSAGE AUTONOME' rempli avec les réponses du client) mais aucun accord de financement signé, aucune facture ni preuve de réclamation trouvés dans les fichiers lus — semble être au stade de la demande plutôt que du financement accordé, malgré le classement dans 'Demande faite en 2026'. | Velozone est un détaillant/distributeur de vélos électriques et accessoires (adresse : 688 Bd du Séminaire N, Saint-Jean-sur-Richelieu, QC J3B 5M5), en activité depuis plus de 20 ans, distribuant notamment les marques québécoises Devinci et Maui. A déjà réalisé des ventes ponctuelles en France (environ 4 commandes par an). Le projet vise le marché français via une mission commerciale et un mandat avec la firme Woodez. Aucun nom de signataire, de responsable de réclamations ni de responsable de projet n'a été renseigné dans le questionnaire (champs laissés vides). Aucun montant de subvention, taux de contribution ni facture n'apparaît dans les fichiers lus — à vérifier si un accord de financement signé existe ailleurs (non trouvé dans ce dossier). Ce client apparaît aussi dans d'autres dossiers du portefeuille (ex. 'MFOR - VELOZONE' avec sous-dossier 'REMBOURSEMENT'), suggérant un autre programme de subvention actif en parallèle pour la même entreprise. | Documents non lus automatiquement (à consulter manuellement) : CANEXPORT - REMPLISSAGE AUTONOME.docx, Grandes lignes - Velozone.docx, VELOZONE - CANEXPORT.docx",
+          "official_start_date": "2025-05-01",
+          "official_end_date": "2026-04-30",
+          "total_project_cost": null,
+          "approved_grant_amount": null,
+          "grant_rate": null,
+          "agreement": {
+            "project_start": "2025-05-01",
+            "project_end": "2026-04-30",
+            "eligible_expense_period_start": null,
+            "eligible_expense_period_end": null,
+            "grant_amount": null,
+            "grant_rate": null,
+            "special_conditions": "Velozone est un détaillant/distributeur de vélos électriques et accessoires (adresse : 688 Bd du Séminaire N, Saint-Jean-sur-Richelieu, QC J3B 5M5), en activité depuis plus de 20 ans, distribuant notamment les marques québécoises Devinci et Maui. A déjà réalisé des ventes ponctuelles en France (environ 4 commandes par an). Le projet vise le marché français via une mission commerciale et un mandat avec la firme Woodez. Aucun nom de signataire, de responsable de réclamations ni de responsable de projet n'a été renseigné dans le questionnaire (champs laissés vides). Aucun montant de subvention, taux de contribution ni facture n'apparaît dans les fichiers lus — à vérifier si un accord de financement signé existe ailleurs (non trouvé dans ce dossier). Ce client apparaît aussi dans d'autres dossiers du portefeuille (ex. 'MFOR - VELOZONE' avec sous-dossier 'REMBOURSEMENT'), suggérant un autre programme de subvention actif en parallèle pour la même entreprise. | Documents non lus automatiquement (à consulter manuellement) : CANEXPORT - REMPLISSAGE AUTONOME.docx, Grandes lignes - Velozone.docx, VELOZONE - CANEXPORT.docx"
+          },
+          "suppliers": [
+            {
+              "name": "Woodez",
+              "contact": "Firme québécoise mandatée pour élaborer une stratégie de pénétration du marché français (analyse de marché, positionnement concurrentiel, stratégie de distribution, adaptation marketing SEO/contenu/site web)"
+            }
+          ],
+          "expenses": [],
+          "claims": [],
+          "contacts": []
+        },
+        {
+          "source_folder": "MFOR - VELOZONE",
+          "category": "faite_2026",
+          "program_name": "MFOR",
+          "name": "Vision et collaboration numérique — formation sur Shopify, Klaviyo, intelligence artificielle, design & conversion et stratégie numérique",
+          "status": "submitted",
+          "description": "Formation dispensée par Woodez (Shopify, Klaviyo, IA, design & conversion, stratégie numérique), 80h sur 10 semaines pour 4 participants. Trois factures de Woodez déjà émises et marquées 'Payé au complet' (2026-06-01, 2026-07-01, 2026-08-02). Un sous-dossier REMBOURSEMENT contient une 'Réclamation 2' (registre de présence et relevé des dépenses/demande de versement, non convertis en texte), ce qui indique qu'une demande de remboursement/versement #2 est en cours ou a été déposée. | NEQ de Vélozone : 1162546825. Adresse : 688 boul. du Séminaire N, Saint-Jean-sur-Richelieu (Québec) J3B5M5. Dans le fichier INFO_ENTREPRISES_2025.txt, le champ 'Numéro de téléphone du contact' affiche la même valeur que le champ courriel (boutiquevelozone@outlook.com) — probable erreur de mise en page du tableau source (colonnes désalignées) ; le numéro de téléphone réel n'a pas pu être extrait, d'où phone=null pour Vincent Deslauriers. Le devis 'VZ-Programme_Formation (2)' (proposition Woodez) indique un investissement total de 12 000 $ CAD (80h × 150$/h, taxes en sus) — c'est un montant de devis fournisseur, pas nécessairement le montant de la subvention MFOR (donc grant_amount laissé null). Le fichier entente (3).txt est vide (le PDF entente (3).pdf semble être une image scannée non OCRisée) — le contenu de l'entente MFOR proprement dite (montant/taux de subvention, dates officielles du projet) n'a pas pu être lu. Anomalie relevée : le fichier nommé 'Facture#1302.txt' contient en réalité une facture numérotée 1292 dans le corps du document (et non 1302) — écart entre le nom de fichier et le numéro de facture réel, à vérifier avant import. | Documents non lus automatiquement (à consulter manuellement) : REMBOURSEMENT/Réclamation 2 - Registre de présence_5 participants_Signatures.xlsx, REMBOURSEMENT/Réclamation 2 - Relevé des dépenses et demande de versement.xlsx, REMBOURSEMENT/Registre de présence_5 participants_Signatures (1).xlsx, REMBOURSEMENT/Relevé des dépenses et demande de versement (2).xlsx",
+          "official_start_date": null,
+          "official_end_date": null,
+          "total_project_cost": null,
+          "approved_grant_amount": null,
+          "grant_rate": null,
+          "agreement": null,
+          "suppliers": [
+            {
+              "name": "Woodez Inc (9563-5421 Qc Inc)",
+              "contact": "Formateur / fournisseur de la formation (Shopify, Klaviyo, IA, design & conversion, stratégie numérique)"
+            }
+          ],
+          "expenses": [
+            {
+              "invoice_number": "1313",
+              "invoice_date": "2026-08-02",
+              "total": 2931.86,
+              "supplier": "Woodez Inc"
+            },
+            {
+              "invoice_number": "1292",
+              "invoice_date": "2026-06-01",
+              "total": 6208.65,
+              "supplier": "Woodez Inc"
+            },
+            {
+              "invoice_number": "1303",
+              "invoice_date": "2026-07-01",
+              "total": 4656.49,
+              "supplier": "Woodez Inc"
+            }
+          ],
+          "claims": [
+            {
+              "label": "Réclamation 2",
+              "period_start": null,
+              "period_end": null,
+              "status_hint": "Fichiers 'Réclamation 2 - Registre de présence_5 participants_Signatures.xlsx' et 'Réclamation 2 - Relevé des dépenses et demande de versement.xlsx' présents dans le sous-dossier REMBOURSEMENT mais non convertis en texte (xlsx) — contenu et statut exact non lus. La présence d'une 'Réclamation 2' suggère qu'une première réclamation a probablement déjà été traitée, mais aucun document 'Réclamation 1' n'a été trouvé dans ce dossier."
+            }
+          ],
+          "contacts": [
+            {
+              "full_name": "Vincent Deslauriers",
+              "role": "Personne contact de l'entreprise (fiche entreprise MFOR) ; également participant à la formation",
+              "email": "boutiquevelozone@outlook.com",
+              "phone": null
+            },
+            {
+              "full_name": "Pascal Deslauriers",
+              "role": "Propriétaire et dirigeant, personne autorisée à signer l'entente, responsable RH ; également participant à la formation",
+              "email": null,
+              "phone": null
+            },
+            {
+              "full_name": "Eric Charland",
+              "role": "Participant à la formation",
+              "email": null,
+              "phone": null
+            },
+            {
+              "full_name": "Sandrine Meunier",
+              "role": "Participante à la formation",
+              "email": null,
+              "phone": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "VR Panoramic",
+      "name_alt": null,
+      "status": "active",
+      "projects": [
+        {
+          "source_folder": "Demande faite en 2026/CANEXPORT - VR PANO ",
+          "category": "faite_2026",
+          "program_name": "CanExport PME",
+          "name": "Développement des marchés américains pour la commercialisation de véhicules récréatifs de classe B Panoramic",
+          "status": "approved",
+          "description": "Dossier de demande rédigé en détail (questionnaire rempli, dépenses admissibles annotées, répartition de billets d'avion planifiée pour une tournée commerciale multi-villes aux États-Unis) mais aucun accord de financement signé ni facture trouvés dans les fichiers lus. | VR Panoramic (adresse : 3400 Bd Industriel, Chambly, QC J3L 4W3) est une entreprise québécoise spécialisée dans la conversion de vans en véhicules récréatifs de classe B (modèles Panoramic Classique, Panoramic G, Panoramic GL, Perspective). 74 employés ETP, revenu annuel brut déclaré ~31,6 M$, ventes internationales déjà réalisées ~2,2 M$ US (3 M$ CA). Marchés cibles : Californie, Washington, Oregon, Texas (États-Unis). Le fichier 'Répartition billets avion' détaille une tournée commerciale multi-employés (Dimitri, Camille, Serge, Philippe, Jean-Guy, Renée, Jason) vers Portland, Sacramento, Simi Valley/Los Angeles, Boston et Calgary entre fin avril et fin mai, avec des coûts de billets individuels (450$ à 1050$) et des indemnités journalières de 600$/jour/personne — mais ces chiffres sont des données de planification budgétaire du client, pas des factures réelles reçues de fournisseurs ; ils n'ont donc pas été intégrés dans le tableau 'expenses' de ce fichier (qui est réservé aux factures effectivement émises). Un fichier 'Dépenses Marché USA.xlsx' non converti en texte existe et pourrait contenir un budget détaillé additionnel à vérifier séparément. Aucun montant de subvention, taux de contribution, ou accord signé n'a été trouvé dans les fichiers lus. Note technique : les noms de fichiers originaux du dossier contiennent des caractères accentués encodés de façon inhabituelle (ex. 'De#U0301penses', 'R#U00e9partition') — les noms ont été normalisés ici pour lisibilité. | Documents non lus automatiquement (à consulter manuellement) : Dépenses admissibles-CanExport.docx, CANEXPORT - REMPLISSAGE AUTONOME.docx, Dépenses Marché USA.xlsx, Répartition billets avion VR PANO.docx",
+          "official_start_date": "2026-04-24",
+          "official_end_date": "2026-11-24",
+          "total_project_cost": null,
+          "approved_grant_amount": null,
+          "grant_rate": null,
+          "agreement": {
+            "project_start": "2026-04-24",
+            "project_end": "2026-11-24",
+            "eligible_expense_period_start": null,
+            "eligible_expense_period_end": null,
+            "grant_amount": null,
+            "grant_rate": null,
+            "special_conditions": "VR Panoramic (adresse : 3400 Bd Industriel, Chambly, QC J3L 4W3) est une entreprise québécoise spécialisée dans la conversion de vans en véhicules récréatifs de classe B (modèles Panoramic Classique, Panoramic G, Panoramic GL, Perspective). 74 employés ETP, revenu annuel brut déclaré ~31,6 M$, ventes internationales déjà réalisées ~2,2 M$ US (3 M$ CA). Marchés cibles : Californie, Washington, Oregon, Texas (États-Unis). Le fichier 'Répartition billets avion' détaille une tournée commerciale multi-employés (Dimitri, Camille, Serge, Philippe, Jean-Guy, Renée, Jason) vers Portland, Sacramento, Simi Valley/Los Angeles, Boston et Calgary entre fin avril et fin mai, avec des coûts de billets individuels (450$ à 1050$) et des indemnités journalières de 600$/jour/personne — mais ces chiffres sont des données de planification budgétaire du client, pas des factures réelles reçues de fournisseurs ; ils n'ont donc pas été intégrés dans le tableau 'expenses' de ce fichier (qui est réservé aux factures effectivement émises). Un fichier 'Dépenses Marché USA.xlsx' non converti en texte existe et pourrait contenir un budget détaillé additionnel à vérifier séparément. Aucun montant de subvention, taux de contribution, ou accord signé n'a été trouvé dans les fichiers lus. Note technique : les noms de fichiers originaux du dossier contiennent des caractères accentués encodés de façon inhabituelle (ex. 'De#U0301penses', 'R#U00e9partition') — les noms ont été normalisés ici pour lisibilité. | Documents non lus automatiquement (à consulter manuellement) : Dépenses admissibles-CanExport.docx, CANEXPORT - REMPLISSAGE AUTONOME.docx, Dépenses Marché USA.xlsx, Répartition billets avion VR PANO.docx"
+          },
+          "suppliers": [
+            {
+              "name": "Rablab",
+              "contact": "Consultant en stratégie d'entrée de marché"
+            },
+            {
+              "name": "Imprimerie Clermont",
+              "contact": "Impression de matériel promotionnel"
+            },
+            {
+              "name": "Graphiste interne (non nommé)",
+              "contact": "Traduction/adaptation de matériel promotionnel et design de brochures — ressource interne, pas un fournisseur externe"
+            },
+            {
+              "name": "Créateur de contenu interne (non nommé)",
+              "contact": "Vidéos promotionnelles adaptées — ressource interne"
+            }
+          ],
+          "expenses": [],
+          "claims": [],
+          "contacts": [
+            {
+              "full_name": "Richard Paquet",
+              "role": "Directeur Marketing ; signataire autorisé à signer l'accord de financement ; responsable de la gestion du projet",
+              "email": null,
+              "phone": null
+            },
+            {
+              "full_name": "Sheila Laliberté",
+              "role": "Responsable des finances ; personne en charge des réclamations",
+              "email": null,
+              "phone": null
+            }
+          ]
+        },
+        {
+          "source_folder": "Demande à faire/IRRT - VR",
+          "category": "a_faire",
+          "program_name": "IRRT (Initiative régionale de réponse tarifaire) — Développement économique Canada (DEC)",
+          "name": "IRRT (Initiative régionale de réponse tarifaire) — Développement économique Canada (DEC)",
+          "status": "preparing",
+          "description": "Document de cadrage stratégique / brief interne (« Brief pour VR PANO - projet IRRT ») visant à identifier des opportunités de projets admissibles au programme IRRT-DEC pour VR Panoramic. Aucun projet précis n'a encore été choisi ni déposé : le document propose 5 pistes de projets possibles (automatisation/standardisation, relocalisation de fournisseurs, gamme de vans nord-américaine, robotisation, expansion export hors É.-U.) et liste les prochaines étapes à venir (sélection du projet, validation admissibilité, montage et dépôt de la demande). | Aucune entente, aucun montant de subvention et aucune date de projet précis ne figurent dans les documents : ce sont uniquement des documents de préparation/pitch (identiques en contenu, l'un étant la version brute et l'autre la version mise en page du même brief). Le document mentionne des plafonds d'aide génériques du programme IRRT (300 000 $ pour diversification de marchés seule, 1 000 000 $ pour productivité/hybride, plus de 1 M$ pour un projet majeur structurant remboursable) mais ce ne sont PAS des montants accordés à VR Panoramic — à ne pas utiliser comme grant_amount. Le client VR Panoramic apparaît aussi ailleurs dans les dossiers Apex sous le programme CANEXPORT (dossier 'CANEXPORT - VR PANO' dans Demande faite en 2026) et sous PARI CNRC (dossier 'PARI CNRC - VR' dans Demande à faire) — à rapprocher dans le CRM comme le même client sous plusieurs programmes.",
+          "official_start_date": null,
+          "official_end_date": null,
+          "total_project_cost": null,
+          "approved_grant_amount": null,
+          "grant_rate": null,
+          "agreement": null,
+          "suppliers": [],
+          "expenses": [],
+          "claims": [],
+          "contacts": []
+        },
+        {
+          "source_folder": "Demande à faire/PARI CNRC - VR",
+          "category": "a_faire",
+          "program_name": "PARI CNRC / IRAP",
+          "name": "PARI CNRC / IRAP",
+          "status": "preparing",
+          "description": "IMPORTANT — ce dossier ne contient AUCUN document propre au client (pas de mandat, pas de description de projet, pas de budget, pas d'entente). Les 7 fichiers du dossier sont des captures/impressions de la page publique « Grants and Contributions » d'Open Government Canada (search.open.canada.ca), soit des fiches de divulgation proactive de subventions déjà octroyées à SEPT ENTREPRISES TIERCES DIFFÉRENTES du secteur des véhicules récréatifs / conversion de fourgonnettes (aucune n'est VR Panoramic) : Future Van Designs Inc. (IRAP Contributions to Firms, 37 000$, 2023-2024), Hovey Industries (2005) Inc. (IRAP Youth Employment, 40 500$, 2020-2021), International Truck Body Inc. (Regional Economic Growth through Innovation / Prairies Economic Development Canada, 1 000 000$, 2026-2028), Potential Motors Inc. (IRAP Youth Employment, 20 000$, 2018-2019), Équipements Roadloft inc. (REGI / Développement économique Canada pour les régions du Québec, 300 000$, 2022-2024), True North Custom Campers Inc. (IRAP Green Youth Employment, 10 000$, 2018-2019), Van d'ici inc. (IRAP Contributions to Firms, 75 000$, 2024-2025). Il s'agit manifestement de recherche concurrentielle/comparables collectée par Apex pour appuyer un dossier PARI-CNRC pour son propre client « VR » (probablement VR Panoramic), et non des dossiers clients distincts. | RÉPONSE À LA QUESTION DE STRUCTURATION : ce dossier « PARI CNRC - VR » ne contient ni plusieurs dossiers clients distincts, ni un dossier client 'VR' agrégateur avec ses propres documents — il ne contient AUCUN document appartenant réellement à un client nommé 'VR', seulement 7 fiches publiques concernant 7 sociétés tierces sans lien capitalistique apparent entre elles (secteurs et provinces différents : Colombie-Britannique, Ontario, Manitoba, Nouveau-Brunswick, Alberta, Québec x2). Le nom 'VR' (Véhicules Récréatifs) correspond très probablement au même client que l'on retrouve ailleurs dans les dossiers Apex sous d'autres programmes : « IRRT - VR » (dossier 'VR Panoramic', Demande à faire) et « CANEXPORT - VR PANO » (Demande faite en 2026) — voir le fichier vr-panoramic-irrt.json déjà produit, qui documente explicitement ce rapprochement. Ce dossier PARI-CNRC-VR semble donc être la recherche de comparables/precedents PARI-CNRC pour le client VR Panoramic, à rattacher au même client dans le CRM, mais SANS aucune donnée de projet, montant ou date propre à VR Panoramic elle-même (aucune ne doit être inventée). Les fichiers .txt correspondants étaient vides (2-3 octets, échec probable de l'extraction/OCR du PDF) ; le contenu ci-dessus provient d'une lecture directe des PDF originaux dans demande_sub.",
+          "official_start_date": null,
+          "official_end_date": null,
+          "total_project_cost": null,
+          "approved_grant_amount": null,
+          "grant_rate": null,
+          "agreement": null,
+          "suppliers": [
+            {
+              "name": "Future Van Designs Inc.",
+              "contact": "Comparable/prospect externe (bénéficiaire historique IRAP, non-client Apex) — PAS un fournisseur de VR Panoramic"
+            },
+            {
+              "name": "Hovey Industries (2005) Inc.",
+              "contact": "Comparable/prospect externe (bénéficiaire historique IRAP, non-client Apex)"
+            },
+            {
+              "name": "International Truck Body Inc.",
+              "contact": "Comparable/prospect externe (bénéficiaire historique REGI, non-client Apex)"
+            },
+            {
+              "name": "Potential Motors Inc.",
+              "contact": "Comparable/prospect externe (bénéficiaire historique IRAP, non-client Apex)"
+            },
+            {
+              "name": "Équipements Roadloft inc.",
+              "contact": "Comparable/prospect externe (bénéficiaire historique REGI, non-client Apex)"
+            },
+            {
+              "name": "True North Custom Campers Inc.",
+              "contact": "Comparable/prospect externe (bénéficiaire historique IRAP, non-client Apex)"
+            },
+            {
+              "name": "Van d'ici inc.",
+              "contact": "Comparable/prospect externe (bénéficiaire historique IRAP, non-client Apex)"
+            }
+          ],
+          "expenses": [],
+          "claims": [],
+          "contacts": []
+        }
+      ]
+    },
+    {
+      "name": "Willsup",
+      "name_alt": "WILLSUP INC.",
+      "status": "active",
+      "projects": [
+        {
+          "source_folder": "Demande faite en 2026/Plan de facturation - Adi + willsup/Réclamation PSCE/WILLSUP",
+          "category": "faite_2026",
+          "program_name": "PSCE (Programme de soutien à la commercialisation et à l'exportation), Volet 2 — diversification et consolidation sur les marchés hors Québec — Investissement Québec",
+          "name": "Diversification et consolidation des marchés du Canada hors Québec",
+          "status": "active",
+          "description": "Offre de contribution financière non remboursable signée par les deux parties le 2026-03-03 (dossier PSCE76134 / 100017751). Une demande de versement (Annexe B) a été complétée avec des montants réels pour la période du 2026-01-28 au 2026-08-03, et une Annexe C (fiche d'évaluation) a également été complétée avec des réponses narratives positives (« Tout se déroule dans l'ordre établi... très satisfaits des résultats »). Une facture Sitegrow (#1326) et une preuve de paiement associée sont présentes dans le sous-dossier « Ce qui a été envoyé », suggérant qu'une réclamation a effectivement été transmise à IQ. | NEQ 1140937237, SCIAN 326150. Dépenses admissibles totales prévues à l'offre : 69 750 $ (coût total du projet 120 850 $, dont 85 975 $ de fonds de roulement); grant_rate=0.5 (50% des dépenses admissibles, comme pour ADI Laval), rétention possible de 20% sur le dernier versement. Deux versions de la facture Sitegrow #1326 existent dans les dossiers : une datée du 28/01/2026 (échéance 30/04/2026) classée par erreur dans le dossier ADI LAVAL, et une datée du 01/08/2026 (échéance 01/08/2026) classée correctement dans WILLSUP/Ce qui a été envoyé — même contenu de prestations sinon la date; le montant retenu ici (invoice_date, total) est celui de la version datée du 01/08/2026 (la plus cohérente avec la période de réclamation 2026-01-28 au 2026-08-03). Le fichier 'reclamation1_psce_willsup.txt' contient une série de montants bruts sans libellés clairs (0, 0, 13995, 21000, 34995, 17497,50, 17497,50, daté 19 août 2026) qui semble être une extraction partielle/désordonnée d'un formulaire de réclamation — non repris tel quel dans les champs structurés faute de certitude sur le mapping exact des montants (17 497,50$ vs 17 437,50$ trouvé dans l'Annexe B complétée : différence à clarifier, deux montants voisins mais non identiques apparaissent dans des fichiers différents). Willsup et ADI Laval partagent le même signataire autorisé (François-Xavier Edger-Sauvé) et la même consultante Sitegrow — à valider s'il s'agit d'entreprises liées/apparentées. | Documents non lus automatiquement (à consulter manuellement) : preuve_paiement_facture_1326.png",
+          "official_start_date": "2026-01-28",
+          "official_end_date": "2027-01-27",
+          "total_project_cost": null,
+          "approved_grant_amount": 34875.0,
+          "grant_rate": 0.5,
+          "agreement": {
+            "project_start": "2026-01-28",
+            "project_end": "2027-01-27",
+            "eligible_expense_period_start": "2026-01-28",
+            "eligible_expense_period_end": "2027-01-27",
+            "grant_amount": 34875.0,
+            "grant_rate": 0.5,
+            "special_conditions": "NEQ 1140937237, SCIAN 326150. Dépenses admissibles totales prévues à l'offre : 69 750 $ (coût total du projet 120 850 $, dont 85 975 $ de fonds de roulement); grant_rate=0.5 (50% des dépenses admissibles, comme pour ADI Laval), rétention possible de 20% sur le dernier versement. Deux versions de la facture Sitegrow #1326 existent dans les dossiers : une datée du 28/01/2026 (échéance 30/04/2026) classée par erreur dans le dossier ADI LAVAL, et une datée du 01/08/2026 (échéance 01/08/2026) classée correctement dans WILLSUP/Ce qui a été envoyé — même contenu de prestations sinon la date; le montant retenu ici (invoice_date, total) est celui de la version datée du 01/08/2026 (la plus cohérente avec la période de réclamation 2026-01-28 au 2026-08-03). Le fichier 'reclamation1_psce_willsup.txt' contient une série de montants bruts sans libellés clairs (0, 0, 13995, 21000, 34995, 17497,50, 17497,50, daté 19 août 2026) qui semble être une extraction partielle/désordonnée d'un formulaire de réclamation — non repris tel quel dans les champs structurés faute de certitude sur le mapping exact des montants (17 497,50$ vs 17 437,50$ trouvé dans l'Annexe B complétée : différence à clarifier, deux montants voisins mais non identiques apparaissent dans des fichiers différents). Willsup et ADI Laval partagent le même signataire autorisé (François-Xavier Edger-Sauvé) et la même consultante Sitegrow — à valider s'il s'agit d'entreprises liées/apparentées. | Documents non lus automatiquement (à consulter manuellement) : preuve_paiement_facture_1326.png"
+          },
+          "suppliers": [
+            {
+              "name": "Sitegrow",
+              "contact": "Consultant marketing/export (honoraires plan de mise en œuvre, diagnostic, plan d'exportation) — facture 1326"
+            },
+            {
+              "name": "Google Ads",
+              "contact": "Fournisseur — publicité en ligne"
+            },
+            {
+              "name": "Google Keyword Planner",
+              "contact": "Fournisseur — accès base de données"
+            }
+          ],
+          "expenses": [
+            {
+              "invoice_number": "1326",
+              "invoice_date": "2026-08-01",
+              "total": 40235.5,
+              "supplier": "Sitegrow (Consultation Sitegrow Inc.)"
+            }
+          ],
+          "claims": [
+            {
+              "label": "Réclamation PSCE76134 (Annexe B + Annexe C complétées)",
+              "period_start": "2026-01-28",
+              "period_end": "2026-08-03",
+              "status_hint": "Annexe B: dépenses admissibles engagées et acquittées durant la période = 34 995 $ (13 995 $ pour 'Élaboration d'une stratégie d'exportation / accès bases de données' + 21 000 $ pour 'Élaboration d'un diagnostic ou plan d'affaires'); montant à encaisser Programme PSCE = 17 437,50 $; section 4 (avancement des travaux) remplie avec description des activités (diagnostic, analyse de marché, analyse concurrentielle); case à cocher (1re/2e/3e/finale demande) et signature/date non visibles dans le texte extrait. Annexe C complétée avec réponses narratives et répartition financière (coût total 69 750 $, dont 34 875 $ PSCE)."
+            }
+          ],
+          "contacts": [
+            {
+              "full_name": "François-Xavier Edger-Sauvé",
+              "role": "Président, signataire autorisé de l'offre PSCE76134",
+              "email": null,
+              "phone": null
+            },
+            {
+              "full_name": "Bobby Papadopoulos",
+              "role": "Co-signataire autorisé désigné (résolution du CA) pour documents accessoires; destinataire de la facture Sitegrow",
+              "email": null,
+              "phone": null
+            },
+            {
+              "full_name": "Alain Delarosbil",
+              "role": "Conseiller spécialisé, Aides financières — Investissement Québec (signataire de l'offre)",
+              "email": null,
+              "phone": null
+            },
+            {
+              "full_name": "Marie-Josée Lacoursière",
+              "role": "Co-fondatrice, Sitegrow (fournisseur)",
+              "email": "mj@sitegrow.co",
+              "phone": "(450) 358-0888"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

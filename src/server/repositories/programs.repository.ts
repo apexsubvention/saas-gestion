@@ -18,6 +18,16 @@ export function programsRepository(supabase: SupabaseClient) {
       if (error) throw error;
       return data as ProgramRow[];
     },
+    async findByName(name: string): Promise<ProgramRow | null> {
+      const { data, error } = await supabase
+        .from("grant_programs")
+        .select("*")
+        .ilike("name", name.trim())
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data as ProgramRow | null;
+    },
     async create(input: {
       organization_id: string;
       name: string;

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { grantProjectsRepository } from "@/server/repositories/grantProjects.repository";
 import { createGrantProjectSchema, type CreateGrantProjectInput } from "@/features/grants/schemas";
+import { GRANT_PROJECT_STATUS_LABELS } from "@/features/grants/constants";
 
 export function grantProjectsService(supabase: SupabaseClient) {
   const repo = grantProjectsRepository(supabase);
@@ -22,6 +23,13 @@ export function grantProjectsService(supabase: SupabaseClient) {
         official_start_date: parsed.official_start_date || null,
         official_end_date: parsed.official_end_date || null,
       });
+    },
+
+    async updateStatus(id: string, status: string) {
+      if (!(status in GRANT_PROJECT_STATUS_LABELS)) {
+        throw new Error(`Statut invalide : ${status}`);
+      }
+      return repo.updateStatus(id, status);
     },
   };
 }

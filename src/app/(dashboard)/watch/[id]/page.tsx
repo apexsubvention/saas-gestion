@@ -4,6 +4,7 @@ import { ArrowLeft, CalendarClock, DatabaseZap, ExternalLink, History, Link2, Ma
 import { createClient } from "@/lib/supabase/server";
 import { requireOrgContext } from "@/lib/permissions";
 import { FUNDING_TYPE_LABELS, SOURCE_FAMILY_LABELS, WATCH_STATUS_LABELS } from "@/features/watch/constants";
+import { supportsOpenCanadaAwards } from "@/features/watch/connectors/openCanadaAwards";
 import { addOpportunityTerritory, linkOpportunitySource, refreshFundingAwardExamples, refreshOpportunityOfficialDetails } from "./actions";
 import { updateOpportunityStatus } from "../actions";
 
@@ -47,7 +48,7 @@ export default async function FundingOpportunityDetailPage({ params }: { params:
   const sourceById = new Map(sources.map((source) => [source.id, source]));
   const officialSource = item.official_source_id ? sourceById.get(item.official_source_id) : null;
   const awards = awardsResult.data ?? [];
-  const supportsOpenCanadaExamples = /canexport|pari|irap|industrial research assistance/i.test(`${item.title ?? ""} ${item.organization ?? ""}`);
+  const supportsOpenCanadaExamples = supportsOpenCanadaAwards(`${item.title ?? ""} ${item.organization ?? ""}`);
 
   return (
     <div className="space-y-6">
@@ -88,7 +89,8 @@ export default async function FundingOpportunityDetailPage({ params }: { params:
           <Section title="Résumé"><p className="whitespace-pre-wrap text-sm leading-6 text-slate-700">{item.summary || "Aucun résumé enregistré."}</p></Section>
 
           <Section title="Aide financière" icon={<TrendingUp className="h-4 w-4" />}>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <FreshnessBadge deepReadAt={item.deep_read_at} formatDateTime={formatDateTime} />
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <MiniStat label="Financement minimal" value={formatMoney(item.min_amount)} />
               <MiniStat label="Dépenses admissibles minimales" value={formatMoney(item.min_eligible_spend)} />
               <MiniStat label="Apport privé minimal" value={formatPercent(item.private_contribution_min_rate)} />
@@ -110,7 +112,10 @@ export default async function FundingOpportunityDetailPage({ params }: { params:
           </Section>
 
           <Section title="Préparer le dossier" icon={<ClipboardList className="h-4 w-4" />}>
+            <FreshnessBadge deepReadAt={item.deep_read_at} formatDateTime={formatDateTime} />
+            <div className="mt-3">
             {(item.preparation_documents ?? []).length > 0 ? <div className="space-y-2">{(item.preparation_documents ?? []).map((doc) => <div key={doc} className="flex items-start gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700"><span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-indigo-500" />{doc}</div>)}</div> : <p className="text-sm text-slate-500">Aucune liste de documents explicite n’a encore été détectée sur la source.</p>}
+            </div>
             {item.preparation_notes && <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-slate-600">{item.preparation_notes}</p>}
             {item.preparation_source_url && <a href={item.preparation_source_url} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-800"><ExternalLink className="h-4 w-4" /> Vérifier les exigences sur la source</a>}
           </Section>
@@ -152,5 +157,14 @@ export default async function FundingOpportunityDetailPage({ params }: { params:
 function InfoCard({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) { return <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-slate-400">{icon}{label}</div><div className="mt-2 text-lg font-semibold text-slate-950">{value}</div></div>; }
 function MiniStat({ label, value }: { label: string; value: string }) { return <div className="rounded-xl bg-slate-50 p-3"><div className="text-xs text-slate-400">{label}</div><div className="mt-1 text-sm font-semibold text-slate-800">{value}</div></div>; }
 function Section({ title, icon, children }: { title: string; icon?: React.ReactNode; children: React.ReactNode }) { return <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="mb-4 flex items-center gap-2"><span className="text-slate-400">{icon}</span><h2 className="font-semibold text-slate-950">{title}</h2></div>{children}</section>; }
+// Distingue une donnée relue automatiquement sur la source officielle (deep_read_at renseigné)
+// d'une donnée saisie une fois pour toutes (seed) : sans ce badge, les deux se ressemblaient
+// à l'écran alors qu'une seed codée en dur ne se met jamais à jour toute seule.
+function FreshnessBadge({ deepReadAt, formatDateTime }: { deepReadAt: string | null; formatDateTime: (v: string | null) => string }) {
+  if (deepReadAt) {
+    return <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700">Relu sur la source officielle · {formatDateTime(deepReadAt)}</span>;
+  }
+  return <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-800">Non vérifié en direct — à confirmer sur la source officielle</span>;
+}
 function TagBlock({ label, values }: { label: string; values: string[] }) { return <div className="mt-4"><div className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">{label}</div><div className="flex flex-wrap gap-1.5">{values.map((value) => <span key={value} className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-600">{value}</span>)}</div></div>; }
 function StatusButton({ id, status, children, primary = false }: { id: string; status: string; children: React.ReactNode; primary?: boolean }) { return <form action={updateOpportunityStatus}><input type="hidden" name="id" value={id} /><input type="hidden" name="status" value={status} /><button className={primary ? "rounded-lg bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-700" : "rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"}>{children}</button></form>; }

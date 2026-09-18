@@ -10,3 +10,9 @@ export const createClientSchema = z.object({
 });
 
 export type CreateClientInput = z.infer<typeof createClientSchema>;
+
+export const updateClientNeedsSchema = z.object({
+  current_needs: z.string().max(5000).optional().or(z.literal("")),
+});
+
+export type UpdateClientNeedsInput = z.infer<typeof updateClientNeedsSchema>;

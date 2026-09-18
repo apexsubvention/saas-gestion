@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { grantProjectsService } from "@/server/services/grantProjects.service";
+import { GRANT_PROJECT_STATUS_LABELS, grantProjectStatusBadgeClass } from "@/features/grants/constants";
 
 export default async function GrantsPage() {
   const supabase = await createClient();
@@ -39,7 +40,11 @@ export default async function GrantsPage() {
                 </td>
                 <td className="px-4 py-2 text-neutral-600">{p.clients?.name ?? "—"}</td>
                 <td className="px-4 py-2 text-neutral-600">{p.grant_programs?.name ?? "—"}</td>
-                <td className="px-4 py-2 text-neutral-600">{p.status}</td>
+                <td className="px-4 py-2">
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${grantProjectStatusBadgeClass(p.status)}`}>
+                    {GRANT_PROJECT_STATUS_LABELS[p.status] ?? p.status}
+                  </span>
+                </td>
                 <td className="px-4 py-2 text-neutral-600">
                   {p.approved_grant_amount ? `${Number(p.approved_grant_amount).toLocaleString("fr-CA")} $` : "—"}
                 </td>

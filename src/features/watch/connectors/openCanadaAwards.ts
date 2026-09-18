@@ -112,10 +112,36 @@ function parseAgreementDates(
   };
 }
 
-async function recordUrls(page: number) {
+// Organisme fédéral (owner_org de search.open.canada.ca) associé à chaque programme connu.
+// Sans ce mappage, la recherche interrogeait toujours nrc-cnrc (PARI) quel que soit le
+// programme demandé : CanExport ne pouvait donc jamais remonter d'exemple, même si
+// matchesProgram() sait reconnaître le mot "canexport" dans un résultat.
+// Valeur "dfatd-maecd" vérifiée le 18 sept. 2026 via une recherche indexée réelle
+// (search.open.canada.ca/grants/?owner_org=dfatd-maecd renvoie des ententes Affaires
+// mondiales Canada / Global Affairs Canada, dont des ententes CanExport).
+const OWNER_ORG_BY_PROGRAM: Array<{ pattern: RegExp; ownerOrg: string }> = [
+  { pattern: /pari|irap|industrial research assistance|nrc[- ]cnrc|conseil national de recherches/i, ownerOrg: "nrc-cnrc" },
+  { pattern: /canexport|affaires mondiales|global affairs/i, ownerOrg: "dfatd-maecd" },
+];
+
+// Organisme fédéral à interroger pour un programme donné, ou null si inconnu
+// (dans ce cas la recherche ne filtre pas par owner_org et matchesProgram() fait le tri).
+export function resolveOwnerOrg(programHint: string): string | null {
+  const match = OWNER_ORG_BY_PROGRAM.find((entry) => entry.pattern.test(programHint));
+  return match?.ownerOrg ?? null;
+}
+
+// À utiliser côté UI pour savoir si "Exemples de projets déjà financés" a une chance de
+// trouver quelque chose, plutôt que de dupliquer une regex qui peut diverger de ce mappage.
+export function supportsOpenCanadaAwards(programHint: string) {
+  return resolveOwnerOrg(programHint) !== null;
+}
+
+async function recordUrls(page: number, ownerOrg: string | null) {
+  const ownerOrgParam = ownerOrg ? `&owner_org=${encodeURIComponent(ownerOrg)}` : "";
   const url =
-    `${ROOT}/grants/?owner_org=nrc-cnrc` +
-    `&page=${page}` +
+    `${ROOT}/grants/?page=${page}` +
+    ownerOrgParam +
     `&sort=agreement_start_date+desc` +
     `&wbdisable=false`;
 
@@ -302,6 +328,7 @@ export async function collectOpenCanadaAwards(
   programHint: string,
   limit = 8,
 ): Promise<OpenCanadaAward[]> {
+  const ownerOrg = resolveOwnerOrg(programHint);
   const urls = new Set<string>();
 
   for (
@@ -310,7 +337,7 @@ export async function collectOpenCanadaAwards(
     page += 1
   ) {
     const pageUrls =
-      await recordUrls(page);
+      await recordUrls(page, ownerOrg);
 
     for (const url of pageUrls) {
       urls.add(url);
