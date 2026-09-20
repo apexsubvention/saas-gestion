@@ -5,6 +5,11 @@ import { requireOrgContext } from "@/lib/permissions";
 import { refreshFundingWatch, updateOpportunityStatus } from "./actions";
 import { FUNDING_TYPE_LABELS, FUNDING_TYPE_OPTIONS, WATCH_STATUS_LABELS } from "@/features/watch/constants";
 import { fundingSearchScore } from "@/features/watch/search";
+import { assessRelevance, buildNeedProfile } from "@/features/watch/relevance";
+import { DeepWebSearch } from "./DeepWebSearch";
+import { deepSearchAvailable } from "@/features/watch/webSearch/deepSearch";
+import { projectWebSearchService } from "@/server/services/projectWebSearch.service";
+import type { DeepSearchResult } from "@/features/watch/webSearch/types";
 import { extractProjectSignals, scoreOpportunityForProject, type FundingAwardForMatch, type OpportunityForMatch, type ProjectMatchResult } from "@/features/watch/projectMatch";
 
 function formatMoney(value: number | null) {
@@ -16,10 +21,13 @@ function formatDate(value: string | null) {
   return new Intl.DateTimeFormat("fr-CA", { day: "numeric", month: "short", year: "numeric" }).format(new Date(`${value}T12:00:00`));
 }
 
-type SearchParams = { q?: string; project?: string; view?: string; audience?: string; province?: string; funding_type?: string; source?: string; deadline?: string };
+// La recherche web approfondie (DeepWebSearch) peut durer jusqu'à ~1 min.
+export const maxDuration = 60;
+
+type SearchParams = { all?: string; q?: string; project?: string; view?: string; audience?: string; province?: string; funding_type?: string; source?: string; deadline?: string };
 
 export default async function WatchPage({ searchParams }: { searchParams?: SearchParams }) {
-  await requireOrgContext(); const supabase = await createClient();
+  const ctx = await requireOrgContext(); const supabase = await createClient();
 
   const q = (searchParams?.q ?? "").trim().toLowerCase(); const project = (searchParams?.project ?? "").trim(); const view = searchParams?.view ?? "active";
   const audience = searchParams?.audience ?? "business"; const province = searchParams?.province ?? "all"; const fundingType = searchParams?.funding_type ?? "all"; const sourceId = searchParams?.source ?? "all"; const deadline = searchParams?.deadline ?? "all";
@@ -58,13 +66,21 @@ export default async function WatchPage({ searchParams }: { searchParams?: Searc
     return scoreOpportunityForProject(projectSignals, item as unknown as OpportunityForMatch, awardsByOpportunity.get(item.id) ?? []);
   }
 
+  // Pertinence réelle : partage d'un univers métier ou de mots significatifs avec ce qui DÉCRIT le
+  // programme (voir relevance.ts). Sans cela, tout programme obtient un score de base non nul.
+  const needProfile = project ? buildNeedProfile(project) : null;
+  const showAll = searchParams?.all === "1";
+  const focusText = (i: (typeof all)[number]) =>
+    [i.title, i.summary, i.organization, (i.categories ?? []).join(" "), (i.eligible_sectors ?? []).join(" "), (i.eligible_expenses ?? []).join(" "), i.eligibility_criteria, (i.search_aliases ?? []).join(" "), (i.government_priorities ?? []).join(" ")].filter(Boolean).join(" ");
+
   const withMatch = all.map((item) => ({
     item,
     matchResult: matchProject(item),
     searchMatch: fundingSearchScore(q, item),
+    relevant: needProfile ? assessRelevance(needProfile, focusText(item)).relevant : true,
   }));
 
-  const scored = withMatch.filter(({ item, matchResult, searchMatch }) => {
+  const scored = withMatch.filter(({ item, searchMatch, relevant }) => {
     const qMatch = !q || searchMatch > 0;
     const viewMatch = view === "all" ? true : view === "active" ? !["ignored","archived"].includes(item.status) : view === "modified" ? changed.has(item.id) : view === "opening_soon" ? item.availability_status === "opening_soon" : item.status === view;
     const audienceMatch = audience === "all" ? true : audience === "business" ? (["private_business","mixed"].includes(item.target_audience) || (item.target_audience === "unknown" && item.business_relevance_score >= 50)) : item.target_audience === audience;
@@ -74,7 +90,7 @@ export default async function WatchPage({ searchParams }: { searchParams?: Searc
     const linked = links.filter((l) => l.opportunity_id === item.id).map((l) => l.source_id);
     const sourceMatch = sourceId === "all" || item.official_source_id === sourceId || linked.includes(sourceId);
     let deadlineMatch = true; if (deadline !== "all") { if (!item.deadline) deadlineMatch = false; else { const d = new Date(`${item.deadline}T23:59:59`).getTime(); deadlineMatch = d >= now && d <= now + Number(deadline)*86400000; } }
-    const projectMatch = !project || (matchResult?.score ?? 0) > 0;
+    const projectMatch = !project || showAll || relevant;
     return qMatch && viewMatch && audienceMatch && provinceMatch && typeMatch && sourceMatch && deadlineMatch && projectMatch;
   }).sort((a,b) => {
     if (project) return (b.matchResult?.score ?? 0) - (a.matchResult?.score ?? 0);
@@ -87,8 +103,17 @@ export default async function WatchPage({ searchParams }: { searchParams?: Searc
   const lexicalMatches = q
     ? withMatch.filter((x) => x.searchMatch > 0).map((x) => x.item)
     : project
-      ? withMatch.filter((x) => (x.matchResult?.score ?? 0) > 0).map((x) => x.item)
+      ? withMatch.filter((x) => x.relevant).map((x) => x.item)
       : [];
+
+  // Recherche web de secours : rien dans le catalogue ne correspond au projet décrit.
+  const noRelevant = Boolean(project) && !withMatch.some((x) => x.relevant);
+  const projectUsable = project.length >= 10 && project.length <= 1500;
+  let cachedWebSearch: DeepSearchResult | null = null;
+  if (project && projectUsable) {
+    try { cachedWebSearch = await projectWebSearchService(supabase).getCached(ctx.organizationId, project); }
+    catch { cachedWebSearch = null; } // table absente (migration 0032 non appliquée) : la page reste utilisable
+  }
 
   const opportunities = scored.map((x) => x.item); const matchById = new Map(scored.map((x) => [x.item.id, x.matchResult]));
   const provinces = unique(territories.map((x) => x.province_territory));
@@ -101,8 +126,14 @@ export default async function WatchPage({ searchParams }: { searchParams?: Searc
 
     <form className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-white p-5 shadow-sm">
       <input type="hidden" name="view" value={view}/><input type="hidden" name="audience" value="business"/>
-      <div className="flex items-start gap-3"><div className="rounded-xl bg-indigo-600 p-2.5 text-white"><MessageSquareText className="h-5 w-5"/></div><div className="flex-1"><div className="font-semibold text-slate-950">Parle-moi de ton projet</div><p className="mt-1 text-sm text-slate-600">Ex. « PME de Granby, 15 employés, implantation d’un CRM à 40 000 $ et formation de 6 employés. » Apex repère le lieu, le budget, les effectifs et les univers touchés (stage, formation, export, IA, manufacturier…), puis compare chaque programme sur son admissibilité territoriale, son adéquation financière, sa disponibilité, ses priorités et des projets déjà financés similaires quand ils existent.</p><textarea name="project" defaultValue={project} rows={3} className="mt-3 w-full rounded-xl border border-indigo-100 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-300" placeholder="Décris l’entreprise, le lieu, le projet, le budget, les dépenses et les emplois concernés…"/><div className="mt-3 flex flex-wrap items-center gap-3"><button className="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700">Trouver les aides compatibles</button>{project && <Link href="/watch" className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-600"><RotateCcw className="h-4 w-4"/>Effacer</Link>}{project && <span className="text-xs text-slate-500">Score de pertinence explicable — pas une probabilité d’acceptation.</span>}</div></div></div>
+      <div className="flex items-start gap-3"><div className="rounded-xl bg-indigo-600 p-2.5 text-white"><MessageSquareText className="h-5 w-5"/></div><div className="flex-1"><div className="font-semibold text-slate-950">Parle-moi de ton projet</div><p className="mt-1 text-sm text-slate-600">Ex. « PME de Granby, 15 employés, implantation d’un CRM à 40 000 $ et formation de 6 employés. » Apex repère le lieu, le budget, les effectifs et les univers touchés (stage, formation, export, IA, manufacturier, événement…), puis compare chaque programme sur son admissibilité territoriale, son adéquation financière, sa disponibilité, ses priorités et des projets déjà financés similaires quand ils existent. Si rien ne correspond dans le catalogue, une recherche web approfondie est lancée automatiquement.</p><textarea name="project" defaultValue={project} rows={3} className="mt-3 w-full rounded-xl border border-indigo-100 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-300" placeholder="Décris l’entreprise, le lieu, le projet, le budget, les dépenses et les emplois concernés…"/><div className="mt-3 flex flex-wrap items-center gap-3"><button className="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700">Trouver les aides compatibles</button>{project && <Link href="/watch" className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-600"><RotateCcw className="h-4 w-4"/>Effacer</Link>}{project && <span className="text-xs text-slate-500">Score de pertinence explicable — pas une probabilité d’acceptation.</span>}</div></div></div>
     </form>
+
+    {project && projectUsable && (
+      <DeepWebSearch key={project} project={project} initial={cachedWebSearch} autoStart={noRelevant} configured={deepSearchAvailable()} noLocalResults={noRelevant} />
+    )}
+    {project && !projectUsable && <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">La description du projet doit faire entre 10 et 1 500 caractères pour lancer une recherche web.</p>}
+    {project && showAll && <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">Affichage de tous les programmes du catalogue, triés par pertinence, y compris ceux sans rapport clair avec le projet. <Link href={`/watch?view=${view}&audience=business&project=${encodeURIComponent(project)}`} className="ml-1 font-semibold underline">Revenir aux programmes pertinents</Link></div>}
 
     <div className="flex flex-wrap gap-2"><ViewTab href="/watch?view=active&audience=business" active={view==="active"}>Actives</ViewTab><ViewTab href="/watch?view=new&audience=business" active={view==="new"}>Nouvelles</ViewTab><ViewTab href="/watch?view=to_review&audience=business" active={view==="to_review"}>À analyser</ViewTab><ViewTab href="/watch?view=qualified&audience=business" active={view==="qualified"}>Pertinentes</ViewTab><ViewTab href="/watch?view=modified&audience=business" active={view==="modified"}>Modifiées</ViewTab><ViewTab href="/watch?view=opening_soon&audience=business" active={view==="opening_soon"}>Ouverture bientôt</ViewTab><ViewTab href="/watch?view=all&audience=business" active={view==="all"}>Toutes</ViewTab></div>
 
@@ -121,7 +152,7 @@ export default async function WatchPage({ searchParams }: { searchParams?: Searc
 
     {opportunities.length === 0 && lexicalMatches.length > 0 && (q || project) && (fundingType !== "all" || sourceId !== "all" || province !== "all" || deadline !== "all" || audience !== "business") && <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"><strong>{lexicalMatches.length} programme{lexicalMatches.length>1?"s":""} correspond{lexicalMatches.length>1?"ent":""} à ta recherche</strong>, mais les filtres actuels les masquent. <Link href={`/watch?view=${view}&audience=business${q?`&q=${encodeURIComponent(q)}`:""}${project?`&project=${encodeURIComponent(project)}`:""}`} className="ml-1 font-semibold underline">Réinitialiser les filtres et voir les résultats</Link>.</div>}
 
-    {opportunities.length===0 ? <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center"><Radar className="mx-auto h-8 w-8 text-slate-300"/><h2 className="mt-3 font-semibold text-slate-900">Aucune opportunité trouvée</h2><p className="mt-1 text-sm text-slate-500">Essaie une recherche plus large ou clique sur Actualiser la veille.</p></div> : <div className="grid gap-4 xl:grid-cols-2">{opportunities.map((item)=>{
+    {opportunities.length===0 ? <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center"><Radar className="mx-auto h-8 w-8 text-slate-300"/><h2 className="mt-3 font-semibold text-slate-900">{project ? "Aucun programme du catalogue ne correspond à ce projet" : "Aucune opportunité trouvée"}</h2><p className="mt-1 text-sm text-slate-500">{project ? <>Consulte les résultats de la recherche web ci-dessus, ou <Link href={`/watch?view=${view}&audience=business&project=${encodeURIComponent(project)}&all=1`} className="font-semibold underline">affiche tous les programmes triés par pertinence</Link>.</> : "Essaie une recherche plus large ou clique sur Actualiser la veille."}</p></div> : <div className="grid gap-4 xl:grid-cols-2">{opportunities.map((item)=>{
       const officialSource=item.official_source_id?sourceById.get(item.official_source_id):null; const linked=links.filter((l)=>l.opportunity_id===item.id).map((l)=>l.source_id); const count=new Set([item.official_source_id,...linked].filter(Boolean)).size; const tr=territories.find((t)=>t.opportunity_id===item.id); const projectMatch=matchById.get(item.id)??null;
       return <article key={item.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:border-slate-300"><div className="flex items-start justify-between gap-4"><div className="min-w-0 flex-1"><div className="mb-2 flex flex-wrap gap-2"><span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[11px] font-medium text-indigo-700">{WATCH_STATUS_LABELS[item.status]??item.status}</span>{item.funding_type&&<span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px]">{FUNDING_TYPE_LABELS[item.funding_type]??item.funding_type}</span>}{item.availability_status==="opening_soon"&&<span className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">Ouverture bientôt</span>}{item.availability_status==="open"&&<span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">Ouvert</span>}<span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">Entreprise {item.business_relevance_score}%</span>{projectMatch&&<span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${projectMatch.priorityLabel==="Prioritaire"?"bg-violet-100 text-violet-800":projectMatch.priorityLabel==="À évaluer"?"bg-violet-50 text-violet-700":"bg-slate-100 text-slate-600"}`}>{projectMatch.priorityLabel} · {projectMatch.score}/100</span>}</div><Link href={`/watch/${item.id}`} className="font-semibold text-slate-950 hover:text-indigo-700">{item.title??"Sans titre"}</Link><p className="mt-1 text-sm text-slate-500">{item.organization??"Organisme à préciser"}</p></div>{(item.official_url||item.external_url)&&<a href={item.official_url??item.external_url??"#"} target="_blank" rel="noreferrer" className="rounded-lg border border-slate-200 p-2 text-slate-500"><ExternalLink className="h-4 w-4"/></a>}</div>
       {item.summary&&<p className="mt-4 line-clamp-3 text-sm leading-6 text-slate-600">{item.summary}</p>}<div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-600"><span className="inline-flex items-center gap-1 rounded-md bg-slate-50 px-2 py-1"><MapPin className="h-3.5 w-3.5"/>{tr?.province_territory??item.territory??"À préciser"}</span><span className="inline-flex items-center gap-1 rounded-md bg-slate-50 px-2 py-1"><DatabaseZap className="h-3.5 w-3.5"/>{officialSource?`${officialSource.name} · ${officialSource.is_official?"officielle":"source principale"}`:"Source officielle à confirmer"}</span><span className="inline-flex items-center gap-1 rounded-md bg-slate-50 px-2 py-1"><Layers3 className="h-3.5 w-3.5"/>{count} source{count>1?"s":""}</span></div>

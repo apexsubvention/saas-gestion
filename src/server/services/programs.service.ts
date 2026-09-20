@@ -62,6 +62,7 @@ export function programsService(supabase: SupabaseClient) {
   return {
     list: () => repo.list(),
     get: (id: string) => repo.findById(id),
+    findBySourceUrl: (url: string) => repo.findBySourceUrl(url),
     listExamples: (programId: string) => examples.listByProgram(programId),
     listAllExamples: () => examples.listAll(),
 

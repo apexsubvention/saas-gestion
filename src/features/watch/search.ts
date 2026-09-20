@@ -33,10 +33,10 @@ const STOP_WORDS = new Set([
 // de l'emploi du mot exact utilisé par la source (ex. stage vs WIL vs stagiaire).
 const SYNONYM_GROUPS: string[][] = [
   ["stage", "stages", "stagiaire", "stagiaires", "internship", "intern", "placement", "placements", "wil", "coop", "co op", "etudiant", "etudiante", "etudiants", "etudiantes", "student", "students", "career ready", "pratique rh", "pratiques rh"],
-  ["formation", "formations", "competence", "competences", "mfor", "main oeuvre", "developpement competences", "upskilling", "reskilling"],
+  ["formation", "formations", "former", "competence", "competences", "mfor", "main oeuvre", "developpement competences", "upskilling", "reskilling"],
   ["embauche", "recrutement", "recruter", "emploi", "emplois", "salarial", "salaire", "salaires", "subvention salariale", "wage subsidy"],
   ["crm", "erp", "logiciel", "logiciels", "numerique", "digital", "digitalisation", "transformation numerique", "technologie", "technologies", "automatisation"],
-  ["export", "exportation", "commercialisation", "international", "internationalisation", "hors quebec", "marche etranger", "marches etrangers"],
+  ["export", "exportation", "salon commercial", "salons commerciaux", "foire commerciale", "mission commerciale", "commercialisation", "international", "internationalisation", "hors quebec", "marche etranger", "marches etrangers"],
   ["innovation", "recherche", "developpement", "rd", "r d", "r&d", "technologique", "pari", "irap"],
   ["environnement", "environnemental", "environnementale", "vert", "verte", "ecologique", "eco canada", "ecocanada", "cleantech", "transition energetique"],
   // Ajoutés le 18 sept. 2026 : ces univers n'avaient aucun groupe de synonymes (recherche
@@ -48,6 +48,9 @@ const SYNONYM_GROUPS: string[][] = [
   ["cybersecurite", "cyber securite", "securite informatique", "securite des donnees", "protection des donnees", "cyberattaque", "cyberattaques", "cybersecurity"],
   ["defense", "double usage", "dual use", "securite nationale", "technologies militaires", "defence"],
   ["manufacturier", "manufacturiere", "manufacturiers", "manufacturieres", "usine", "usines", "production", "chaine de production", "automatisation industrielle", "robotique", "robotisation", "industrie 4 0"],
+  // Ajoutés le 20 sept. 2026 : aucune des recherches « événement / festival / salon » ne trouvait de vocabulaire.
+  ["evenement", "evenements", "evenementiel", "evenementielle", "festival", "festivals", "congres", "colloque", "conference", "conferences", "tournoi", "tournois", "gala", "manifestation", "manifestations", "spectacle", "spectacles", "fete", "fetes", "event", "events"],
+  ["tourisme", "touristique", "touristiques", "attraction touristique", "culture", "culturel", "culturelle", "culturels", "artistique", "artistiques", "arts", "patrimoine", "musee", "musees", "creation artistique"],
 ];
 
 // Étiquette lisible par univers, alignée sur l'ordre de SYNONYM_GROUPS ci-dessus.
@@ -66,6 +69,8 @@ const GROUP_LABELS = [
   "Cybersécurité",
   "Défense / double usage",
   "Manufacturier / automatisation",
+  "Événement / festival",
+  "Tourisme / culture",
 ];
 
 /** Univers métiers (groupes de synonymes) déclenchés par un texte libre. */

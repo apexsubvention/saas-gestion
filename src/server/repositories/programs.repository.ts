@@ -49,6 +49,11 @@ export function programsRepository(supabase: SupabaseClient) {
       if (error) throw error;
       return data as ProgramRow | null;
     },
+    async findBySourceUrl(url: string): Promise<ProgramRow | null> {
+      const { data, error } = await supabase.from("grant_programs").select("*").eq("source_url", url).limit(1).maybeSingle();
+      if (error) throw error;
+      return data as ProgramRow | null;
+    },
     async findByName(name: string): Promise<ProgramRow | null> {
       const { data, error } = await supabase
         .from("grant_programs")

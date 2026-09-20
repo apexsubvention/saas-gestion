@@ -8,6 +8,7 @@
 //  - les URL de liens et de sources ne viennent jamais du modèle : il désigne des identifiants
 //    de la liste fournie, que l'on retraduit ici -> pas d'URL inventée possible.
 import { z } from "zod";
+import { lenientList } from "@/lib/zodLenient";
 import { AVAILABILITY_VALUES, emptyExtraction, type FundedExample, type ProgramExtraction, type ResourceLink, type ResourceLinkKind } from "./types";
 
 export type LlmPage = { id: number; url: string; text: string };
@@ -99,13 +100,6 @@ const TOOL = {
 const str = (max: number) => z.string().trim().min(1).transform((s) => s.slice(0, max)).nullable().catch(null);
 const num = z.number().finite().nonnegative().nullable().catch(null);
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((s) => !Number.isNaN(Date.parse(s))).nullable().catch(null);
-// Liste tolérante : un élément invalide est écarté sans faire perdre les autres.
-function lenientList<T extends z.ZodTypeAny>(item: T, max: number) {
-  return z
-    .array(z.unknown())
-    .transform((arr) => arr.flatMap((x) => { const r = item.safeParse(x); return r.success ? [r.data as z.infer<T>] : []; }).slice(0, max))
-    .catch([] as Array<z.infer<T>>);
-}
 const strList = lenientList(z.string().trim().min(1).transform((s) => s.slice(0, 300)), 30);
 
 const toolInputSchema = z.object({

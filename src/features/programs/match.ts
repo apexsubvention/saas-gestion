@@ -10,7 +10,7 @@
 //     (ex. « Export / international » pour un programme de commercialisation) ou, à défaut,
 //     au moins 2 mots significatifs entiers. La recherche lexicale de la veille n'est pas utilisée
 //     comme filtre : elle compte des sous-chaînes (« ia » dans « commercialisation »).
-import { matchedIntentGroupsStrict, normalizeSearchText } from "@/features/watch/search";
+import { assessRelevance, buildNeedProfile } from "@/features/watch/relevance";
 import {
   extractProjectSignals,
   scoreOpportunityForProject,
@@ -22,29 +22,6 @@ import type { ProgramRow } from "@/server/repositories/programs.repository";
 import type { ProgramExampleRow } from "@/server/repositories/programExamples.repository";
 
 const MIN_SCORE = 35;
-const MIN_SHARED_KEYWORDS = 2;
-
-// Mots trop génériques pour prouver qu'un besoin et un programme parlent de la même chose.
-const GENERIC_WORDS = new Set([
-  "client", "clients", "projet", "projets", "entreprise", "entreprises", "besoin", "besoins", "veut", "voudrait",
-  "souhaite", "aide", "aides", "programme", "programmes", "subvention", "subventions", "financement", "developper",
-  "developpement", "nouveau", "nouveaux", "nouvelle", "nouvelles", "pour", "avec", "dans", "leur", "leurs", "notre",
-  "quebec", "canada", "depenses", "admissibles", "admissible", "soutien", "mettre", "faire", "avoir", "etre",
-]);
-
-function keywordStem(word: string) {
-  return word.replace(/(es|s|x)$/, "");
-}
-
-function significantKeywords(text: string): Set<string> {
-  return new Set(
-    normalizeSearchText(text)
-      .split(" ")
-      .filter((w) => w.length >= 5 && !GENERIC_WORDS.has(w))
-      .map(keywordStem)
-  );
-}
-
 function splitList(text: string | null): string[] {
   return (text ?? "").split(/\n|;|•/).map((s) => s.replace(/^[-\s]+/, "").trim()).filter(Boolean);
 }
@@ -98,8 +75,8 @@ export function matchNeedsToPrograms(
   if (!text) return { matches: [], hiddenCount: 0, needThemes: [] };
 
   const signals = extractProjectSignals(text);
-  const needThemes = matchedIntentGroupsStrict(text);
-  const needKeywords = significantKeywords(text);
+  const profile = buildNeedProfile(text);
+  const needThemes = profile.themes;
 
   const awardsByProgram = new Map<string, FundingAwardForMatch[]>();
   for (const e of examples) {
@@ -111,15 +88,11 @@ export function matchNeedsToPrograms(
   const all: ProgramMatch[] = [];
   for (const program of programs) {
     const opportunity = programToOpportunity(program);
-    const programThemes = matchedIntentGroupsStrict(
+    const { relevant, sharedThemes } = assessRelevance(
+      profile,
       [program.name, program.description, program.program_type, program.eligible_expenses, program.government_priorities.join(" ")].filter(Boolean).join(" ")
     );
-    const sharedThemes = needThemes.filter((t) => programThemes.includes(t));
-    // Mots entiers en commun avec ce qui décrit le programme (secours quand aucun univers
-    // métier n'est reconnu, ex. « robotique agricole »).
-    const programKeywords = significantKeywords([program.name, program.description, program.eligible_expenses].filter(Boolean).join(" "));
-    const sharedKeywords = [...needKeywords].filter((w) => programKeywords.has(w));
-    if (sharedThemes.length === 0 && sharedKeywords.length < MIN_SHARED_KEYWORDS) continue;
+    if (!relevant) continue;
     all.push({ program, result: scoreOpportunityForProject(signals, opportunity, awardsByProgram.get(program.id) ?? []), sharedThemes });
   }
 
