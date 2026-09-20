@@ -6,8 +6,7 @@ import {
   FolderKanban,
   Landmark,
   FileText,
-  ReceiptText,
-  CheckSquare2,
+  CalendarClock,
   Settings,
 } from "lucide-react";
 import type { OrgRole } from "@/lib/permissions";
@@ -19,8 +18,7 @@ const NAV = [
   { href: "/grants", label: "Dossiers", icon: FolderKanban },
   { href: "/programs", label: "Programmes", icon: Landmark },
   { href: "/documents", label: "Documents", icon: FileText },
-  { href: "/reclamations", label: "Réclamations", icon: ReceiptText },
-  { href: "/taches", label: "Tâches", icon: CheckSquare2 },
+  { href: "/echeancier", label: "Échéancier", icon: CalendarClock },
 ] as const;
 
 export function Sidebar({ role }: { role: OrgRole }) {

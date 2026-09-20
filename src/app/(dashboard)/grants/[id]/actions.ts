@@ -6,6 +6,8 @@ import { grantProjectsService } from "@/server/services/grantProjects.service";
 import { documentsService } from "@/server/services/documents.service";
 import { claimsService } from "@/server/services/claims.service";
 import { tasksService } from "@/server/services/tasks.service";
+import { milestonesService } from "@/server/services/milestones.service";
+import { grantAgreementsRepository } from "@/server/repositories/grantAgreements.repository";
 import { requireOrgContext } from "@/lib/permissions";
 
 export type UpdateGrantProjectStatusFormState = { error: string | null };
@@ -112,7 +114,7 @@ export async function createClaimAction(
   }
 
   revalidatePath(`/grants/${grantProjectId}`);
-  revalidatePath("/reclamations");
+  revalidatePath("/echeancier");
   return { error: null };
 }
 
@@ -135,7 +137,7 @@ export async function updateClaimStatusAction(
   }
 
   revalidatePath(`/grants/${grantProjectId}`);
-  revalidatePath("/reclamations");
+  revalidatePath("/echeancier");
   return { error: null };
 }
 
@@ -169,7 +171,7 @@ export async function createTaskAction(
   }
 
   revalidatePath(`/grants/${grantProjectId}`);
-  revalidatePath("/taches");
+  revalidatePath("/echeancier");
   return { error: null };
 }
 
@@ -192,6 +194,76 @@ export async function updateTaskStatusAction(
   }
 
   revalidatePath(`/grants/${grantProjectId}`);
-  revalidatePath("/taches");
+  revalidatePath("/echeancier");
   return { error: null };
+}
+
+// ---- Échéancier (milestones) -------------------------------------------------
+// Voir src/server/scheduling/suggestMilestones.ts pour la logique et pourquoi ces
+// dates sont toujours des SUGGESTIONS à valider, jamais des échéances officielles.
+
+export type UpdateMilestoneStatusFormState = { error: string | null };
+
+export async function updateMilestoneStatusAction(
+  grantProjectId: string,
+  milestoneId: string,
+  _prev: UpdateMilestoneStatusFormState,
+  formData: FormData
+): Promise<UpdateMilestoneStatusFormState> {
+  await requireOrgContext();
+  const status = String(formData.get("status") ?? "");
+
+  const supabase = await createClient();
+  try {
+    await milestonesService(supabase).updateStatus(milestoneId, status);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Erreur d'enregistrement" };
+  }
+
+  revalidatePath(`/grants/${grantProjectId}`);
+  revalidatePath("/echeancier");
+  return { error: null };
+}
+
+export async function deleteMilestoneAction(grantProjectId: string, milestoneId: string): Promise<void> {
+  await requireOrgContext();
+  const supabase = await createClient();
+  await milestonesService(supabase).remove(milestoneId);
+  revalidatePath(`/grants/${grantProjectId}`);
+  revalidatePath("/echeancier");
+}
+
+export type SuggestMilestonesState = { error: string | null; created: number; skipped: number };
+
+export async function suggestMilestonesAction(
+  grantProjectId: string,
+  _prev: SuggestMilestonesState,
+  _formData: FormData
+): Promise<SuggestMilestonesState> {
+  const ctx = await requireOrgContext();
+  const supabase = await createClient();
+
+  try {
+    const agreements = await grantAgreementsRepository(supabase).listByProject(grantProjectId);
+    const agreement = agreements[0];
+    if (!agreement) {
+      return {
+        error: "Aucune entente de convention enregistrée pour ce dossier — rien à estimer sans dates de projet.",
+        created: 0,
+        skipped: 0,
+      };
+    }
+
+    const result = await milestonesService(supabase).suggestForProject(ctx.organizationId, grantProjectId, {
+      eligible_expense_period_start: agreement.eligible_expense_period_start,
+      eligible_expense_period_end: agreement.eligible_expense_period_end,
+      project_end: agreement.project_end,
+    });
+
+    revalidatePath(`/grants/${grantProjectId}`);
+    revalidatePath("/echeancier");
+    return { error: null, created: result.created, skipped: result.skipped };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Erreur", created: 0, skipped: 0 };
+  }
 }

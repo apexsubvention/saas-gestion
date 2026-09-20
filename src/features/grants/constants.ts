@@ -139,6 +139,49 @@ export const TASK_PRIORITY_LABELS: Record<string, string> = {
   high: "Haute",
 };
 
+// Étiquettes françaises pour milestones.type/status (voir 0005_agreements_milestones.sql).
+// "Échéance" dans l'UI = une ligne de milestones. type='claim' correspond à une réclamation
+// à venir mais PAS ENCORE un dossier de réclamation réel (voir claims) -- c'est une entrée
+// d'échéancier, suggérée ou manuelle, qui précède la création du dossier.
+export const MILESTONE_TYPE_LABELS: Record<string, string> = {
+  claim: "Réclamation à venir",
+  report: "Rapport",
+  document: "Document",
+  invoice: "Facture",
+  payment_proof: "Preuve de paiement",
+  project_end: "Fin de projet",
+  client_followup: "Suivi client",
+  supplier_followup: "Suivi fournisseur",
+  other: "Autre",
+};
+
+export const MILESTONE_STATUS_LABELS: Record<string, string> = {
+  pending: "À venir",
+  done: "Complétée",
+  at_risk: "À risque",
+  cancelled: "Annulée",
+};
+
+export const MILESTONE_STATUS_OPTIONS: Array<{ value: string; label: string }> = [
+  "pending",
+  "at_risk",
+  "done",
+  "cancelled",
+].map((value) => ({ value, label: MILESTONE_STATUS_LABELS[value] ?? value }));
+
+export function milestoneStatusBadgeClass(status: string): string {
+  switch (status) {
+    case "done":
+      return "bg-emerald-50 text-emerald-700";
+    case "at_risk":
+      return "bg-amber-50 text-amber-800";
+    case "cancelled":
+      return "bg-red-50 text-red-700";
+    default:
+      return "bg-neutral-100 text-neutral-600";
+  }
+}
+
 // Étiquettes françaises pour documents.category (voir 0007_documents.sql pour la liste
 // exhaustive). Sous-ensemble utile pour le formulaire d'upload sur un dossier de
 // subvention -- toutes les valeurs de la contrainte check ne sont pas listées ici.
