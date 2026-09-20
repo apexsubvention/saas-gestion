@@ -41,11 +41,21 @@ export function AgreementForm({ grantProjectId, agreement }: { grantProjectId: s
         <Field label="Montant accordé ($)"><input name="grant_amount" inputMode="decimal" defaultValue={agreement?.grant_amount ?? ""} className={input} /></Field>
         <Field label="Taux d'aide (%)" hint="Ex. 50"><input name="grant_rate_percent" inputMode="decimal" defaultValue={ratePercent} className={input} /></Field>
       </div>
-      <Field label="Fréquence des réclamations"><input name="claim_frequency" defaultValue={agreement?.claim_frequency ?? ""} className={input} placeholder="Ex. trimestrielle, à la fin du projet…" /></Field>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field
+          label="Fréquence des réclamations"
+          hint="PARI-CNRC : une réclamation (DDR) par mois est générée automatiquement. Pour un autre programme, écris « mensuelle » pour obtenir aussi un DDR par mois."
+        >
+          <input name="claim_frequency" defaultValue={agreement?.claim_frequency ?? ""} className={input} placeholder="Ex. mensuelle (DDR), trimestrielle, à la fin du projet…" />
+        </Field>
+        <Field label="Échéance de chaque DDR (jours après la fin du mois)" hint="Utilisé seulement pour les réclamations mensuelles. Par défaut 15 ; ajuste les dates ensuite dans l'échéancier.">
+          <input name="ddr_due_delay_days" inputMode="numeric" defaultValue="15" className={input} />
+        </Field>
+      </div>
       <Field label="Conditions particulières"><textarea name="special_conditions" rows={3} defaultValue={agreement?.special_conditions ?? ""} className={input} /></Field>
       <p className="text-xs text-neutral-500">
-        En enregistrant, les dates de réclamation sont estimées à partir de ces dates et ajoutées à l&apos;échéancier, et le dossier passe à
-        « Approuvé — en attente de réclamation ».
+        En enregistrant, les dates de réclamation sont estimées à partir de ces dates et ajoutées à l&apos;échéancier (un DDR par mois pour PARI-CNRC), et le
+        dossier passe à « Approuvé — en attente de réclamation ».
       </p>
       {state.error && <p className="text-sm text-red-600">{state.error}</p>}
       {state.message && !state.error && <p className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{state.message}</p>}

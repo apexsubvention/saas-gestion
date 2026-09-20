@@ -31,9 +31,12 @@ export function milestonesService(supabase: SupabaseClient) {
     async suggestForProject(
       organizationId: string,
       grantProjectId: string,
-      agreement: { eligible_expense_period_start: string | null; eligible_expense_period_end: string | null; project_end: string | null }
+      agreement: { eligible_expense_period_start: string | null; eligible_expense_period_end: string | null; project_end: string | null },
+      opts: { skipClaimSuggestions?: boolean } = {}
     ) {
-      const suggestions = suggestMilestonesFromAgreement(agreement);
+      // Régime mensuel (DDR) : les réclamations sont de vrais dossiers créés à part, on ne suggère
+      // donc que les dates de fin de projet / d'admissibilité.
+      const suggestions = suggestMilestonesFromAgreement(agreement).filter((s) => !(opts.skipClaimSuggestions && s.type === "claim"));
       if (suggestions.length === 0) {
         return { created: 0, skipped: 0 };
       }

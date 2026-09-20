@@ -360,14 +360,22 @@ export async function saveAgreementAction(
 
   const supabase = await createClient();
   try {
-    const result = await grantAgreementsService(supabase).saveAndSchedule(ctx.organizationId, grantProjectId, parsed.data);
+    // Délai d'échéance de chaque DDR mensuel (jours après la fin du mois) : 15 par défaut, 0 à 90.
+    const delayRaw = numberOrNull(formData.get("ddr_due_delay_days"));
+    const dueDelayDays = delayRaw != null && Number.isFinite(delayRaw) ? Math.min(90, Math.max(0, Math.round(delayRaw))) : undefined;
+    const result = await grantAgreementsService(supabase).saveAndSchedule(ctx.organizationId, grantProjectId, parsed.data, { dueDelayDays });
     revalidatePath(`/grants/${grantProjectId}`);
     revalidatePath("/echeancier");
     revalidatePath("/dashboard");
     const parts = ["Entente enregistrée."];
-    if (result.created > 0) parts.push(`${result.created} échéance(s) de réclamation estimée(s) ajoutée(s) — à valider dans l'échéancier.`);
-    else if (result.skipped > 0) parts.push("Les échéances de réclamation étaient déjà présentes.");
-    else parts.push("Aucune date de réclamation n'a pu être calculée : renseigne la période d'admissibilité et/ou la fin du projet.");
+    if (result.monthly) {
+      if (result.claimsCreated > 0) parts.push(`${result.claimsCreated} DDR mensuel(s) créé(s) du début à la fin du projet — leurs échéances sont dans l'échéancier (à ajuster si besoin).`);
+      else if (result.claimsSkipped > 0) parts.push("Les DDR mensuels étaient déjà présents.");
+      else parts.push("Réclamations mensuelles (DDR) : renseigne le début ET la fin du projet pour les générer.");
+    }
+    if (result.created > 0) parts.push(`${result.created} échéance(s) estimée(s) ajoutée(s) — à valider dans l'échéancier.`);
+    else if (!result.monthly && result.skipped > 0) parts.push("Les échéances de réclamation étaient déjà présentes.");
+    else if (!result.monthly && result.claimsCreated === 0) parts.push("Aucune date de réclamation n'a pu être calculée : renseigne la période d'admissibilité et/ou la fin du projet.");
     if (result.statusChanged) parts.push(`Statut du dossier : ${GRANT_PROJECT_STATUS_LABELS[result.status] ?? result.status}.`);
     return { error: null, message: parts.join(" ") };
   } catch (e) {
