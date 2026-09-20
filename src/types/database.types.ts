@@ -643,6 +643,7 @@ export type Database = {
           notes: string | null
           organization_id: string
           owner_id: string | null
+          parent_client_id: string | null
           sector: string | null
           status: string
           tags: string[]
@@ -661,6 +662,7 @@ export type Database = {
           notes?: string | null
           organization_id: string
           owner_id?: string | null
+          parent_client_id?: string | null
           sector?: string | null
           status?: string
           tags?: string[]
@@ -679,6 +681,7 @@ export type Database = {
           notes?: string | null
           organization_id?: string
           owner_id?: string | null
+          parent_client_id?: string | null
           sector?: string | null
           status?: string
           tags?: string[]
@@ -705,6 +708,13 @@ export type Database = {
             columns: ["needs_updated_by"]
             isOneToOne: false
             referencedRelation: "organization_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clients_parent_client_id_fkey"
+            columns: ["parent_client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
             referencedColumns: ["id"]
           },
         ]

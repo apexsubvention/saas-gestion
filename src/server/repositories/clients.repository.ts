@@ -17,6 +17,7 @@ export type ClientRow = {
   current_needs: string | null;
   needs_updated_at: string | null;
   needs_updated_by: string | null;
+  parent_client_id: string | null;
 };
 
 export function clientsRepository(supabase: SupabaseClient) {
@@ -73,6 +74,31 @@ export function clientsRepository(supabase: SupabaseClient) {
           needs_updated_at: new Date().toISOString(),
           needs_updated_by: input.needs_updated_by,
         })
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as ClientRow;
+    },
+
+    // Clients "enfants" -- voir 0028_client_hierarchy_and_portal_access.sql. Un accès
+    // portail accordé sur le parent redonne accès à tous ses enfants via
+    // can_access_client (RLS), donc listChildren() est uniquement pour l'affichage côté
+    // staff -- pas de logique d'accès ici.
+    async listChildren(parentClientId: string): Promise<ClientRow[]> {
+      const { data, error } = await supabase
+        .from("clients")
+        .select("*")
+        .eq("parent_client_id", parentClientId)
+        .order("name", { ascending: true });
+      if (error) throw error;
+      return data as ClientRow[];
+    },
+
+    async updateParent(id: string, parentClientId: string | null): Promise<ClientRow> {
+      const { data, error } = await supabase
+        .from("clients")
+        .update({ parent_client_id: parentClientId })
         .eq("id", id)
         .select()
         .single();
