@@ -1,50 +1,62 @@
-// Étiquettes françaises pour grant_projects.status (voir supabase/migrations/0003_grant_projects.sql
-// pour la contrainte check qui définit la liste exhaustive des valeurs possibles).
-// L'ordre ci-dessous reflète la progression normale d'un dossier, utilisé pour le <select>.
+// Étiquettes françaises pour grant_projects.status (voir supabase/migrations/0034_grant_project_statuses.sql
+// pour la contrainte check). Six statuts seulement, dans l'ordre normal d'un dossier ; « Approuvé —
+// en attente de réclamation » est posé automatiquement quand l'entente est saisie.
 
 export const GRANT_PROJECT_STATUS_LABELS: Record<string, string> = {
-  prospect: "Prospect",
-  qualifying: "En qualification",
-  preparing: "En préparation",
-  submitted: "Déposé — en attente",
-  under_review: "En attente (analyse par le bailleur)",
-  approved: "Approuvé — en attente de réclamation",
-  active: "Actif — projet en cours",
-  final_claim: "Réclamation finale en cours",
-  completed: "Complété",
+  draft: "À rédiger",
+  pending_approval: "En attente d'approbation",
+  approved: "Approuvé",
+  awaiting_claim: "Approuvé — en attente de réclamation",
   rejected: "Refusé",
-  cancelled: "Annulé",
+  completed: "Complété",
 };
 
 export const GRANT_PROJECT_STATUS_OPTIONS: Array<{ value: string; label: string }> = [
-  "prospect",
-  "qualifying",
-  "preparing",
-  "submitted",
-  "under_review",
+  "draft",
+  "pending_approval",
   "approved",
-  "active",
-  "final_claim",
-  "completed",
+  "awaiting_claim",
   "rejected",
-  "cancelled",
+  "completed",
 ].map((value) => ({ value, label: GRANT_PROJECT_STATUS_LABELS[value] ?? value }));
+
+// Dossiers « en cours » (tableau de bord) : tout sauf refusé / complété.
+export const ACTIVE_GRANT_PROJECT_STATUSES = ["draft", "pending_approval", "approved", "awaiting_claim"];
+
+// Anciens statuts (11 valeurs, avant 0034) -> nouveaux. Même règle que la migration : un dossier
+// approuvé/actif avec une entente est « en attente de réclamation », sans entente « approuvé ».
+export function normalizeGrantProjectStatus(status: string, opts: { hasAgreement?: boolean } = {}): string {
+  switch (status) {
+    case "prospect":
+    case "qualifying":
+    case "preparing":
+      return "draft";
+    case "submitted":
+    case "under_review":
+      return "pending_approval";
+    case "approved":
+    case "active":
+    case "final_claim":
+      return opts.hasAgreement ? "awaiting_claim" : "approved";
+    case "cancelled":
+      return "rejected";
+    default:
+      return status; // valeur déjà nouvelle (ou invalide : la contrainte de la base la refusera)
+  }
+}
 
 // Couleur de badge par statut, regroupée par famille (en attente / positif / négatif).
 export function grantProjectStatusBadgeClass(status: string): string {
   switch (status) {
     case "completed":
       return "bg-emerald-50 text-emerald-700";
-    case "active":
     case "approved":
       return "bg-indigo-50 text-indigo-700";
-    case "final_claim":
+    case "awaiting_claim":
       return "bg-amber-50 text-amber-800";
     case "rejected":
-    case "cancelled":
       return "bg-red-50 text-red-700";
-    case "submitted":
-    case "under_review":
+    case "pending_approval":
       return "bg-slate-100 text-slate-700";
     default:
       return "bg-neutral-100 text-neutral-600";

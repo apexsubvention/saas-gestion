@@ -10,6 +10,10 @@ import { milestonesService } from "@/server/services/milestones.service";
 import { projectSuppliersService } from "@/server/services/projectSuppliers.service";
 import { grantAgreementsRepository } from "@/server/repositories/grantAgreements.repository";
 import { requireOrgContext } from "@/lib/permissions";
+import { grantAgreementsService } from "@/server/services/grantAgreements.service";
+import { saveAgreementSchema } from "@/features/grants/agreementSchema";
+import { GRANT_PROJECT_STATUS_LABELS } from "@/features/grants/constants";
+import { formatCaughtError } from "@/lib/errors";
 
 export type UpdateGrantProjectStatusFormState = { error: string | null };
 
@@ -315,4 +319,58 @@ export async function createSupplierAction(
 
   revalidatePath(`/grants/${grantProjectId}`);
   return { error: null };
+}
+
+// ---- Entente de convention ----------------------------------------------------
+// Enregistrer l'entente crée les dates de réclamation (estimées à partir des dates saisies) et fait
+// passer le dossier à « Approuvé — en attente de réclamation ».
+
+export type SaveAgreementState = { error: string | null; message: string | null };
+
+function numberOrNull(value: FormDataEntryValue | null): number | null {
+  const text = String(value ?? "").replace(/\s|\u00a0/g, "").replace(",", ".").replace(/\$|%/g, "");
+  if (!text) return null;
+  const n = Number(text);
+  return Number.isFinite(n) ? n : Number.NaN;
+}
+function dateOrNull(value: FormDataEntryValue | null): string | null {
+  const text = String(value ?? "").trim();
+  return text || null;
+}
+
+export async function saveAgreementAction(
+  grantProjectId: string,
+  _prev: SaveAgreementState,
+  formData: FormData
+): Promise<SaveAgreementState> {
+  const ctx = await requireOrgContext();
+  const parsed = saveAgreementSchema.safeParse({
+    project_start: dateOrNull(formData.get("project_start")),
+    project_end: dateOrNull(formData.get("project_end")),
+    eligible_expense_period_start: dateOrNull(formData.get("eligible_expense_period_start")),
+    eligible_expense_period_end: dateOrNull(formData.get("eligible_expense_period_end")),
+    grant_amount: numberOrNull(formData.get("grant_amount")),
+    grant_rate_percent: numberOrNull(formData.get("grant_rate_percent")),
+    claim_frequency: String(formData.get("claim_frequency") ?? ""),
+    special_conditions: String(formData.get("special_conditions") ?? ""),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Formulaire invalide", message: null };
+  }
+
+  const supabase = await createClient();
+  try {
+    const result = await grantAgreementsService(supabase).saveAndSchedule(ctx.organizationId, grantProjectId, parsed.data);
+    revalidatePath(`/grants/${grantProjectId}`);
+    revalidatePath("/echeancier");
+    revalidatePath("/dashboard");
+    const parts = ["Entente enregistrée."];
+    if (result.created > 0) parts.push(`${result.created} échéance(s) de réclamation estimée(s) ajoutée(s) — à valider dans l'échéancier.`);
+    else if (result.skipped > 0) parts.push("Les échéances de réclamation étaient déjà présentes.");
+    else parts.push("Aucune date de réclamation n'a pu être calculée : renseigne la période d'admissibilité et/ou la fin du projet.");
+    if (result.statusChanged) parts.push(`Statut du dossier : ${GRANT_PROJECT_STATUS_LABELS[result.status] ?? result.status}.`);
+    return { error: null, message: parts.join(" ") };
+  } catch (e) {
+    return { error: formatCaughtError(e), message: null };
+  }
 }

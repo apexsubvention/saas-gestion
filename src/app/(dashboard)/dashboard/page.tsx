@@ -11,16 +11,8 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireOrgContext } from "@/lib/permissions";
+import { ACTIVE_GRANT_PROJECT_STATUSES, GRANT_PROJECT_STATUS_LABELS } from "@/features/grants/constants";
 
-const ACTIVE_PROJECT_STATUSES = [
-  "qualifying",
-  "preparing",
-  "submitted",
-  "under_review",
-  "approved",
-  "active",
-  "final_claim",
-];
 
 function formatMoney(value: number | null | undefined) {
   if (value == null) return "—";
@@ -66,7 +58,7 @@ export default async function DashboardPage() {
     supabase
       .from("grant_projects")
       .select("id,name,status,approved_grant_amount,official_end_date,clients(name),grant_programs(name)")
-      .in("status", ACTIVE_PROJECT_STATUSES)
+      .in("status", ACTIVE_GRANT_PROJECT_STATUSES)
       .order("updated_at", { ascending: false })
       .limit(5),
     supabase
@@ -297,9 +289,5 @@ function ActionGroup({ title, icon: Icon, items, empty }: { title: string; icon:
 }
 
 function StatusBadge({ value }: { value: string }) {
-  const labels: Record<string, string> = {
-    qualifying: "Qualification", preparing: "Préparation", submitted: "Déposé", under_review: "En analyse",
-    approved: "Approuvé", active: "Actif", final_claim: "Réclamation finale",
-  };
-  return <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">{labels[value] ?? value}</span>;
+  return <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">{GRANT_PROJECT_STATUS_LABELS[value] ?? value}</span>;
 }

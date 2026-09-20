@@ -19,6 +19,8 @@ import { TaskStatusSelect } from "./TaskStatusSelect";
 import { MilestoneStatusSelect } from "./MilestoneStatusSelect";
 import { DeleteMilestoneButton } from "./DeleteMilestoneButton";
 import { SuggestMilestonesButton } from "./SuggestMilestonesButton";
+import { AgreementForm } from "./AgreementForm";
+import { grantAgreementsService } from "@/server/services/grantAgreements.service";
 import { NewSupplierForm } from "./NewSupplierForm";
 import { DOCUMENT_CATEGORY_LABELS, PRIORITY_BUCKET_LABELS, priorityBucketBadgeClass } from "@/features/grants/constants";
 
@@ -43,14 +45,16 @@ export default async function GrantProjectPage({ params }: { params: { id: strin
     { spent: 0, claimed: 0, paid: 0 }
   );
 
-  const [documents, claims, tasks, milestones, suppliers, allClients] = await Promise.all([
+  const [documents, claims, tasks, milestones, suppliers, allClients, agreements] = await Promise.all([
     documentsService(supabase).listByProject(params.id),
     claimsService(supabase).listByProject(params.id),
     tasksService(supabase).listByProject(params.id),
     milestonesService(supabase).listByProject(params.id),
     projectSuppliersService(supabase).listByProject(params.id),
     clientsService(supabase).list(),
+    grantAgreementsService(supabase).listByProject(params.id),
   ]);
+  const agreement = agreements[0] ?? null;
   const otherClients = allClients.filter((c) => c.id !== project.client_id);
 
   const pendingMilestones = milestones.filter((m) => m.status === "pending" || m.status === "at_risk");
@@ -280,9 +284,19 @@ export default async function GrantProjectPage({ params }: { params: { id: strin
         </div>
       </section>
 
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold text-neutral-900">Entente de convention</h2>
+        <p className="text-xs text-neutral-500">
+          Saisis les dates et montants de l&apos;entente : les dates de réclamation sont alors ajoutées à l&apos;échéancier et le statut du dossier
+          devient « Approuvé — en attente de réclamation ».
+        </p>
+        <div className="rounded-lg border border-neutral-200 bg-white p-4">
+          <AgreementForm grantProjectId={project.id} agreement={agreement} />
+        </div>
+      </section>
+
       <div className="rounded-lg border border-dashed border-neutral-300 bg-white p-6 text-sm text-neutral-400">
-        Onglets Application / Agreement / Budget / Expenses détaillés — arrivent à l&apos;Étape 3 (moteur
-        opérationnel).
+        Onglets Application / Budget / Expenses détaillés — arrivent à l&apos;Étape 3 (moteur opérationnel).
       </div>
     </div>
   );

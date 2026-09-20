@@ -8,6 +8,7 @@
 // qui a déjà été construit sans jamais deviner de valeur absente (voir apexClientsSeed.types.ts).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { normalizeGrantProjectStatus } from "@/features/grants/constants";
 import { clientsRepository } from "@/server/repositories/clients.repository";
 import { programsRepository } from "@/server/repositories/programs.repository";
 import { grantProjectsRepository } from "@/server/repositories/grantProjects.repository";
@@ -117,7 +118,7 @@ export async function runApexClientsImport(
         program_id: programId,
         name: project.name,
         owner_id: ownerId,
-        status: project.status,
+        status: normalizeGrantProjectStatus(project.status, { hasAgreement: Boolean(project.agreement) }),
         description: project.description,
         total_project_cost: project.total_project_cost,
         approved_grant_amount: project.approved_grant_amount,

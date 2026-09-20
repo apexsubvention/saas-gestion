@@ -10,8 +10,20 @@ export type GrantAgreementRow = {
   eligible_expense_period_end: string | null;
   grant_amount: number | null;
   grant_rate: number | null;
+  claim_frequency: string | null;
   special_conditions: string | null;
   created_at: string;
+};
+
+export type GrantAgreementWrite = {
+  project_start?: string | null;
+  project_end?: string | null;
+  eligible_expense_period_start?: string | null;
+  eligible_expense_period_end?: string | null;
+  grant_amount?: number | null;
+  grant_rate?: number | null;
+  claim_frequency?: string | null;
+  special_conditions?: string | null;
 };
 
 export function grantAgreementsRepository(supabase: SupabaseClient) {
@@ -35,9 +47,16 @@ export function grantAgreementsRepository(supabase: SupabaseClient) {
       eligible_expense_period_end?: string | null;
       grant_amount?: number | null;
       grant_rate?: number | null;
+      claim_frequency?: string | null;
       special_conditions?: string | null;
     }): Promise<GrantAgreementRow> {
       const { data, error } = await supabase.from("grant_agreements").insert(input).select().single();
+      if (error) throw error;
+      return data as GrantAgreementRow;
+    },
+
+    async update(id: string, patch: GrantAgreementWrite): Promise<GrantAgreementRow> {
+      const { data, error } = await supabase.from("grant_agreements").update(patch).eq("id", id).select().single();
       if (error) throw error;
       return data as GrantAgreementRow;
     },
