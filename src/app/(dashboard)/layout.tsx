@@ -1,9 +1,17 @@
+import { redirect } from "next/navigation";
 import { requireOrgContext } from "@/lib/permissions";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const ctx = await requireOrgContext();
+
+  // Un compte portail (role="client", voir 0028_client_hierarchy_and_portal_access.sql)
+  // n'a pas sa place dans l'interface staff -- même si RLS limite déjà ce qu'il peut
+  // voir/faire ici, ce n'est pas la surface qui lui est destinée.
+  if (ctx.role === "client") {
+    redirect("/portal");
+  }
 
   return (
     <div className="flex h-screen bg-slate-50">

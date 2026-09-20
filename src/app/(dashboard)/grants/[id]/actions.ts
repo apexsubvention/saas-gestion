@@ -7,6 +7,7 @@ import { documentsService } from "@/server/services/documents.service";
 import { claimsService } from "@/server/services/claims.service";
 import { tasksService } from "@/server/services/tasks.service";
 import { milestonesService } from "@/server/services/milestones.service";
+import { projectSuppliersService } from "@/server/services/projectSuppliers.service";
 import { grantAgreementsRepository } from "@/server/repositories/grantAgreements.repository";
 import { requireOrgContext } from "@/lib/permissions";
 
@@ -266,4 +267,52 @@ export async function suggestMilestonesAction(
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Erreur", created: 0, skipped: 0 };
   }
+}
+
+// ---- Fournisseurs -------------------------------------------------------------
+// Alimente notamment le portail client : voir clients/[id]/page.tsx et
+// portal/page.tsx. Quand supplier_client_id est renseigné (ce fournisseur EST un
+// client Apex, ex. Sitegrow), les infos de facturation saisies ici deviennent
+// visibles dans son portail (si un compte portail lui a été créé).
+
+export type CreateSupplierFormState = { error: string | null };
+
+export async function createSupplierAction(
+  grantProjectId: string,
+  _prev: CreateSupplierFormState,
+  formData: FormData
+): Promise<CreateSupplierFormState> {
+  const ctx = await requireOrgContext();
+  const name = String(formData.get("name") ?? "").trim();
+  const contact = String(formData.get("contact") ?? "").trim() || null;
+  const budgetAmountRaw = String(formData.get("budget_amount") ?? "").trim();
+  const budget_amount = budgetAmountRaw ? Number(budgetAmountRaw) : null;
+  const billing_frequency = String(formData.get("billing_frequency") ?? "").trim() || null;
+  const expectedDayRaw = String(formData.get("expected_invoice_day") ?? "").trim();
+  const expected_invoice_day = expectedDayRaw ? Number(expectedDayRaw) : null;
+  const invoice_description_requirements = String(formData.get("invoice_description_requirements") ?? "").trim() || null;
+  const supplierClientIdRaw = formData.get("supplier_client_id");
+  const supplier_client_id = typeof supplierClientIdRaw === "string" && supplierClientIdRaw.length > 0 ? supplierClientIdRaw : null;
+
+  if (!name) {
+    return { error: "Le nom du fournisseur est requis." };
+  }
+
+  const supabase = await createClient();
+  try {
+    await projectSuppliersService(supabase).create(ctx.organizationId, grantProjectId, {
+      name,
+      contact,
+      budget_amount,
+      billing_frequency,
+      expected_invoice_day,
+      invoice_description_requirements,
+      supplier_client_id,
+    });
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Erreur d'enregistrement" };
+  }
+
+  revalidatePath(`/grants/${grantProjectId}`);
+  return { error: null };
 }

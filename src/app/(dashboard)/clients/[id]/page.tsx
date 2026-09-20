@@ -6,6 +6,9 @@ import { grantProjectsService } from "@/server/services/grantProjects.service";
 import { documentsService } from "@/server/services/documents.service";
 import { UploadDocumentForm } from "./UploadDocumentForm";
 import { NeedsForm } from "./NeedsForm";
+import { SetParentForm } from "./SetParentForm";
+import { CreatePortalAccountForm } from "./CreatePortalAccountForm";
+import { PortalAccountToggle } from "./PortalAccountToggle";
 import { GRANT_PROJECT_STATUS_LABELS, grantProjectStatusBadgeClass } from "@/features/grants/constants";
 
 export default async function ClientDetailPage({ params }: { params: { id: string } }) {
@@ -13,10 +16,31 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
   const client = await clientsService(supabase).get(params.id);
   if (!client) notFound();
 
-  const [projects, documents] = await Promise.all([
+  const [projects, documents, children, allClients] = await Promise.all([
     grantProjectsService(supabase).listByClient(params.id),
     documentsService(supabase).listByClient(params.id),
+    clientsService(supabase).listChildren(params.id),
+    clientsService(supabase).list(),
   ]);
+  const parentCandidates = allClients.filter((c) => c.id !== client.id);
+  const currentParent = client.parent_client_id ? allClients.find((c) => c.id === client.parent_client_id) : null;
+
+  const { data: portalAccount } = await supabase
+    .from("client_portal_users")
+    .select("id, active, user_id")
+    .eq("client_id", client.id)
+    .maybeSingle();
+
+  let portalAccountEmail: string | null = null;
+  if (portalAccount) {
+    const { data: ou } = await supabase
+      .from("organization_users")
+      .select("email")
+      .eq("user_id", portalAccount.user_id)
+      .eq("organization_id", client.organization_id)
+      .maybeSingle();
+    portalAccountEmail = ou?.email ?? null;
+  }
 
   return (
     <div className="space-y-6">
@@ -31,6 +55,76 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
           </a>
         )}
       </div>
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold text-neutral-900">Hiérarchie</h2>
+        <p className="text-xs text-neutral-500">
+          Pour un client qui gère lui-même des clients finaux (ex. une agence comme Sitegrow) : le rattacher
+          comme parent donne automatiquement accès à ses dossiers enfants depuis son portail, s&apos;il en a un.
+        </p>
+        <div className="rounded-lg border border-neutral-200 bg-white p-4">
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-neutral-600">Client parent :</span>
+            <SetParentForm clientId={client.id} currentParentId={client.parent_client_id} candidates={parentCandidates} />
+            {currentParent && (
+              <Link href={`/clients/${currentParent.id}`} className="text-sm text-blue-600 hover:underline">
+                Voir {currentParent.name}
+              </Link>
+            )}
+          </div>
+        </div>
+        {children.length > 0 && (
+          <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+            <div className="border-b border-neutral-200 bg-neutral-50 px-4 py-2 text-xs font-medium text-neutral-500">
+              Clients enfants ({children.length})
+            </div>
+            <table className="w-full text-sm">
+              <tbody>
+                {children.map((c) => (
+                  <tr key={c.id} className="border-b border-neutral-100 last:border-0">
+                    <td className="px-4 py-2">
+                      <Link href={`/clients/${c.id}`} className="font-medium text-neutral-900 hover:underline">
+                        {c.name}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-2 text-neutral-500">{c.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold text-neutral-900">Portail client</h2>
+        <p className="text-xs text-neutral-500">
+          Donne à ce client (ou à un contact chez lui) un accès en ligne, avec son propre identifiant, à ses
+          dossiers, échéances et informations de facturation à fournir — voir aussi les sections Fournisseurs
+          des dossiers concernés.
+        </p>
+        <div className="rounded-lg border border-neutral-200 bg-white p-4">
+          {portalAccount ? (
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-neutral-900">
+                  {portalAccountEmail ?? "Compte portail"}{" "}
+                  <span
+                    className={`ml-2 rounded-full px-2 py-0.5 text-xs font-medium ${
+                      portalAccount.active ? "bg-emerald-50 text-emerald-700" : "bg-neutral-100 text-neutral-500"
+                    }`}
+                  >
+                    {portalAccount.active ? "Actif" : "Désactivé"}
+                  </span>
+                </p>
+              </div>
+              <PortalAccountToggle clientId={client.id} portalUserRowId={portalAccount.id} active={portalAccount.active} />
+            </div>
+          ) : (
+            <CreatePortalAccountForm clientId={client.id} />
+          )}
+        </div>
+      </section>
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-neutral-900">Besoins actuels</h2>

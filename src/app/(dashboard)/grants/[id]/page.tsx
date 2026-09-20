@@ -5,6 +5,8 @@ import { documentsService } from "@/server/services/documents.service";
 import { claimsService } from "@/server/services/claims.service";
 import { tasksService } from "@/server/services/tasks.service";
 import { milestonesService } from "@/server/services/milestones.service";
+import { projectSuppliersService } from "@/server/services/projectSuppliers.service";
+import { clientsService } from "@/server/services/clients.service";
 import { StatusSelect } from "./StatusSelect";
 import { UploadProjectDocumentForm } from "./UploadProjectDocumentForm";
 import { OpenDocumentButton } from "./OpenDocumentButton";
@@ -15,6 +17,7 @@ import { TaskStatusSelect } from "./TaskStatusSelect";
 import { MilestoneStatusSelect } from "./MilestoneStatusSelect";
 import { DeleteMilestoneButton } from "./DeleteMilestoneButton";
 import { SuggestMilestonesButton } from "./SuggestMilestonesButton";
+import { NewSupplierForm } from "./NewSupplierForm";
 import { TASK_PRIORITY_LABELS, DOCUMENT_CATEGORY_LABELS } from "@/features/grants/constants";
 
 export default async function GrantProjectPage({ params }: { params: { id: string } }) {
@@ -38,12 +41,15 @@ export default async function GrantProjectPage({ params }: { params: { id: strin
     { spent: 0, claimed: 0, paid: 0 }
   );
 
-  const [documents, claims, tasks, milestones] = await Promise.all([
+  const [documents, claims, tasks, milestones, suppliers, allClients] = await Promise.all([
     documentsService(supabase).listByProject(params.id),
     claimsService(supabase).listByProject(params.id),
     tasksService(supabase).listByProject(params.id),
     milestonesService(supabase).listByProject(params.id),
+    projectSuppliersService(supabase).listByProject(params.id),
+    clientsService(supabase).list(),
   ]);
+  const otherClients = allClients.filter((c) => c.id !== project.client_id);
 
   const pendingMilestones = milestones.filter((m) => m.status === "pending" || m.status === "at_risk");
   const nextMilestone = pendingMilestones[0] ?? null;
@@ -128,6 +134,51 @@ export default async function GrantProjectPage({ params }: { params: { id: strin
               Aucun document. Aucune convention n&apos;a été téléversée pour ce dossier — pense à l&apos;ajouter si elle
               existe déjà en format papier ou courriel.
             </p>
+          )}
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold text-neutral-900">Fournisseurs</h2>
+        <p className="text-xs text-neutral-500">
+          Quand un fournisseur est lui-même un client Apex (ex. Sitegrow qui facture pour ses propres clients),
+          le lier ci-dessous rend ces informations visibles dans son portail, s&apos;il en a un.
+        </p>
+        <div className="rounded-lg border border-neutral-200 bg-white p-4">
+          <NewSupplierForm grantProjectId={project.id} clients={otherClients.map((c) => ({ id: c.id, name: c.name }))} />
+        </div>
+        <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+          {suppliers.length > 0 ? (
+            <table className="w-full text-sm">
+              <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
+                <tr>
+                  <th className="px-4 py-2 font-medium">Nom</th>
+                  <th className="px-4 py-2 font-medium">Budget</th>
+                  <th className="px-4 py-2 font-medium">Fréquence</th>
+                  <th className="px-4 py-2 font-medium">Jour attendu</th>
+                  <th className="px-4 py-2 font-medium">À inscrire sur la facture</th>
+                  <th className="px-4 py-2 font-medium">Client Apex lié</th>
+                </tr>
+              </thead>
+              <tbody>
+                {suppliers.map((s) => (
+                  <tr key={s.id} className="border-b border-neutral-100 last:border-0">
+                    <td className="px-4 py-2 text-neutral-900">{s.name}</td>
+                    <td className="px-4 py-2 text-neutral-600">
+                      {s.budget_amount != null ? money(Number(s.budget_amount)) : "—"}
+                    </td>
+                    <td className="px-4 py-2 text-neutral-600">{s.billing_frequency ?? "—"}</td>
+                    <td className="px-4 py-2 text-neutral-600">{s.expected_invoice_day ?? "—"}</td>
+                    <td className="px-4 py-2 text-neutral-600">{s.invoice_description_requirements ?? "—"}</td>
+                    <td className="px-4 py-2 text-neutral-600">
+                      {s.supplier_client_id ? allClients.find((c) => c.id === s.supplier_client_id)?.name ?? "—" : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p className="px-4 py-6 text-sm text-neutral-400">Aucun fournisseur pour ce dossier.</p>
           )}
         </div>
       </section>
