@@ -6,6 +6,27 @@ import { grantProjectsService } from "@/server/services/grantProjects.service";
 import { requireOrgContext } from "@/lib/permissions";
 import { createGrantProjectSchema } from "@/features/grants/schemas";
 
+// Duplique volontairement le formatage d'erreur de src/app/(dashboard)/clients/[id]/actions.ts
+// (voir le commentaire là-bas pour le contexte complet) : une erreur Supabase brute
+// (PostgrestError/AuthError) n'est pas une instance d'Error, donc `e instanceof Error ?
+// e.message : "Erreur inconnue"` masquait la vraie cause derrière "Erreur inconnue".
+function formatCaughtError(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (e && typeof e === "object") {
+    const obj = e as Record<string, unknown>;
+    const parts = [obj.message, obj.details, obj.hint, obj.code].filter(
+      (v) => typeof v === "string" && v.length > 0
+    );
+    if (parts.length > 0) return parts.join(" — ");
+    try {
+      return JSON.stringify(obj);
+    } catch {
+      return "Erreur non sérialisable.";
+    }
+  }
+  return String(e);
+}
+
 export type CreateGrantFormState = { error: string | null };
 
 export async function createGrantProjectAction(
@@ -37,7 +58,7 @@ export async function createGrantProjectAction(
       parsed.data
     );
   } catch (e) {
-    return { error: e instanceof Error ? e.message : "Erreur inconnue" };
+    return { error: formatCaughtError(e) };
   }
 
   redirect(`/grants/${project.id}`);

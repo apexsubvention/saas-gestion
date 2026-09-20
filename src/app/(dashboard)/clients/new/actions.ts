@@ -7,6 +7,28 @@ import { clientsService } from "@/server/services/clients.service";
 import { requireOrgContext } from "@/lib/permissions";
 import { createClientSchema } from "@/features/clients/schemas";
 
+// Duplique volontairement le formatage d'erreur de src/app/(dashboard)/clients/[id]/actions.ts
+// (voir le commentaire là-bas pour le contexte complet) : une erreur Supabase brute
+// (PostgrestError/AuthError) n'est pas une instance d'Error, donc `e instanceof Error ?
+// e.message : "Erreur inconnue"` masquait systématiquement la vraie cause (contrainte
+// RLS, colonne manquante, etc.) derrière "Erreur inconnue" -- c'était le bug rapporté.
+function formatCaughtError(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (e && typeof e === "object") {
+    const obj = e as Record<string, unknown>;
+    const parts = [obj.message, obj.details, obj.hint, obj.code].filter(
+      (v) => typeof v === "string" && v.length > 0
+    );
+    if (parts.length > 0) return parts.join(" — ");
+    try {
+      return JSON.stringify(obj);
+    } catch {
+      return "Erreur non sérialisable.";
+    }
+  }
+  return String(e);
+}
+
 export type CreateClientFormState = { error: string | null };
 
 export async function createClientAction(
@@ -37,7 +59,7 @@ export async function createClientAction(
       parsed.data
     );
   } catch (e) {
-    return { error: e instanceof Error ? e.message : "Erreur inconnue" };
+    return { error: formatCaughtError(e) };
   }
 
   revalidatePath("/clients");
