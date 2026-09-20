@@ -19,12 +19,18 @@ import { markScheduleEntryDoneAction, rescheduleScheduleEntryAction } from "./ac
 
 // "no_date" n'a pas sa propre colonne (voir le plan : regroupé visuellement dans "Plus
 // tard" pour ne pas ajouter une 7e colonne à un tableau déjà large) -- la vue Priorités
-// reste la référence complète avec les 7 seaux.
-const KANBAN_COLUMNS: PriorityBucket[] = ["overdue", "this_week", "next_2_weeks", "this_month", "later", "done"];
+// reste la référence complète avec les 7 seaux. DisplayBucket est le type des colonnes
+// RÉELLEMENT affichées par le Kanban (PriorityBucket sans "no_date") -- KANBAN_COLUMNS
+// et le Map de colonnes doivent tous les deux être typés DisplayBucket, pas
+// PriorityBucket, sinon TypeScript autorise à tort qu'une colonne "no_date" existe alors
+// qu'aucune n'est jamais créée (c'était le bug : KANBAN_COLUMNS était typé PriorityBucket[]
+// mais utilisé comme des clés DisplayBucket -- corrigé ici en typant correctement plutôt
+// qu'en forçant un cast).
+type DisplayBucket = Exclude<PriorityBucket, "no_date">;
+
+const KANBAN_COLUMNS: DisplayBucket[] = ["overdue", "this_week", "next_2_weeks", "this_month", "later", "done"];
 
 const KIND_LABELS: Record<ScheduleEntry["kind"], string> = { task: "Tâche", milestone: "Échéance", claim: "Réclamation" };
-
-type DisplayBucket = Exclude<PriorityBucket, "no_date">;
 
 function displayBucket(entry: ScheduleEntry): DisplayBucket {
   return entry.bucket === "no_date" ? "later" : entry.bucket;
