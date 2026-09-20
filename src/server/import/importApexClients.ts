@@ -30,6 +30,27 @@ export type ImportSummary = {
   errors: Array<{ context: string; message: string }>;
 };
 
+// Une erreur Supabase (PostgrestError / AuthError / StorageError) n'est PAS une instance de
+// Error : c'est un objet brut {message, details, hint, code}. `e instanceof Error` est donc
+// `false` pour elle, et `String(e)` retombe sur "[object Object]" — c'est la cause du bug
+// d'affichage. Cette fonction extrait le vrai message dans tous les cas rencontrés ici.
+function formatCaughtError(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (e && typeof e === "object") {
+    const obj = e as Record<string, unknown>;
+    const parts = [obj.message, obj.details, obj.hint, obj.code]
+      .filter((v) => typeof v === "string" && v.length > 0)
+      .map((v, i) => (i === 0 ? String(v) : `[${["message", "details", "hint", "code"][i]}: ${v}]`));
+    if (parts.length > 0) return parts.join(" ");
+    try {
+      return JSON.stringify(obj);
+    } catch {
+      return "Erreur non sérialisable (voir logs serveur Vercel).";
+    }
+  }
+  return String(e);
+}
+
 function normalizeRate(rate: number | null): number | null {
   if (rate === null || rate === undefined) return null;
   if (rate > 1) return rate / 100; // garde-fou si un taux a été extrait en "%"
@@ -164,14 +185,19 @@ export async function runApexClientsImport(
     } catch (e) {
       summary.errors.push({
         context: `${project.program_name} / ${project.name}`,
-        message: e instanceof Error ? e.message : String(e),
+        message: formatCaughtError(e),
       });
     }
   }
 
   for (const client of seed.clients) {
+    let clientRow: Awaited<ReturnType<typeof clients.findByName>> = null;
+
+    // Étape 1 : résoudre/créer le client. Séparée du reste pour que, si ça échoue, l'erreur
+    // dise explicitement "recherche" ou "création" plutôt que de masquer les deux sous un
+    // seul message générique par client.
     try {
-      let clientRow = await clients.findByName(client.name);
+      clientRow = await clients.findByName(client.name);
       if (clientRow) {
         summary.clientsReused.push(client.name);
       } else {
@@ -184,12 +210,16 @@ export async function runApexClientsImport(
         });
         summary.clientsCreated.push(client.name);
       }
-
-      for (const project of client.projects) {
-        await importProject(clientRow.id, project);
-      }
     } catch (e) {
-      summary.errors.push({ context: client.name, message: e instanceof Error ? e.message : String(e) });
+      summary.errors.push({
+        context: `${client.name} (recherche/création du client)`,
+        message: formatCaughtError(e),
+      });
+      continue;
+    }
+
+    for (const project of client.projects) {
+      await importProject(clientRow.id, project);
     }
   }
 
