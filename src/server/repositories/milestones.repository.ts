@@ -74,28 +74,18 @@ export function milestonesRepository(supabase: SupabaseClient) {
 // terminés pour peupler le seau "Terminé", mais sans qu'un jalon complété il y a des
 // mois (date passée) n'écrase la limite de 200 lignes réservée aux jalons actifs.
 const MILESTONE_SELECT = "*, grant_projects(name, client_id, clients(name), grant_programs(name))";
-const MILESTONE_TERMINAL_STATUSES = ["done", "cancelled"];
-const MILESTONE_DONE_LIMIT = 30;
 
 export function milestonesListAll(supabase: SupabaseClient) {
   return async () => {
-    const [active, done] = await Promise.all([
-      supabase
-        .from("milestones")
-        .select(MILESTONE_SELECT)
+    // Les éléments terminés n'apparaissent plus dans l'échéancier : on ne charge que les actifs.
+    const { data, error } = await supabase
+      .from("milestones")
+      .select(MILESTONE_SELECT)
         .neq("status", "done")
         .neq("status", "cancelled")
-        .order("internal_due_date", { ascending: true, nullsFirst: false })
-        .limit(200),
-      supabase
-        .from("milestones")
-        .select(MILESTONE_SELECT)
-        .in("status", MILESTONE_TERMINAL_STATUSES)
-        .order("internal_due_date", { ascending: false, nullsFirst: true })
-        .limit(MILESTONE_DONE_LIMIT),
-    ]);
-    if (active.error) throw active.error;
-    if (done.error) throw done.error;
-    return [...active.data, ...done.data];
+      .order("internal_due_date", { ascending: true, nullsFirst: false })
+      .limit(200);
+    if (error) throw error;
+    return data;
   };
 }

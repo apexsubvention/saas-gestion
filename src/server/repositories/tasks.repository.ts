@@ -79,28 +79,18 @@ export function tasksRepository(supabase: SupabaseClient) {
 // Même raisonnement que milestonesListAll : deux requêtes pour que le seau "Terminé"
 // de l'échéancier priorisé n'écrase pas la limite réservée aux tâches actives.
 const TASK_SELECT = "*, grant_projects(name, client_id, clients(name), grant_programs(name)), clients(name)";
-const TASK_TERMINAL_STATUSES = ["done", "cancelled"];
-const TASK_DONE_LIMIT = 30;
 
 export function tasksListAll(supabase: SupabaseClient) {
   return async () => {
-    const [active, done] = await Promise.all([
-      supabase
-        .from("tasks")
-        .select(TASK_SELECT)
+    // Les éléments terminés n'apparaissent plus dans l'échéancier : on ne charge que les actifs.
+    const { data, error } = await supabase
+      .from("tasks")
+      .select(TASK_SELECT)
         .neq("status", "done")
         .neq("status", "cancelled")
-        .order("due_date", { ascending: true, nullsFirst: false })
-        .limit(200),
-      supabase
-        .from("tasks")
-        .select(TASK_SELECT)
-        .in("status", TASK_TERMINAL_STATUSES)
-        .order("due_date", { ascending: false, nullsFirst: true })
-        .limit(TASK_DONE_LIMIT),
-    ]);
-    if (active.error) throw active.error;
-    if (done.error) throw done.error;
-    return [...active.data, ...done.data];
+      .order("due_date", { ascending: true, nullsFirst: false })
+      .limit(200);
+    if (error) throw error;
+    return data;
   };
 }

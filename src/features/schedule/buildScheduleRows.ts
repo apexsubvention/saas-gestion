@@ -95,8 +95,11 @@ export function buildScheduleRows(input: {
 }): ScheduleEntry[] {
   const rows: ScheduleEntry[] = [];
 
+  // Un élément terminé (tâche/échéance complétée ou annulée, réclamation payée ou refusée) est RETIRÉ de
+  // l'échéancier : il n'y a plus rien à faire. Son statut reste enregistré sur le dossier.
   for (const t of input.tasks) {
     const terminal = TASK_TERMINAL(t.status);
+    if (terminal) continue;
     rows.push({
       kind: "task",
       id: t.id,
@@ -120,6 +123,7 @@ export function buildScheduleRows(input: {
 
   for (const m of input.milestones) {
     const terminal = MILESTONE_TERMINAL(m.status);
+    if (terminal) continue;
     rows.push({
       kind: "milestone",
       id: m.id,
@@ -143,6 +147,7 @@ export function buildScheduleRows(input: {
 
   for (const c of input.claims) {
     const terminal = CLAIM_TERMINAL(c.status);
+    if (terminal) continue;
     rows.push({
       kind: "claim",
       id: c.id,

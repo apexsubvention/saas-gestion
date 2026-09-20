@@ -60,7 +60,12 @@ export function KanbanBoard({ entries }: { entries: ScheduleEntry[] }) {
     // Optimiste : on déplace la carte tout de suite dans l'UI, la mise à jour serveur
     // suit derrière ; router.refresh() ensuite pour resynchroniser avec les données
     // réelles (recalcule aussi les seaux, qui dépendent de la date du jour).
-    setLocalEntries((prev) => prev.map((e) => (e.kind === kind && e.id === id ? { ...e, bucket: targetBucket } : e)));
+    // Déposée dans « Terminé » : la carte quitte l'échéancier tout de suite (elle est complétée).
+    setLocalEntries((prev) =>
+      targetBucket === "done"
+        ? prev.filter((e) => !(e.kind === kind && e.id === id))
+        : prev.map((e) => (e.kind === kind && e.id === id ? { ...e, bucket: targetBucket } : e))
+    );
 
     startTransition(async () => {
       try {
@@ -85,7 +90,7 @@ export function KanbanBoard({ entries }: { entries: ScheduleEntry[] }) {
         </div>
       </DndContext>
       <p className="mt-3 text-xs text-neutral-400">
-        Glisse une carte vers « Terminé » pour la marquer complétée, ou vers une autre colonne pour la reprogrammer
+        Glisse une carte vers « Terminé » pour la marquer complétée (elle est alors retirée de l'échéancier), ou vers une autre colonne pour la reprogrammer
         (date approximative dans la période choisie — ajuste-la ensuite depuis le dossier si besoin).
       </p>
     </div>
@@ -113,7 +118,9 @@ function KanbanColumn({ bucket, items }: { bucket: DisplayBucket; items: Schedul
           <KanbanCard key={`${entry.kind}-${entry.id}`} entry={entry} />
         ))}
         {items.length === 0 && (
-          <p className="rounded border border-dashed border-neutral-200 p-3 text-center text-xs text-neutral-300">Vide</p>
+          <p className="rounded border border-dashed border-neutral-200 p-3 text-center text-xs text-neutral-300">
+            {bucket === "done" ? "Dépose ici une carte pour la terminer" : "Vide"}
+          </p>
         )}
       </div>
     </div>
