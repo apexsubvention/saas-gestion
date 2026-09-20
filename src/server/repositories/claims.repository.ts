@@ -46,17 +46,49 @@ export function claimsRepository(supabase: SupabaseClient) {
       if (error) throw error;
       return data as ClaimRow;
     },
+
+    // Reprogrammation depuis le glisser-déposer de la vue Kanban de l'échéancier --
+    // voir src/app/(dashboard)/echeancier/actions.ts.
+    async updateDueDate(id: string, dueDate: string): Promise<ClaimRow> {
+      const { data, error } = await supabase
+        .from("claims")
+        .update({ due_date: dueDate })
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as ClaimRow;
+    },
   };
 }
 
+// Même raisonnement que milestonesListAll/tasksListAll : une réclamation payée/refusée
+// (terminale) est nécessaire pour le seau "Terminé" de l'échéancier priorisé, mais une
+// requête unique "tous statuts" laisserait d'anciennes réclamations payées écraser la
+// limite réservée aux réclamations actives.
+const CLAIM_SELECT = "*, grant_projects(name, client_id, clients(name), grant_programs(name))";
+const CLAIM_TERMINAL_STATUSES = ["paid", "rejected"];
+const CLAIM_DONE_LIMIT = 30;
+
 export function claimsListAll(supabase: SupabaseClient) {
   return async () => {
-    const { data, error } = await supabase
-      .from("claims")
-      .select("*, grant_projects(name, client_id, clients(name))")
-      .order("due_date", { ascending: true, nullsFirst: false })
-      .limit(200);
-    if (error) throw error;
-    return data;
+    const [active, done] = await Promise.all([
+      supabase
+        .from("claims")
+        .select(CLAIM_SELECT)
+        .neq("status", "paid")
+        .neq("status", "rejected")
+        .order("due_date", { ascending: true, nullsFirst: false })
+        .limit(200),
+      supabase
+        .from("claims")
+        .select(CLAIM_SELECT)
+        .in("status", CLAIM_TERMINAL_STATUSES)
+        .order("due_date", { ascending: false, nullsFirst: true })
+        .limit(CLAIM_DONE_LIMIT),
+    ]);
+    if (active.error) throw active.error;
+    if (done.error) throw done.error;
+    return [...active.data, ...done.data];
   };
 }

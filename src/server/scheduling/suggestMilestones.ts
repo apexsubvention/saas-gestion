@@ -12,7 +12,7 @@
 // ajuster/supprimer ces suggestions au besoin.
 
 export type MilestoneSuggestion = {
-  type: "claim";
+  type: "claim" | "project_end" | "eligibility_end";
   title: string;
   internal_due_date: string; // YYYY-MM-DD
 };
@@ -55,6 +55,27 @@ export function suggestMilestonesFromAgreement(agreement: {
       type: "claim",
       title: `Réclamation finale (estimée : fin de période + ${FINAL_CLAIM_GRACE_DAYS} jours — vérifier le délai exact dans l'entente)`,
       internal_due_date: addDays(end, FINAL_CLAIM_GRACE_DAYS),
+    });
+  }
+
+  // Échéances non-réclamation, elles aussi tirées uniquement de dates déjà structurées
+  // (jamais de reporting_requirements/special_conditions en texte libre, même raison
+  // qu'en tête de fichier) -- alimentent l'échéancier priorisé (voir
+  // src/features/schedule/) pour que ces obligations ne restent pas invisibles tant
+  // qu'une tâche/réclamation n'a pas été créée manuellement pour les représenter.
+  if (agreement.eligible_expense_period_end) {
+    suggestions.push({
+      type: "eligibility_end",
+      title: "Fin de la période d'admissibilité des dépenses (estimée — voir l'entente)",
+      internal_due_date: agreement.eligible_expense_period_end,
+    });
+  }
+
+  if (agreement.project_end) {
+    suggestions.push({
+      type: "project_end",
+      title: "Fin du projet (estimée — voir l'entente)",
+      internal_due_date: agreement.project_end,
     });
   }
 

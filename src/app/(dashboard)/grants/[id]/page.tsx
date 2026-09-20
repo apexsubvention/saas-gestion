@@ -7,6 +7,8 @@ import { tasksService } from "@/server/services/tasks.service";
 import { milestonesService } from "@/server/services/milestones.service";
 import { projectSuppliersService } from "@/server/services/projectSuppliers.service";
 import { clientsService } from "@/server/services/clients.service";
+import { claimRequirementsService } from "@/server/services/claimRequirements.service";
+import { buildScheduleRows } from "@/features/schedule/buildScheduleRows";
 import { StatusSelect } from "./StatusSelect";
 import { UploadProjectDocumentForm } from "./UploadProjectDocumentForm";
 import { OpenDocumentButton } from "./OpenDocumentButton";
@@ -18,7 +20,7 @@ import { MilestoneStatusSelect } from "./MilestoneStatusSelect";
 import { DeleteMilestoneButton } from "./DeleteMilestoneButton";
 import { SuggestMilestonesButton } from "./SuggestMilestonesButton";
 import { NewSupplierForm } from "./NewSupplierForm";
-import { TASK_PRIORITY_LABELS, DOCUMENT_CATEGORY_LABELS } from "@/features/grants/constants";
+import { DOCUMENT_CATEGORY_LABELS, PRIORITY_BUCKET_LABELS, priorityBucketBadgeClass } from "@/features/grants/constants";
 
 export default async function GrantProjectPage({ params }: { params: { id: string } }) {
   const supabase = await createClient();
@@ -60,17 +62,24 @@ export default async function GrantProjectPage({ params }: { params: { id: strin
   // Échéancier unifié : tâches (manuel), échéances (suggérées ou manuelles depuis
   // l'entente) et réclamations (dossiers réels) forment ensemble UNE liste triée par
   // date, chacune étiquetée pour rester distinguable -- voir la demande de l'utilisateur
-  // de fusionner "Tâches" et "Réclamations" en un seul endroit.
-  type ScheduleRow =
-    | { kind: "task"; date: string | null; row: (typeof tasks)[number] }
-    | { kind: "milestone"; date: string | null; row: (typeof milestones)[number] }
-    | { kind: "claim"; date: string | null; row: (typeof claims)[number] };
-
-  const scheduleRows: ScheduleRow[] = [
-    ...tasks.map((row): ScheduleRow => ({ kind: "task", date: row.due_date, row })),
-    ...milestones.map((row): ScheduleRow => ({ kind: "milestone", date: row.internal_due_date, row })),
-    ...claims.map((row): ScheduleRow => ({ kind: "claim", date: row.due_date, row })),
-  ].sort((a, b) => {
+  // de fusionner "Tâches" et "Réclamations" en un seul endroit. buildScheduleRows()
+  // (src/features/schedule/) est la même fonction que la vue globale /echeancier --
+  // context fourni ici car listByProject() n'est pas jointe à grant_projects/clients
+  // (déjà connus sur cette page, pas besoin de les redemander).
+  const missingCountByClaimId = await claimRequirementsService(supabase).countOpenByClaimIds(
+    claims.map((c) => c.id)
+  );
+  const scheduleEntries = buildScheduleRows({
+    tasks,
+    milestones,
+    claims,
+    missingCountByClaimId,
+    context: {
+      clientName: project.clients?.name ?? null,
+      projectName: project.name,
+      programName: project.grant_programs?.name ?? null,
+    },
+  }).sort((a, b) => {
     if (!a.date && !b.date) return 0;
     if (!a.date) return 1;
     if (!b.date) return -1;
@@ -203,85 +212,63 @@ export default async function GrantProjectPage({ params }: { params: { id: strin
         </div>
 
         <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
-          {scheduleRows.length > 0 ? (
+          {scheduleEntries.length > 0 ? (
             <table className="w-full text-sm">
               <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
                 <tr>
                   <th className="px-4 py-2 font-medium">Type</th>
                   <th className="px-4 py-2 font-medium">Description</th>
                   <th className="px-4 py-2 font-medium">Date</th>
+                  <th className="px-4 py-2 font-medium">Urgence</th>
                   <th className="px-4 py-2 font-medium">Statut</th>
                   <th className="px-4 py-2 font-medium"></th>
                 </tr>
               </thead>
               <tbody>
-                {scheduleRows.map((entry) => {
-                  if (entry.kind === "task") {
-                    const t = entry.row;
-                    return (
-                      <tr key={`task-${t.id}`} className="border-b border-neutral-100 last:border-0">
-                        <td className="px-4 py-2">
-                          <KindBadge label="Tâche" className="bg-slate-100 text-slate-700" />
-                        </td>
-                        <td className="px-4 py-2 text-neutral-900">
-                          {t.title}
-                          <span className="ml-2 text-xs text-neutral-400">
-                            {TASK_PRIORITY_LABELS[t.priority] ?? t.priority}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2 text-neutral-600">{t.due_date ?? "—"}</td>
-                        <td className="px-4 py-2">
-                          <TaskStatusSelect grantProjectId={project.id} taskId={t.id} status={t.status} />
-                        </td>
-                        <td className="px-4 py-2" />
-                      </tr>
-                    );
-                  }
-                  if (entry.kind === "milestone") {
-                    const m = entry.row;
-                    return (
-                      <tr key={`milestone-${m.id}`} className="border-b border-neutral-100 last:border-0">
-                        <td className="px-4 py-2">
-                          <KindBadge label="Échéance" className="bg-indigo-50 text-indigo-700" />
-                        </td>
-                        <td className="px-4 py-2 text-neutral-900">
-                          {m.title}
-                          {m.source === "ai_proposed" && (
-                            <span className="ml-2 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-700">
-                              estimée
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-2 text-neutral-600">{m.internal_due_date ?? "—"}</td>
-                        <td className="px-4 py-2">
-                          <MilestoneStatusSelect grantProjectId={project.id} milestoneId={m.id} status={m.status} />
-                        </td>
-                        <td className="px-4 py-2 text-right">
-                          <DeleteMilestoneButton grantProjectId={project.id} milestoneId={m.id} />
-                        </td>
-                      </tr>
-                    );
-                  }
-                  const c = entry.row;
-                  return (
-                    <tr key={`claim-${c.id}`} className="border-b border-neutral-100 last:border-0">
-                      <td className="px-4 py-2">
-                        <KindBadge label="Réclamation" className="bg-emerald-50 text-emerald-700" />
-                      </td>
-                      <td className="px-4 py-2 text-neutral-900">
-                        {c.claim_number || "Réclamation"}
-                        <span className="ml-2 text-xs text-neutral-400">
-                          {c.period_start ?? "—"} → {c.period_end ?? "—"}
+                {scheduleEntries.map((entry) => (
+                  <tr key={`${entry.kind}-${entry.id}`} className="border-b border-neutral-100 last:border-0">
+                    <td className="px-4 py-2">
+                      <KindBadge label={SCHEDULE_KIND_LABELS[entry.kind]} className={SCHEDULE_KIND_BADGE[entry.kind]} />
+                    </td>
+                    <td className="px-4 py-2 text-neutral-900">
+                      {entry.title}
+                      {entry.subtitle && <span className="ml-2 text-xs text-neutral-400">{entry.subtitle}</span>}
+                      {entry.estimated && (
+                        <span className="ml-2 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-700">
+                          estimée
                         </span>
-                      </td>
-                      <td className="px-4 py-2 text-neutral-600">{c.due_date ?? "—"}</td>
-                      <td className="px-4 py-2">
-                        <ClaimStatusSelect grantProjectId={project.id} claimId={c.id} status={c.status} />
-                      </td>
-                      <td className="px-4 py-2" />
-                    </tr>
-                  );
-                })}
+                      )}
+                      {entry.missingCount != null && entry.missingCount > 0 && (
+                        <span className="ml-2 text-[11px] font-medium text-red-600">
+                          {entry.missingCount} élément{entry.missingCount > 1 ? "s" : ""} manquant
+                          {entry.missingCount > 1 ? "s" : ""}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2 text-neutral-600">{entry.date ?? "—"}</td>
+                    <td className="px-4 py-2">
+                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${priorityBucketBadgeClass(entry.bucket)}`}>
+                        {PRIORITY_BUCKET_LABELS[entry.bucket]}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2">
+                      {entry.kind === "task" && (
+                        <TaskStatusSelect grantProjectId={project.id} taskId={entry.id} status={entry.status} />
+                      )}
+                      {entry.kind === "milestone" && (
+                        <MilestoneStatusSelect grantProjectId={project.id} milestoneId={entry.id} status={entry.status} />
+                      )}
+                      {entry.kind === "claim" && (
+                        <ClaimStatusSelect grantProjectId={project.id} claimId={entry.id} status={entry.status} />
+                      )}
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                      {entry.kind === "milestone" && (
+                        <DeleteMilestoneButton grantProjectId={project.id} milestoneId={entry.id} />
+                      )}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           ) : (
@@ -300,6 +287,13 @@ export default async function GrantProjectPage({ params }: { params: { id: strin
     </div>
   );
 }
+
+const SCHEDULE_KIND_LABELS = { task: "Tâche", milestone: "Échéance", claim: "Réclamation" } as const;
+const SCHEDULE_KIND_BADGE = {
+  task: "bg-slate-100 text-slate-700",
+  milestone: "bg-indigo-50 text-indigo-700",
+  claim: "bg-emerald-50 text-emerald-700",
+} as const;
 
 function KindBadge({ label, className }: { label: string; className: string }) {
   return <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${className}`}>{label}</span>;

@@ -16,10 +16,18 @@ export function milestonesService(supabase: SupabaseClient) {
     },
 
     remove: (id: string) => repo.remove(id),
+    updateDueDate: (id: string, dueDate: string) => repo.updateDueDate(id, dueDate),
 
-    // Idempotent : ne recrée pas une suggestion déjà présente pour ce projet (même
-    // titre exact), pour que cliquer plusieurs fois sur "Suggérer l'échéancier" ne
-    // duplique rien.
+    // Idempotent : ne recrée pas une suggestion déjà présente pour ce projet, parmi les
+    // jalons source='ai_proposed'. Clé de dédoublonnage :
+    //  - type 'project_end'/'eligibility_end' : par TYPE seul -- une entente n'a qu'une
+    //    seule date de fin de projet et qu'une seule fin de période d'admissibilité, donc
+    //    au plus une suggestion de chaque peut jamais exister ; dédoublonner par type reste
+    //    valide même si le libellé généré est reformulé plus tard (contrairement à une
+    //    comparaison de titre exact).
+    //  - type 'claim' : par TITRE exact (comme avant) -- il existe légitimement DEUX
+    //    suggestions de type 'claim' (mi-projet et finale), donc dédoublonner par type
+    //    seul fusionnerait les deux à tort.
     async suggestForProject(
       organizationId: string,
       grantProjectId: string,
@@ -31,12 +39,15 @@ export function milestonesService(supabase: SupabaseClient) {
       }
 
       const existing = await repo.listByProject(grantProjectId);
-      const existingTitles = new Set(existing.map((m) => m.title));
+      const aiProposed = existing.filter((m) => m.source === "ai_proposed");
+      const dedupeKey = (type: string, title: string) => (type === "claim" ? `claim:${title}` : `type:${type}`);
+      const existingKeys = new Set(aiProposed.map((m) => dedupeKey(m.type, m.title)));
 
       let created = 0;
       let skipped = 0;
       for (const s of suggestions) {
-        if (existingTitles.has(s.title)) {
+        const key = dedupeKey(s.type, s.title);
+        if (existingKeys.has(key)) {
           skipped += 1;
           continue;
         }
@@ -48,6 +59,7 @@ export function milestonesService(supabase: SupabaseClient) {
           internal_due_date: s.internal_due_date,
           source: "ai_proposed",
         });
+        existingKeys.add(key);
         created += 1;
       }
       return { created, skipped };

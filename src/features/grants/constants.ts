@@ -150,6 +150,7 @@ export const MILESTONE_TYPE_LABELS: Record<string, string> = {
   invoice: "Facture",
   payment_proof: "Preuve de paiement",
   project_end: "Fin de projet",
+  eligibility_end: "Fin de la période d'admissibilité",
   client_followup: "Suivi client",
   supplier_followup: "Suivi fournisseur",
   other: "Autre",
@@ -208,3 +209,34 @@ export const DOCUMENT_CATEGORY_OPTIONS: Array<{ value: string; label: string }> 
   "annex",
   "other",
 ].map((value) => ({ value, label: DOCUMENT_CATEGORY_LABELS[value] ?? value }));
+
+// Étiquettes/couleurs pour les seaux d'urgence de l'échéancier (voir
+// src/features/schedule/priority.ts) -- utilisées par les vues Priorités et Kanban.
+export const PRIORITY_BUCKET_LABELS: Record<string, string> = {
+  overdue: "En retard",
+  this_week: "Cette semaine",
+  next_2_weeks: "Dans 2 semaines",
+  this_month: "Ce mois-ci",
+  later: "Plus tard",
+  no_date: "Sans date",
+  done: "Terminé",
+};
+
+export function priorityBucketBadgeClass(bucket: string): string {
+  switch (bucket) {
+    case "overdue":
+      return "bg-red-50 text-red-700";
+    case "this_week":
+      return "bg-orange-50 text-orange-800";
+    case "next_2_weeks":
+      return "bg-amber-50 text-amber-800";
+    case "this_month":
+      return "bg-blue-50 text-blue-700";
+    case "done":
+      return "bg-emerald-50 text-emerald-700";
+    case "no_date":
+      return "bg-neutral-100 text-neutral-500";
+    default:
+      return "bg-slate-100 text-slate-600";
+  }
+}
