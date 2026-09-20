@@ -68,7 +68,7 @@ function toIsoDate(day: string, month: string, year: string) {
   return d.toISOString().slice(0, 10);
 }
 
-function extractFrenchDate(
+export function extractFrenchDate(
   text: string,
   prefix: RegExp,
 ) {
@@ -92,7 +92,7 @@ function extractFrenchDate(
   return toIsoDate(day, month, year);
 }
 
-function extractFrenchDateTimeRange(text: string) {
+export function extractFrenchDateTimeRange(text: string) {
   const match = text.match(
     /(?:ouvert|ouverte|période[^.]{0,50}|réception[^.]{0,50})\s+du\s+(\d{1,2})\s+([A-Za-zÀ-ÿ]+)\s+(20\d{2})(?:\s+à\s+(midi|\d{1,2}\s*h(?:\s*\d{1,2})?))?\s+au\s+(\d{1,2})(?:er)?\s+([A-Za-zÀ-ÿ]+)\s+(20\d{2})(?:\s+à\s+(midi|\d{1,2}\s*h(?:\s*\d{1,2})?))?/i,
   );
@@ -173,7 +173,7 @@ function extractFrenchDateTimeRange(text: string) {
   };
 }
 
-function extractMaxAmount(text: string) {
+export function extractMaxAmount(text: string) {
   const patterns = [
     /aide financière maximale\s*[:\-]?\s*([0-9][0-9\s.,]*)\s*\$/i,
     /jusqu[’']?à\s*([0-9][0-9\s.,]*)\s*\$/i,
@@ -193,7 +193,7 @@ function extractMaxAmount(text: string) {
   return null;
 }
 
-function extractMaxRate(text: string) {
+export function extractMaxRate(text: string) {
   const matches = [
     ...text.matchAll(
       /taux d['’]aide maximal[^%]{0,160}?([0-9]{1,3})\s*%/gi,
@@ -223,7 +223,7 @@ function extractMaxRate(text: string) {
     : null;
 }
 
-function extractMinEligibleSpend(text: string) {
+export function extractMinEligibleSpend(text: string) {
   const match =
     text.match(
       /montant minimal des dépenses admissibles[^0-9]{0,120}?([0-9][0-9\s.,]*)\s*\$/i,
@@ -267,7 +267,7 @@ function extractUpdatedLabel(text: string) {
   );
 }
 
-function inferAvailability(
+export function inferAvailability(
   text: string,
   range: ReturnType<
     typeof extractFrenchDateTimeRange
@@ -331,7 +331,7 @@ function inferAvailability(
   return "unknown" as const;
 }
 
-function extractPriorities(text: string) {
+export function extractPriorities(text: string) {
   const lower = text.toLowerCase();
 
   const priorities: string[] = [];

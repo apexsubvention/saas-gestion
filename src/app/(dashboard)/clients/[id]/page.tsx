@@ -6,6 +6,7 @@ import { grantProjectsService } from "@/server/services/grantProjects.service";
 import { documentsService } from "@/server/services/documents.service";
 import { UploadDocumentForm } from "./UploadDocumentForm";
 import { NeedsForm } from "./NeedsForm";
+import { CompatiblePrograms } from "./CompatiblePrograms";
 import { SetParentForm } from "./SetParentForm";
 import { CreatePortalAccountForm } from "./CreatePortalAccountForm";
 import { PortalAccountToggle } from "./PortalAccountToggle";
@@ -140,6 +141,14 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
             needsUpdatedAt={client.needs_updated_at}
           />
         </div>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold text-neutral-900">Programmes compatibles</h2>
+        <p className="text-xs text-neutral-500">
+          Programmes enregistrés dans Apex dont la nature correspond aux besoins actuels de ce client.
+        </p>
+        <CompatiblePrograms supabase={supabase} needs={client.current_needs} />
       </section>
 
       <section className="space-y-3">

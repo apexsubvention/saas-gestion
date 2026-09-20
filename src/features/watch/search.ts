@@ -83,6 +83,28 @@ export function matchedIntentGroups(query: string): string[] {
   return labels.filter(Boolean);
 }
 
+/**
+ * Variante STRICTE de matchedIntentGroups : un terme doit apparaître comme mot entier (ou
+ * comme début d'un mot d'au moins 5 lettres : « export » -> « exporter »). Évite les faux
+ * positifs de sous-chaîne des tokens courts (« ia » dans « stagiaires » ou « commercialisation »).
+ * Sert à décider si un programme est réellement du même univers qu'un besoin (features/programs/match.ts) ;
+ * la recherche de la veille continue d'utiliser la version large ci-dessus.
+ */
+export function matchedIntentGroupsStrict(query: string): string[] {
+  const words = normalizeSearchText(query).split(" ").filter(Boolean);
+  const padded = ` ${words.join(" ")} `;
+  const labels: string[] = [];
+  SYNONYM_GROUPS.forEach((group, index) => {
+    const hit = group.map(normalizeSearchText).some((term) => {
+      if (!term) return false;
+      if (term.includes(" ")) return padded.includes(` ${term} `);
+      return words.some((w) => w === term || (term.length >= 5 && w.startsWith(term)));
+    });
+    if (hit) labels.push(GROUP_LABELS[index] ?? group[0] ?? "");
+  });
+  return labels.filter(Boolean);
+}
+
 const FUNDING_TYPE_ALIASES: Record<string, string[]> = {
   internship: ["stage", "stagiaire", "etudiant", "placement", "wil", "coop", "internship"],
   wage_subsidy: ["embauche", "emploi", "salaire", "subvention salariale", "wage subsidy"],
