@@ -19,11 +19,8 @@ const NAV = [
   { href: "/grants", label: "Dossiers", icon: FolderKanban },
   { href: "/programs", label: "Programmes", icon: Landmark },
   { href: "/documents", label: "Documents", icon: FileText },
-] as const;
-
-const UPCOMING = [
-  { label: "Réclamations", icon: ReceiptText },
-  { label: "Tâches", icon: CheckSquare2 },
+  { href: "/reclamations", label: "Réclamations", icon: ReceiptText },
+  { href: "/taches", label: "Tâches", icon: CheckSquare2 },
 ] as const;
 
 export function Sidebar({ role }: { role: OrgRole }) {
@@ -50,22 +47,6 @@ export function Sidebar({ role }: { role: OrgRole }) {
             </Link>
           );
         })}
-
-        <div className="pt-5">
-          <div className="px-3 pb-2 text-[10px] font-medium uppercase tracking-[0.16em] text-slate-600">
-            Prochaines fonctions
-          </div>
-          {UPCOMING.map((item) => {
-            const Icon = item.icon;
-            return (
-              <div key={item.label} className="flex items-center gap-3 px-3 py-2 text-sm text-slate-600">
-                <Icon className="h-4 w-4" strokeWidth={1.8} />
-                <span>{item.label}</span>
-                <span className="ml-auto rounded bg-white/5 px-1.5 py-0.5 text-[9px] uppercase tracking-wide">bientôt</span>
-              </div>
-            );
-          })}
-        </div>
       </nav>
 
       <div className="border-t border-white/10 p-3">
