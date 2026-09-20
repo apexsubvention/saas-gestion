@@ -15,6 +15,9 @@ type ProgramNotice =
   | "reread_ok"
   | "reread_partial"
   | "reread_failed"
+  | "url_read_ok"
+  | "url_read_partial"
+  | "url_read_failed"
   | "examples_none"
   | "examples_unsupported"
   | "examples_failed"
@@ -134,11 +137,23 @@ export async function updateProgramAction(
   }
 
   const supabase = await createClient();
+  const service = programsService(supabase);
+  let notice: ProgramNotice | null = null;
   try {
-    await programsService(supabase).update(programId, parsed.data);
+    const before = await service.get(programId);
+    await service.update(programId, parsed.data);
+
+    // URL ajoutée ou changée (ou jamais lue) : on lit la page et on complète les champs VIDES,
+    // sans écraser ce qui vient d'être saisi dans ce même formulaire.
+    const newUrl = parsed.data.source_url || null;
+    if (newUrl && ((before?.source_url ?? null) !== newUrl || before?.read_status === "never")) {
+      const read = await service.reread(programId, { fillEmptyOnly: true });
+      notice = read.status === "ok" ? "url_read_ok" : read.status === "partial" ? "url_read_partial" : "url_read_failed";
+    }
   } catch (e) {
     return { error: formatCaughtError(e), savedAt: null };
   }
+  if (notice) done(programId, notice); // recharge la fiche avec les informations trouvées
   revalidatePath(`/programs/${programId}`);
   revalidatePath("/programs");
   return { error: null, savedAt: Date.now() };

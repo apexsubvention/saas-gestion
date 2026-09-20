@@ -39,6 +39,22 @@ function readToColumns(read: ProgramReadResult): ProgramWrite {
   return cols;
 }
 
+// Ne garde que les colonnes que la fiche n'a pas déjà remplies (les métadonnées de lecture sont
+// toujours mises à jour). Sert quand l'URL vient d'être ajoutée : on complète sans écraser ce que
+// l'utilisateur a saisi ou corrigé à la main.
+const ALWAYS_UPDATED = new Set(["last_read_at", "read_status", "read_error", "extraction_method", "source_text"]);
+function keepOnlyEmptyFields(cols: ProgramWrite, existing: ProgramRow): ProgramWrite {
+  const isEmpty = (v: unknown) => v == null || v === "" || (Array.isArray(v) && v.length === 0);
+  const out: Record<string, unknown> = { ...cols };
+  for (const key of Object.keys(out)) {
+    if (ALWAYS_UPDATED.has(key)) continue;
+    const current = (existing as Record<string, unknown>)[key];
+    const empty = key === "availability_status" ? current === "unknown" : isEmpty(current);
+    if (!empty) delete out[key];
+  }
+  return out as ProgramWrite;
+}
+
 export function programsService(supabase: SupabaseClient) {
   const repo = programsRepository(supabase);
   const examples = programExamplesRepository(supabase);
@@ -90,14 +106,15 @@ export function programsService(supabase: SupabaseClient) {
 
     // Relit la page source : met à jour les champs trouvés (sans effacer les autres) et ajoute
     // les nouveaux exemples. Renvoie le résultat de lecture pour que l'appelant l'affiche.
-    async reread(id: string): Promise<ProgramReadResult> {
+    async reread(id: string, opts: { fillEmptyOnly?: boolean } = {}): Promise<ProgramReadResult> {
       const program = await repo.findById(id);
       if (!program) throw new Error("Programme introuvable.");
       if (!program.source_url) throw new Error("Ce programme n'a pas d'URL source à relire.");
 
       const read = await readProgramFromUrl(program.source_url);
       // Le nom saisi par l'utilisateur n'est jamais remplacé par le titre de la page.
-      const { name: _name, ...columns } = readToColumns(read);
+      const { name: _name, ...allColumns } = readToColumns(read);
+      const columns = opts.fillEmptyOnly ? keepOnlyEmptyFields(allColumns, program) : allColumns;
       await repo.update(id, columns);
       await saveExamples(program, read);
       return read;

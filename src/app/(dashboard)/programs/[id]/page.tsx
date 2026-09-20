@@ -28,6 +28,9 @@ function noticeText(code: string | undefined): { text: string; tone: "ok" | "war
   switch (code) {
     case "reread_ok": return { text: "Page relue : la fiche a été mise à jour.", tone: "ok" };
     case "reread_partial": return { text: "Page relue, mais seulement en partie : vérifie les champs ci-dessous.", tone: "warn" };
+    case "url_read_ok": return { text: "Modifications enregistrées et page lue : les champs vides ont été complétés avec les informations trouvées (ce que tu avais saisi n'a pas été modifié).", tone: "ok" };
+    case "url_read_partial": return { text: "Modifications enregistrées. La page a été lue seulement en partie : vérifie les champs et complète-les à la main si besoin.", tone: "warn" };
+    case "url_read_failed": return { text: "Modifications enregistrées, mais la page n'a pas pu être lue (voir le détail dans « Lecture de la page source »).", tone: "warn" };
     case "reread_failed": return { text: "La page n'a pas pu être relue (voir le détail ci-dessous).", tone: "warn" };
     case "examples_none": return { text: "Aucun exemple correspondant trouvé dans les subventions ouvertes du Canada.", tone: "warn" };
     case "examples_unsupported": return { text: "La recherche d'exemples dans les données ouvertes du Canada n'est pas disponible pour ce programme.", tone: "warn" };
