@@ -19,13 +19,28 @@ export type LedgerInvoice = {
   document: { id: string; filename: string; storage_path: string } | null;
 };
 
-export type LedgerSupplier = ProjectSupplierRow & { invoices: LedgerInvoice[]; invoiced: number };
+// Valeur effective = override manuel ?? valeur automatique ?? calcul de repli.
+export type Tracked = {
+  effective: number | null;
+  auto: number | null; // valeur automatique conservée même si elle est remplacée
+  override: number | null;
+  mode: "manual" | "auto" | "calculated" | "none";
+};
+
+export type LedgerSupplier = ProjectSupplierRow & {
+  invoices: LedgerInvoice[];
+  invoiced: number;
+  accepted: Tracked; // subvention acceptée
+  claimed: Tracked; // réclamé à ce jour (auto = réclamations liées à ses factures)
+  remaining: number | null; // subvention acceptée - réclamé
+};
 
 export type Ledger = {
   suppliers: LedgerSupplier[];
   unassigned: LedgerInvoice[]; // factures dont le fournisseur a été supprimé ou n'est pas encore choisi
   spent: number; // toutes les factures, avant taxes
   supplierBudgetTotal: number;
+  totals: { budget: number; accepted: number; claimed: number; remaining: number };
 };
 
 const num = (v: unknown) => (v == null || v === "" ? null : Number(v));
@@ -45,7 +60,8 @@ export function supplierLedgerService(supabase: SupabaseClient) {
   const documentsRepo = documentsRepository(supabase);
 
   return {
-    async load(grantProjectId: string): Promise<Ledger> {
+    // `projectRate` (fraction) sert au calcul de repli de la subvention acceptée : budget x taux.
+    async load(grantProjectId: string, projectRate: number | null = null): Promise<Ledger> {
       const [suppliers, expenses] = await Promise.all([suppliersRepo.listByProject(grantProjectId), expensesRepo.listByProject(grantProjectId)]);
       const links = await documentsRepo.listInvoiceLinks(expenses.map((e) => e.id));
       const docByExpense = new Map(links.map((l) => [l.expense_id, { id: l.document_id, filename: l.filename, storage_path: l.storage_path }]));
@@ -72,19 +88,64 @@ export function supplierLedgerService(supabase: SupabaseClient) {
         } else unassigned.push(inv);
       }
 
+      // Réclamé automatiquement = montants réclamés (claim_expenses) sur les factures de chaque fournisseur.
+      const claimedByExpense = new Map<string, number>();
+      if (expenses.length > 0) {
+        const { data: claimRows } = await supabase.from("claim_expenses").select("expense_id, claimed_amount").in("expense_id", expenses.map((e) => e.id));
+        for (const r of (claimRows ?? []) as Array<{ expense_id: string; claimed_amount: number | null }>) {
+          claimedByExpense.set(r.expense_id, (claimedByExpense.get(r.expense_id) ?? 0) + (num(r.claimed_amount) ?? 0));
+        }
+      }
+
       const ledgerSuppliers: LedgerSupplier[] = suppliers.map((s) => {
         const list = bySupplier.get(s.id) ?? [];
-        return { ...s, invoices: list, invoiced: list.reduce((sum, i) => sum + (i.amount ?? 0), 0) };
+        const budget = num(s.budget_amount);
+        const accAuto = num(s.accepted_subsidy_auto);
+        const accOverride = num(s.accepted_subsidy_override);
+        const fallback = budget != null && projectRate != null ? Math.round(budget * projectRate * 100) / 100 : null;
+        const accepted: Tracked =
+          accOverride != null ? { effective: accOverride, auto: accAuto ?? fallback, override: accOverride, mode: "manual" }
+          : accAuto != null ? { effective: accAuto, auto: accAuto, override: null, mode: "auto" }
+          : fallback != null ? { effective: fallback, auto: fallback, override: null, mode: "calculated" }
+          : { effective: null, auto: null, override: null, mode: "none" };
+
+        const claimAuto = Math.round(list.reduce((sum, i) => sum + (claimedByExpense.get(i.id) ?? 0), 0) * 100) / 100;
+        const claimOverride = num(s.claimed_override);
+        const claimed: Tracked =
+          claimOverride != null ? { effective: claimOverride, auto: claimAuto, override: claimOverride, mode: "manual" }
+          : { effective: claimAuto, auto: claimAuto, override: null, mode: "auto" };
+
+        const remaining = accepted.effective != null ? Math.round((accepted.effective - (claimed.effective ?? 0)) * 100) / 100 : null;
+        return { ...s, invoices: list, invoiced: list.reduce((sum, i) => sum + (i.amount ?? 0), 0), accepted, claimed, remaining };
       });
+      const sumOf = (pick: (s: LedgerSupplier) => number | null) => Math.round(ledgerSuppliers.reduce((sum, s) => sum + (pick(s) ?? 0), 0) * 100) / 100;
       return {
         suppliers: ledgerSuppliers,
         unassigned,
         spent: invoices.reduce((sum, i) => sum + (i.amount ?? 0), 0),
         supplierBudgetTotal: suppliers.reduce((sum, s) => sum + (num(s.budget_amount) ?? 0), 0),
+        totals: {
+          budget: sumOf((s) => num(s.budget_amount)),
+          accepted: sumOf((s) => s.accepted.effective),
+          claimed: sumOf((s) => s.claimed.effective),
+          remaining: sumOf((s) => s.remaining),
+        },
       };
     },
 
     saveSupplier: (id: string, patch: Parameters<typeof suppliersRepo.update>[1]) => suppliersRepo.update(id, patch),
+
+    // Modification manuelle d'une valeur suivie. value = null -> « revenir au calcul automatique » :
+    // seul l'override est effacé, la valeur automatique n'a jamais été touchée.
+    async setOverride(supplierId: string, field: "accepted" | "claimed", value: number | null, organizationUserId: string) {
+      const stamp = value == null ? { by: null, at: null } : { by: organizationUserId, at: new Date().toISOString() };
+      return suppliersRepo.update(
+        supplierId,
+        field === "accepted"
+          ? { accepted_subsidy_override: value, accepted_subsidy_override_by: stamp.by, accepted_subsidy_override_at: stamp.at }
+          : { claimed_override: value, claimed_override_by: stamp.by, claimed_override_at: stamp.at }
+      );
+    },
     removeSupplier: (id: string) => suppliersRepo.remove(id),
 
     async saveInvoice(organizationId: string, grantProjectId: string, expenseId: string | null, input: SaveInvoiceInput) {
@@ -126,7 +187,7 @@ export function supplierLedgerService(supabase: SupabaseClient) {
       let supplier = x.supplier_name ? matchSupplier(x.supplier_name, suppliers) : null;
       let supplierCreated = false;
       if (!supplier) {
-        supplier = await suppliersRepo.create({ organization_id: organizationId, grant_project_id: grantProjectId, name });
+        supplier = await suppliersRepo.create({ organization_id: organizationId, grant_project_id: grantProjectId, name, source_kind: "ai", source_document_id: documentId, source_ref: "facture", extracted_at: new Date().toISOString(), confidence: "medium" });
         supplierCreated = true;
       }
 

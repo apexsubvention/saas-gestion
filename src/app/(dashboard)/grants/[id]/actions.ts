@@ -14,10 +14,38 @@ import { grantAgreementsService } from "@/server/services/grantAgreements.servic
 import { saveAgreementSchema } from "@/features/grants/agreementSchema";
 import { GRANT_PROJECT_STATUS_LABELS } from "@/features/grants/constants";
 import { formatCaughtError } from "@/lib/errors";
+import { logDossierEvent } from "@/server/services/audit";
+import { aiSuggestionsService } from "@/server/services/aiSuggestions.service";
+import { analyzeConventionFile, hasAgreementTerms } from "@/features/conventions/analyzeConvention";
 import { supplierLedgerService } from "@/server/services/supplierLedger.service";
 import { analyzableMime, analyzeInvoiceFile, invoiceAnalysisAvailable, MAX_INVOICE_BYTES } from "@/features/invoices/analyzeInvoice";
 
 const moneyCad = (n: number | null) => (n == null ? "montant illisible" : new Intl.NumberFormat("fr-CA", { style: "currency", currency: "CAD" }).format(n));
+
+// Convention / entente téléversée : Apex la lit et PROPOSE (fournisseurs, montant, taux, dates) ; rien n'est
+// appliqué sans confirmation dans le panneau « Apex a détecté… ».
+async function analyzeUploadedConvention(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  ctx: { organizationId: string; organizationUserId: string },
+  grantProjectId: string,
+  clientId: string,
+  documentId: string,
+  file: File
+): Promise<string | null> {
+  if (!invoiceAnalysisAvailable()) return "Document téléversé. La lecture automatique n'est pas configurée (ANTHROPIC_API_KEY).";
+  const mime = analyzableMime(file.name);
+  if (!mime) return "Document téléversé. Seuls les PDF et images peuvent être lus automatiquement.";
+  if (file.size > MAX_INVOICE_BYTES) return "Document téléversé. Fichier trop volumineux pour la lecture automatique (4 Mo max).";
+  try {
+    const extraction = await analyzeConventionFile({ bytes: await file.arrayBuffer(), mime });
+    if (!extraction.is_agreement) return "Document téléversé, mais il ne ressemble pas à une convention ou à une entente : aucune proposition.";
+    const count = await aiSuggestionsService(supabase).createFromConvention(ctx, grantProjectId, clientId, documentId, extraction);
+    if (count === 0) return "Convention lue, mais aucune information exploitable n'a été trouvée.";
+    return `Convention lue : ${count} proposition(s) à confirmer dans le panneau « Apex a détecté… » ci-dessous (fournisseurs${hasAgreementTerms(extraction) ? ", montant, taux et dates" : ""}).`;
+  } catch (e) {
+    return `Document téléversé, mais sa lecture automatique a échoué (${formatCaughtError(e)}).`;
+  }
+}
 
 async function analyzeUploadedInvoice(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -48,7 +76,7 @@ export async function updateGrantProjectStatusAction(
   _prev: UpdateGrantProjectStatusFormState,
   formData: FormData
 ): Promise<UpdateGrantProjectStatusFormState> {
-  await requireOrgContext();
+  const ctx = await requireOrgContext();
   const status = String(formData.get("status") ?? "");
 
   const supabase = await createClient();
@@ -57,6 +85,7 @@ export async function updateGrantProjectStatusAction(
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Erreur d'enregistrement" };
   }
+  await logDossierEvent(supabase, ctx, { grant_project_id: grantProjectId, kind: "status_changed", title: `Statut : ${GRANT_PROJECT_STATUS_LABELS[status] ?? status}`, source: "manual" });
 
   revalidatePath(`/grants/${grantProjectId}`);
   revalidatePath("/grants");
@@ -103,6 +132,17 @@ export async function uploadProjectDocumentAction(
   // lecture ne fait JAMAIS échouer le téléversement : le document est déjà enregistré.
   let info: string | null = null;
   if (category === "invoice") info = await analyzeUploadedInvoice(supabase, ctx.organizationId, grantProjectId, uploaded.id, file);
+  else if (category === "agreement") info = await analyzeUploadedConvention(supabase, ctx, grantProjectId, clientId, uploaded.id, file);
+  await logDossierEvent(supabase, ctx, {
+    grant_project_id: grantProjectId,
+    client_id: clientId,
+    kind: category === "invoice" ? "invoice_uploaded" : "document_uploaded",
+    title: `Document téléversé : ${file.name}`,
+    detail: info,
+    source: info ? "ai" : "manual",
+    ref_type: "document",
+    ref_id: uploaded.id,
+  });
 
   revalidatePath(`/grants/${grantProjectId}`);
   return { error: null, info };
@@ -190,19 +230,39 @@ export async function createTaskAction(
 ): Promise<CreateTaskFormState> {
   const ctx = await requireOrgContext();
   const title = String(formData.get("title") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim().slice(0, 2000) || null;
   const due_date = String(formData.get("due_date") ?? "").trim() || null;
   const priority = String(formData.get("priority") ?? "normal");
+  if (!["low", "normal", "high", "urgent"].includes(priority)) return { error: "Priorité invalide." };
+  const assigneeRaw = String(formData.get("assigned_to") ?? "").trim();
+  const claimRaw = String(formData.get("claim_id") ?? "").trim();
 
   const supabase = await createClient();
   try {
+    // Le responsable doit être un membre du personnel de l'organisation ; la réclamation, une de CE dossier.
+    let assigned_to = ctx.organizationUserId;
+    if (assigneeRaw) {
+      const { data: member } = await supabase.from("organization_users").select("id").eq("id", assigneeRaw).eq("organization_id", ctx.organizationId).eq("active", true).in("role", ["admin", "employee"]).maybeSingle();
+      if (!member) return { error: "Responsable invalide." };
+      assigned_to = member.id;
+    }
+    let claim_id: string | null = null;
+    if (claimRaw) {
+      const owned = (await claimsService(supabase).listByProject(grantProjectId)).some((c) => c.id === claimRaw);
+      if (!owned) return { error: "Réclamation introuvable dans ce dossier." };
+      claim_id = claimRaw;
+    }
     await tasksService(supabase).create(ctx.organizationId, {
       title,
+      description,
       client_id: clientId,
       grant_project_id: grantProjectId,
       due_date,
       priority,
-      assigned_to: ctx.organizationUserId,
+      assigned_to,
+      ...(claim_id ? { claim_id } : {}),
     });
+    await logDossierEvent(supabase, ctx, { grant_project_id: grantProjectId, client_id: clientId, kind: "task_created", title: `Tâche créée : ${title}`, source: "manual" });
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Erreur d'enregistrement" };
   }
@@ -409,6 +469,16 @@ export async function saveAgreementAction(
     else if (!result.monthly && result.skipped > 0) parts.push("Les échéances de réclamation étaient déjà présentes.");
     else if (!result.monthly && result.claimsCreated === 0) parts.push("Aucune date de réclamation n'a pu être calculée : renseigne la période d'admissibilité et/ou la fin du projet.");
     if (result.statusChanged) parts.push(`Statut du dossier : ${GRANT_PROJECT_STATUS_LABELS[result.status] ?? result.status}.`);
+    await logDossierEvent(supabase, ctx, {
+      grant_project_id: grantProjectId,
+      kind: "agreement_saved",
+      title: "Entente enregistrée",
+      detail: parts.slice(1).join(" ") || null,
+      source: "manual",
+    });
+    if (result.statusChanged) {
+      await logDossierEvent(supabase, ctx, { grant_project_id: grantProjectId, kind: "status_changed", title: `Statut : ${GRANT_PROJECT_STATUS_LABELS[result.status] ?? result.status}`, detail: "Changé automatiquement à l'enregistrement de l'entente.", source: "system" });
+    }
     return { error: null, message: parts.join(" ") };
   } catch (e) {
     return { error: formatCaughtError(e), message: null };

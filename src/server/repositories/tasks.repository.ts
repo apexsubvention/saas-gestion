@@ -34,6 +34,7 @@ export function tasksRepository(supabase: SupabaseClient) {
       organization_id: string;
       title: string;
       description?: string | null;
+      claim_id?: string | null;
       client_id?: string | null;
       grant_project_id?: string | null;
       assigned_to?: string | null;

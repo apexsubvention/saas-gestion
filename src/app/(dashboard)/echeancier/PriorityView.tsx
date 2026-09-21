@@ -91,6 +91,7 @@ function EntryCard({ entry }: { entry: ScheduleEntry }) {
       </div>
 
       <p className="mt-2 text-sm font-medium text-neutral-900">{entry.title}</p>
+      {entry.origin && <p className="text-[11px] text-neutral-400">Origine : {entry.origin}</p>}
       {entry.subtitle && <p className="text-xs text-neutral-400">{entry.subtitle}</p>}
       <p className="mt-1 text-xs font-medium text-neutral-600">{entry.dueText}</p>
 

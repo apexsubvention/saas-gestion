@@ -32,6 +32,7 @@ export type ScheduleEntry = {
   amount: number | null;
   missingCount: number | null;
   estimated: boolean;
+  origin: string | null; // Manuelle / Générée par Apex / Extraite d'une entente / Réclamation / Réunion...
   href: string;
 };
 
@@ -48,6 +49,7 @@ type TaskLike = {
   due_date: string | null;
   status: string;
   priority: string;
+  source?: string;
   client_id: string | null;
   grant_project_id: string | null;
   grant_projects?: JoinedProject;
@@ -81,6 +83,18 @@ type ClaimLike = {
 // dossier précis, client/dossier/programme déjà connus par ailleurs sur la page) --
 // sinon les noms sont tirés des relations jointes (vue globale, plusieurs dossiers).
 type NameContext = { clientName: string | null; projectName: string | null; programName: string | null };
+
+// Provenance affichée : une tâche/échéance automatique reste modifiable sans perdre son origine.
+const TASK_ORIGIN_LABELS: Record<string, string> = {
+  manual: "Manuelle",
+  email: "Courriel",
+  meeting: "Réunion",
+  claim: "Réclamation",
+  agreement: "Extraite d'une entente",
+  ai: "Générée par Apex",
+  document: "Demande de document client",
+};
+const MILESTONE_ORIGIN_LABELS: Record<string, string> = { manual: "Manuelle", template: "Modèle", ai_proposed: "Générée par Apex (entente)" };
 
 const TASK_TERMINAL = (status: string) => status === "done" || status === "cancelled";
 const MILESTONE_TERMINAL = (status: string) => status === "done" || status === "cancelled";
@@ -117,6 +131,7 @@ export function buildScheduleRows(input: {
       amount: null,
       missingCount: null,
       estimated: false,
+      origin: TASK_ORIGIN_LABELS[t.source ?? "manual"] ?? null,
       href: t.grant_project_id ? `/grants/${t.grant_project_id}` : t.client_id ? `/clients/${t.client_id}` : "#",
     });
   }
@@ -141,6 +156,7 @@ export function buildScheduleRows(input: {
       amount: null,
       missingCount: null,
       estimated: m.source === "ai_proposed",
+      origin: MILESTONE_ORIGIN_LABELS[m.source] ?? null,
       href: `/grants/${m.grant_project_id}`,
     });
   }
@@ -165,6 +181,7 @@ export function buildScheduleRows(input: {
       amount: c.claimed_amount ?? c.approved_amount ?? null,
       missingCount: input.missingCountByClaimId?.[c.id] ?? null,
       estimated: false,
+      origin: c.claim_number?.startsWith("DDR ") ? "Générée par Apex (DDR mensuel)" : "Réclamation",
       href: `/grants/${c.grant_project_id}`,
     });
   }

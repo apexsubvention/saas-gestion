@@ -157,6 +157,7 @@ function KanbanCard({ entry }: { entry: ScheduleEntry }) {
         </p>
       )}
       <p className="mt-1 text-neutral-400">{entry.dueText}</p>
+      {entry.origin && <p className="mt-0.5 text-[10px] text-neutral-300">{entry.origin}</p>}
       {entry.missingCount != null && entry.missingCount > 0 && (
         <p className="mt-1 font-medium text-red-600">
           {entry.missingCount} manquant{entry.missingCount > 1 ? "s" : ""}

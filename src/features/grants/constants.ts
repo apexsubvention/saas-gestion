@@ -149,6 +149,7 @@ export const TASK_PRIORITY_LABELS: Record<string, string> = {
   low: "Basse",
   normal: "Normale",
   high: "Haute",
+  urgent: "Urgente",
 };
 
 // Étiquettes françaises pour milestones.type/status (voir 0005_agreements_milestones.sql).

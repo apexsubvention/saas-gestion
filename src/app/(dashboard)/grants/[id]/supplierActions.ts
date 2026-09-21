@@ -9,6 +9,7 @@ import { supplierLedgerService } from "@/server/services/supplierLedger.service"
 import { projectSuppliersService } from "@/server/services/projectSuppliers.service";
 import { documentsService } from "@/server/services/documents.service";
 import { expensesRepository } from "@/server/repositories/expenses.repository";
+import { logAudit } from "@/server/services/audit";
 
 // Actions du tableau fournisseurs / factures d'un dossier. Chaque action revérifie que les
 // identifiants reçus appartiennent bien à CE dossier (la RLS protège l'accès, pas la cohérence).
@@ -135,6 +136,39 @@ export async function deleteInvoiceAction(grantProjectId: string, invoiceId: str
     if (!(await ownedInvoice(supabase, grantProjectId, invoiceId))) return { error: "Facture introuvable dans ce dossier." };
     const removed = await supplierLedgerService(supabase).removeInvoice(invoiceId);
     if (removed === 0) return { error: "Suppression refusée : tu n'as pas accès à ce dossier." };
+    revalidatePath(`/grants/${grantProjectId}`);
+    return { error: null };
+  } catch (e) {
+    return { error: formatCaughtError(e) };
+  }
+}
+
+// Modifier à la main une valeur du suivi financier (subvention acceptée / réclamé à ce jour), ou
+// revenir au calcul automatique (value = null). La valeur automatique n'est jamais détruite ; le
+// changement est journalisé (qui, quand, avant/après).
+export async function setSupplierOverrideAction(
+  grantProjectId: string,
+  supplierId: string,
+  field: "accepted" | "claimed",
+  value: number | null
+): Promise<LedgerActionResult> {
+  const ctx = await requireOrgContext();
+  if (field !== "accepted" && field !== "claimed") return { error: "Champ invalide." };
+  if (value != null && (!Number.isFinite(value) || value < 0 || value > 100_000_000)) return { error: "Montant invalide." };
+
+  const supabase = await createClient();
+  try {
+    const before = (await projectSuppliersService(supabase).listByProject(grantProjectId)).find((s) => s.id === supplierId);
+    if (!before) return { error: "Fournisseur introuvable dans ce dossier." };
+    await supplierLedgerService(supabase).setOverride(supplierId, field, value, ctx.organizationUserId);
+    const column = field === "accepted" ? "accepted_subsidy_override" : "claimed_override";
+    await logAudit(supabase, ctx, {
+      action: value == null ? "override_reverted" : "override_set",
+      entity_type: "project_supplier",
+      entity_id: supplierId,
+      before: { field: column, value: (before as unknown as Record<string, unknown>)[column] ?? null },
+      after: { field: column, value },
+    });
     revalidatePath(`/grants/${grantProjectId}`);
     return { error: null };
   } catch (e) {

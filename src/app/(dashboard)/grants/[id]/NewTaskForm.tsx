@@ -16,7 +16,17 @@ function SubmitButton() {
   );
 }
 
-export function NewTaskForm({ grantProjectId, clientId }: { grantProjectId: string; clientId: string }) {
+export function NewTaskForm({
+  grantProjectId,
+  clientId,
+  assignees,
+  claims,
+}: {
+  grantProjectId: string;
+  clientId: string;
+  assignees: Array<{ id: string; name: string }>;
+  claims: Array<{ id: string; label: string }>;
+}) {
   const action = createTaskAction.bind(null, grantProjectId, clientId);
   const initialState: CreateTaskFormState = { error: null };
   const [state, formAction] = useFormState(action, initialState);
@@ -43,7 +53,28 @@ export function NewTaskForm({ grantProjectId, clientId }: { grantProjectId: stri
           <option value="low">Basse</option>
           <option value="normal">Normale</option>
           <option value="high">Haute</option>
+          <option value="urgent">Urgente</option>
         </select>
+      </div>
+      <div className="space-y-1">
+        <label className="text-sm font-medium text-neutral-700">Responsable</label>
+        <select name="assigned_to" defaultValue="" className="rounded-md border border-neutral-300 px-2 py-1.5 text-sm">
+          <option value="">Moi</option>
+          {assignees.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+        </select>
+      </div>
+      {claims.length > 0 && (
+        <div className="space-y-1">
+          <label className="text-sm font-medium text-neutral-700">Réclamation associée</label>
+          <select name="claim_id" defaultValue="" className="rounded-md border border-neutral-300 px-2 py-1.5 text-sm">
+            <option value="">Aucune</option>
+            {claims.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+          </select>
+        </div>
+      )}
+      <div className="w-full space-y-1">
+        <label className="text-sm font-medium text-neutral-700">Description (facultatif)</label>
+        <textarea name="description" rows={2} className="w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm" />
       </div>
       <SubmitButton />
       {state.error && <p className="w-full text-sm text-red-600">{state.error}</p>}

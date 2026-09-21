@@ -12,6 +12,19 @@ export type ProjectSupplierRow = {
   invoice_description_requirements: string | null;
   notes: string | null;
   supplier_client_id: string | null;
+  // Traçabilité (0036) : valeur automatique / modification manuelle, jamais détruite
+  accepted_subsidy_auto: number | null;
+  accepted_subsidy_override: number | null;
+  accepted_subsidy_override_by: string | null;
+  accepted_subsidy_override_at: string | null;
+  claimed_override: number | null;
+  claimed_override_by: string | null;
+  claimed_override_at: string | null;
+  source_kind: "manual" | "ai" | "convention" | "import" | null;
+  source_document_id: string | null;
+  source_ref: string | null;
+  extracted_at: string | null;
+  confidence: "high" | "medium" | "low" | null;
 };
 
 export function projectSuppliersRepository(supabase: SupabaseClient) {
@@ -62,6 +75,12 @@ export function projectSuppliersRepository(supabase: SupabaseClient) {
       invoice_description_requirements?: string | null;
       notes?: string | null;
       supplier_client_id?: string | null;
+      accepted_subsidy_auto?: number | null;
+      source_kind?: ProjectSupplierRow["source_kind"];
+      source_document_id?: string | null;
+      source_ref?: string | null;
+      extracted_at?: string | null;
+      confidence?: ProjectSupplierRow["confidence"];
     }): Promise<ProjectSupplierRow> {
       const { data, error } = await supabase.from("project_suppliers").insert(input).select().single();
       if (error) throw error;

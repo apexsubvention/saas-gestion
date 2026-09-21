@@ -22,6 +22,11 @@ import { SuggestMilestonesButton } from "./SuggestMilestonesButton";
 import { AgreementForm } from "./AgreementForm";
 import { SuppliersTable } from "./SuppliersTable";
 import { SubsidyPanel } from "./SubsidyPanel";
+import { SupplierFinanceTable } from "./SupplierFinanceTable";
+import { DossierTimeline } from "./DossierTimeline";
+import { SuggestionsPanel } from "./SuggestionsPanel";
+import { aiSuggestionsService } from "@/server/services/aiSuggestions.service";
+import { listDossierEvents } from "@/server/services/audit";
 import { supplierLedgerService } from "@/server/services/supplierLedger.service";
 import { computeSubsidy, resolveSubsidyInputs } from "@/features/grants/subsidyMath";
 import { grantAgreementsService } from "@/server/services/grantAgreements.service";
@@ -52,16 +57,21 @@ export default async function GrantProjectPage({ params }: { params: { id: strin
     { spent: 0, claimed: 0, paid: 0 }
   );
 
-  const [documents, claims, tasks, milestones, ledger, allClients, agreements] = await Promise.all([
+  const [documents, claims, tasks, milestones, allClients, agreements] = await Promise.all([
     documentsService(supabase).listByProject(params.id),
     claimsService(supabase).listByProject(params.id),
     tasksService(supabase).listByProject(params.id),
     milestonesService(supabase).listByProject(params.id),
-    supplierLedgerService(supabase).load(params.id),
     clientsService(supabase).list(),
     grantAgreementsService(supabase).listByProject(params.id),
   ]);
   const agreement = agreements[0] ?? null;
+  const rateForLedger = Number(project.grant_rate ?? agreement?.grant_rate ?? 0) || null;
+  const ledger = await supplierLedgerService(supabase).load(params.id, rateForLedger);
+  const dossierEvents = await listDossierEvents(supabase, params.id);
+  const suggestions = await aiSuggestionsService(supabase).listProposed(params.id);
+  const { data: staffRows } = await supabase.from("organization_users").select("id, full_name, email").eq("active", true).in("role", ["admin", "employee"]);
+  const assignees = (staffRows ?? []).map((u) => ({ id: u.id, name: u.full_name || u.email || "Membre de l'équipe" }));
   const subsidy = computeSubsidy(resolveSubsidyInputs(project, agreement, ledger.spent));
   const otherClients = allClients.filter((c) => c.id !== project.client_id);
 
@@ -161,7 +171,15 @@ export default async function GrantProjectPage({ params }: { params: { id: strin
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-neutral-900">Fournisseurs et factures</h2>
+        <SuggestionsPanel grantProjectId={project.id} suggestions={suggestions} />
         <SubsidyPanel summary={subsidy} supplierBudgetTotal={ledger.supplierBudgetTotal} />
+        <SupplierFinanceTable
+          grantProjectId={project.id}
+          suppliers={ledger.suppliers}
+          totals={ledger.totals}
+          documents={documents.map((d) => ({ id: d.id, filename: d.filename }))}
+          clients={allClients.map((c) => ({ id: c.id, name: c.name }))}
+        />
         <p className="text-xs text-neutral-500">
           Modifie, ajoute ou supprime les fournisseurs, même ceux générés automatiquement. Une facture téléversée dans « Documents »
           (catégorie Facture) est lue automatiquement et ajoutée ici sous son fournisseur ; tu peux aussi associer un document toi-même.
@@ -192,7 +210,12 @@ export default async function GrantProjectPage({ params }: { params: { id: strin
           des dates officielles.
         </p>
         <div className="flex flex-wrap items-start gap-3 rounded-lg border border-neutral-200 bg-white p-4">
-          <NewTaskForm grantProjectId={project.id} clientId={project.client_id} />
+          <NewTaskForm
+            grantProjectId={project.id}
+            clientId={project.client_id}
+            assignees={assignees}
+            claims={claims.map((c) => ({ id: c.id, label: c.claim_number || `Réclamation (${c.period_start ?? "—"})` }))}
+          />
         </div>
         <div className="flex flex-wrap items-start gap-3 rounded-lg border border-neutral-200 bg-white p-4">
           <NewClaimForm grantProjectId={project.id} />
@@ -219,6 +242,7 @@ export default async function GrantProjectPage({ params }: { params: { id: strin
                   <tr key={`${entry.kind}-${entry.id}`} className="border-b border-neutral-100 last:border-0">
                     <td className="px-4 py-2">
                       <KindBadge label={SCHEDULE_KIND_LABELS[entry.kind]} className={SCHEDULE_KIND_BADGE[entry.kind]} />
+                      {entry.origin && <span className="ml-2 text-[11px] text-neutral-400">{entry.origin}</span>}
                     </td>
                     <td className="px-4 py-2 text-neutral-900">
                       {entry.title}
@@ -280,6 +304,8 @@ export default async function GrantProjectPage({ params }: { params: { id: strin
           <AgreementForm grantProjectId={project.id} agreement={agreement} />
         </div>
       </section>
+
+      <DossierTimeline events={dossierEvents} />
 
       <div className="rounded-lg border border-dashed border-neutral-300 bg-white p-6 text-sm text-neutral-400">
         Onglets Application / Budget / Expenses détaillés — arrivent à l&apos;Étape 3 (moteur opérationnel).
