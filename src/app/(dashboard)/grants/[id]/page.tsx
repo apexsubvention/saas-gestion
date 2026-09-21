@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { grantProjectsService } from "@/server/services/grantProjects.service";
@@ -116,6 +117,9 @@ export default async function GrantProjectPage({ params }: { params: { id: strin
           {project.clients?.name} · {project.grant_programs?.name}
         </p>
         <h1 className="mt-1 text-lg font-semibold text-neutral-900">{project.name}</h1>
+        <Link href={`/grants/${project.id}/redaction`} className="mt-2 inline-block rounded-md border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-100">
+          Aide à la rédaction →
+        </Link>
 
         <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
           <div>
