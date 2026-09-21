@@ -38,6 +38,19 @@ export function projectSuppliersRepository(supabase: SupabaseClient) {
       return data;
     },
 
+    async update(id: string, patch: Partial<Omit<ProjectSupplierRow, "id" | "organization_id" | "grant_project_id">>): Promise<ProjectSupplierRow> {
+      const { data, error } = await supabase.from("project_suppliers").update(patch).eq("id", id).select().single();
+      if (error) throw error;
+      return data as ProjectSupplierRow;
+    },
+
+    // Renvoie le nombre de lignes supprimées : 0 = refusé par la RLS (ou déjà supprimé).
+    async remove(id: string): Promise<number> {
+      const { data, error } = await supabase.from("project_suppliers").delete().eq("id", id).select("id");
+      if (error) throw error;
+      return data?.length ?? 0;
+    },
+
     async create(input: {
       organization_id: string;
       grant_project_id: string;

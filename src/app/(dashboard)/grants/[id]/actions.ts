@@ -14,6 +14,32 @@ import { grantAgreementsService } from "@/server/services/grantAgreements.servic
 import { saveAgreementSchema } from "@/features/grants/agreementSchema";
 import { GRANT_PROJECT_STATUS_LABELS } from "@/features/grants/constants";
 import { formatCaughtError } from "@/lib/errors";
+import { supplierLedgerService } from "@/server/services/supplierLedger.service";
+import { analyzableMime, analyzeInvoiceFile, invoiceAnalysisAvailable, MAX_INVOICE_BYTES } from "@/features/invoices/analyzeInvoice";
+
+const moneyCad = (n: number | null) => (n == null ? "montant illisible" : new Intl.NumberFormat("fr-CA", { style: "currency", currency: "CAD" }).format(n));
+
+async function analyzeUploadedInvoice(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  organizationId: string,
+  grantProjectId: string,
+  documentId: string,
+  file: File
+): Promise<string> {
+  if (!invoiceAnalysisAvailable()) return "Facture téléversée. La lecture automatique n'est pas configurée (ANTHROPIC_API_KEY) : associe-la à un fournisseur dans le tableau.";
+  const mime = analyzableMime(file.name);
+  if (!mime) return "Facture téléversée. Ce format ne peut pas être lu automatiquement (PDF ou image seulement) : associe-la dans le tableau.";
+  if (file.size > MAX_INVOICE_BYTES) return "Facture téléversée. Fichier trop volumineux pour la lecture automatique (4 Mo max) : associe-la dans le tableau.";
+  try {
+    const extraction = await analyzeInvoiceFile({ bytes: await file.arrayBuffer(), mime });
+    if (!extraction.is_invoice) return "Facture téléversée, mais le document ne ressemble pas à une facture : rien n'a été ajouté au tableau.";
+    const r = await supplierLedgerService(supabase).recordAnalyzedInvoice(organizationId, grantProjectId, documentId, extraction);
+    if (r.status === "duplicate") return `Facture téléversée. Elle semble déjà enregistrée pour ${r.supplierName} (même numéro et même total) : rien n'a été ajouté.`;
+    return `Facture lue : ${r.supplierName} · ${moneyCad(r.amount)} avant taxes${extraction.invoice_date ? ` · ${extraction.invoice_date}` : ""}. Ajoutée au tableau fournisseurs${r.supplierCreated ? " (nouveau fournisseur créé)" : ""} — à vérifier.`;
+  } catch (e) {
+    return `Facture téléversée, mais sa lecture automatique a échoué (${formatCaughtError(e)}). Associe-la dans le tableau.`;
+  }
+}
 
 export type UpdateGrantProjectStatusFormState = { error: string | null };
 
@@ -39,7 +65,7 @@ export async function updateGrantProjectStatusAction(
 
 // ---- Documents -------------------------------------------------------------
 
-export type UploadProjectDocumentFormState = { error: string | null };
+export type UploadProjectDocumentFormState = { error: string | null; info: string | null };
 
 export async function uploadProjectDocumentAction(
   grantProjectId: string,
@@ -54,12 +80,13 @@ export async function uploadProjectDocumentAction(
   const linkToClaimId = typeof linkToClaimIdRaw === "string" && linkToClaimIdRaw.length > 0 ? linkToClaimIdRaw : null;
 
   if (!(file instanceof File) || file.size === 0) {
-    return { error: "Choisis un fichier." };
+    return { error: "Choisis un fichier.", info: null };
   }
 
   const supabase = await createClient();
+  let uploaded: Awaited<ReturnType<ReturnType<typeof documentsService>["upload"]>>;
   try {
-    await documentsService(supabase).upload({
+    uploaded = await documentsService(supabase).upload({
       organizationId: ctx.organizationId,
       clientId,
       grantProjectId,
@@ -69,11 +96,16 @@ export async function uploadProjectDocumentAction(
       linkToClaimId,
     });
   } catch (e) {
-    return { error: e instanceof Error ? e.message : "Erreur d'upload" };
+    return { error: e instanceof Error ? e.message : "Erreur d'upload", info: null };
   }
 
+  // Une facture est lue tout de suite : émetteur, montant, date -> tableau fournisseurs. Un échec de
+  // lecture ne fait JAMAIS échouer le téléversement : le document est déjà enregistré.
+  let info: string | null = null;
+  if (category === "invoice") info = await analyzeUploadedInvoice(supabase, ctx.organizationId, grantProjectId, uploaded.id, file);
+
   revalidatePath(`/grants/${grantProjectId}`);
-  return { error: null };
+  return { error: null, info };
 }
 
 // Retourne une URL signée de courte durée pour visualiser/télécharger un document.

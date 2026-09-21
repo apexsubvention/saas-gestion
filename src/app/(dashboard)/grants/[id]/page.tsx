@@ -20,9 +20,16 @@ import { MilestoneStatusSelect } from "./MilestoneStatusSelect";
 import { DeleteMilestoneButton } from "./DeleteMilestoneButton";
 import { SuggestMilestonesButton } from "./SuggestMilestonesButton";
 import { AgreementForm } from "./AgreementForm";
+import { SuppliersTable } from "./SuppliersTable";
+import { SubsidyPanel } from "./SubsidyPanel";
+import { supplierLedgerService } from "@/server/services/supplierLedger.service";
+import { computeSubsidy, resolveSubsidyInputs } from "@/features/grants/subsidyMath";
 import { grantAgreementsService } from "@/server/services/grantAgreements.service";
 import { NewSupplierForm } from "./NewSupplierForm";
 import { DOCUMENT_CATEGORY_LABELS, PRIORITY_BUCKET_LABELS, priorityBucketBadgeClass } from "@/features/grants/constants";
+
+// Le téléversement d'une facture déclenche sa lecture automatique (jusqu'à ~1 min).
+export const maxDuration = 60;
 
 export default async function GrantProjectPage({ params }: { params: { id: string } }) {
   const supabase = await createClient();
@@ -45,16 +52,17 @@ export default async function GrantProjectPage({ params }: { params: { id: strin
     { spent: 0, claimed: 0, paid: 0 }
   );
 
-  const [documents, claims, tasks, milestones, suppliers, allClients, agreements] = await Promise.all([
+  const [documents, claims, tasks, milestones, ledger, allClients, agreements] = await Promise.all([
     documentsService(supabase).listByProject(params.id),
     claimsService(supabase).listByProject(params.id),
     tasksService(supabase).listByProject(params.id),
     milestonesService(supabase).listByProject(params.id),
-    projectSuppliersService(supabase).listByProject(params.id),
+    supplierLedgerService(supabase).load(params.id),
     clientsService(supabase).list(),
     grantAgreementsService(supabase).listByProject(params.id),
   ]);
   const agreement = agreements[0] ?? null;
+  const subsidy = computeSubsidy(resolveSubsidyInputs(project, agreement, ledger.spent));
   const otherClients = allClients.filter((c) => c.id !== project.client_id);
 
   const pendingMilestones = milestones.filter((m) => m.status === "pending" || m.status === "at_risk");
@@ -152,48 +160,26 @@ export default async function GrantProjectPage({ params }: { params: { id: strin
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-neutral-900">Fournisseurs</h2>
+        <h2 className="text-sm font-semibold text-neutral-900">Fournisseurs et factures</h2>
+        <SubsidyPanel summary={subsidy} supplierBudgetTotal={ledger.supplierBudgetTotal} />
         <p className="text-xs text-neutral-500">
-          Quand un fournisseur est lui-même un client Apex (ex. Sitegrow qui facture pour ses propres clients),
-          le lier ci-dessous rend ces informations visibles dans son portail, s&apos;il en a un.
+          Modifie, ajoute ou supprime les fournisseurs, même ceux générés automatiquement. Une facture téléversée dans « Documents »
+          (catégorie Facture) est lue automatiquement et ajoutée ici sous son fournisseur ; tu peux aussi associer un document toi-même.
         </p>
-        <div className="rounded-lg border border-neutral-200 bg-white p-4">
-          <NewSupplierForm grantProjectId={project.id} clients={otherClients.map((c) => ({ id: c.id, name: c.name }))} />
-        </div>
-        <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
-          {suppliers.length > 0 ? (
-            <table className="w-full text-sm">
-              <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
-                <tr>
-                  <th className="px-4 py-2 font-medium">Nom</th>
-                  <th className="px-4 py-2 font-medium">Budget</th>
-                  <th className="px-4 py-2 font-medium">Fréquence</th>
-                  <th className="px-4 py-2 font-medium">Jour attendu</th>
-                  <th className="px-4 py-2 font-medium">À inscrire sur la facture</th>
-                  <th className="px-4 py-2 font-medium">Client Apex lié</th>
-                </tr>
-              </thead>
-              <tbody>
-                {suppliers.map((s) => (
-                  <tr key={s.id} className="border-b border-neutral-100 last:border-0">
-                    <td className="px-4 py-2 text-neutral-900">{s.name}</td>
-                    <td className="px-4 py-2 text-neutral-600">
-                      {s.budget_amount != null ? money(Number(s.budget_amount)) : "—"}
-                    </td>
-                    <td className="px-4 py-2 text-neutral-600">{s.billing_frequency ?? "—"}</td>
-                    <td className="px-4 py-2 text-neutral-600">{s.expected_invoice_day ?? "—"}</td>
-                    <td className="px-4 py-2 text-neutral-600">{s.invoice_description_requirements ?? "—"}</td>
-                    <td className="px-4 py-2 text-neutral-600">
-                      {s.supplier_client_id ? allClients.find((c) => c.id === s.supplier_client_id)?.name ?? "—" : "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <p className="px-4 py-6 text-sm text-neutral-400">Aucun fournisseur pour ce dossier.</p>
-          )}
-        </div>
+        <SuppliersTable
+          grantProjectId={project.id}
+          suppliers={ledger.suppliers}
+          unassigned={ledger.unassigned}
+          documents={documents.map((d) => ({ id: d.id, filename: d.filename, category: d.category }))}
+          clients={allClients.map((c) => ({ id: c.id, name: c.name }))}
+          totals={{ budget: ledger.supplierBudgetTotal, spent: ledger.spent }}
+        />
+        <details className="rounded-lg border border-neutral-200 bg-white p-4">
+          <summary className="cursor-pointer text-sm font-medium text-neutral-800">Ajouter un fournisseur avec ses détails de facturation</summary>
+          <div className="mt-3">
+            <NewSupplierForm grantProjectId={project.id} clients={otherClients.map((c) => ({ id: c.id, name: c.name }))} />
+          </div>
+        </details>
       </section>
 
       <section className="space-y-3">

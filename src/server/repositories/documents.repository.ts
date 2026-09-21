@@ -61,6 +61,32 @@ export function documentsRepository(supabase: SupabaseClient) {
     // liens plus fins (ce document EST la pièce jointe de CETTE réclamation, CETTE
     // facture, etc). organization_id est auto-dérivé par un trigger, pas besoin de le
     // passer ici.
+    // Documents rattachés à des factures (document_links.entity_type = 'expense_invoice').
+    async listInvoiceLinks(expenseIds: string[]): Promise<Array<{ expense_id: string; document_id: string; filename: string; storage_path: string }>> {
+      if (expenseIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from("document_links")
+        .select("entity_id, document_id, documents(filename, storage_path)")
+        .eq("entity_type", "expense_invoice")
+        .in("entity_id", expenseIds);
+      if (error) throw error;
+      return (data ?? []).map((row: any) => ({
+        expense_id: row.entity_id,
+        document_id: row.document_id,
+        filename: row.documents?.filename ?? "",
+        storage_path: row.documents?.storage_path ?? "",
+      }));
+    },
+
+    // Une facture a au plus UN document associé : on remplace le lien existant.
+    async setInvoiceDocument(expenseId: string, documentId: string | null): Promise<void> {
+      const { error: delError } = await supabase.from("document_links").delete().eq("entity_type", "expense_invoice").eq("entity_id", expenseId);
+      if (delError) throw delError;
+      if (!documentId) return;
+      const { error } = await supabase.from("document_links").insert({ document_id: documentId, entity_type: "expense_invoice", entity_id: expenseId });
+      if (error) throw error;
+    },
+
     async linkToEntity(input: {
       document_id: string;
       entity_type: "expense_invoice" | "expense_payment_proof" | "document_request" | "claim_requirement" | "claim" | "grant_agreement" | "application_answer";

@@ -12,7 +12,7 @@ function SubmitButton() {
       disabled={pending}
       className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
     >
-      {pending ? "Envoi..." : "Téléverser"}
+      {pending ? "Envoi et lecture…" : "Téléverser"}
     </button>
   );
 }
@@ -27,7 +27,7 @@ export function UploadProjectDocumentForm({
   claims: Array<{ id: string; label: string }>;
 }) {
   const action = uploadProjectDocumentAction.bind(null, grantProjectId, clientId);
-  const initialState: UploadProjectDocumentFormState = { error: null };
+  const initialState: UploadProjectDocumentFormState = { error: null, info: null };
   const [state, formAction] = useFormState(action, initialState);
 
   return (
@@ -61,6 +61,7 @@ export function UploadProjectDocumentForm({
       )}
       <SubmitButton />
       {state.error && <p className="w-full text-sm text-red-600">{state.error}</p>}
+      {state.info && !state.error && <p className="w-full rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{state.info}</p>}
     </form>
   );
 }
