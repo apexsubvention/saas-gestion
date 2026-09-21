@@ -49,9 +49,11 @@ export function milestonesRepository(supabase: SupabaseClient) {
       return data as MilestoneRow;
     },
 
-    async remove(id: string): Promise<void> {
-      const { error } = await supabase.from("milestones").delete().eq("id", id);
+    // Renvoie le nombre de lignes supprimées : 0 = refusé par les règles d'accès (et non « déjà supprimé »).
+    async remove(id: string): Promise<number> {
+      const { data, error } = await supabase.from("milestones").delete().eq("id", id).select("id");
       if (error) throw error;
+      return data?.length ?? 0;
     },
 
     // Reprogrammation depuis le glisser-déposer de la vue Kanban de l'échéancier --

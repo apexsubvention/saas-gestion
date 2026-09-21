@@ -41,6 +41,13 @@ export function claimsRepository(supabase: SupabaseClient) {
       return data as ClaimRow;
     },
 
+    // Renvoie le nombre de lignes supprimées : 0 = refusé par les règles d'accès.
+    async remove(id: string): Promise<number> {
+      const { data, error } = await supabase.from("claims").delete().eq("id", id).select("id");
+      if (error) throw error;
+      return data?.length ?? 0;
+    },
+
     async updateStatus(id: string, status: string): Promise<ClaimRow> {
       const { data, error } = await supabase.from("claims").update({ status }).eq("id", id).select().single();
       if (error) throw error;

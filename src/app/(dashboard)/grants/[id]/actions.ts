@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { grantProjectsService } from "@/server/services/grantProjects.service";
 import { documentsService } from "@/server/services/documents.service";
 import { claimsService } from "@/server/services/claims.service";
+import { scheduleDismissalsService } from "@/server/services/scheduleDismissals.service";
 import { tasksService } from "@/server/services/tasks.service";
 import { milestonesService } from "@/server/services/milestones.service";
 import { projectSuppliersService } from "@/server/services/projectSuppliers.service";
@@ -167,7 +168,7 @@ export async function getDocumentUrlAction(storagePath: string): Promise<{ url: 
 
 // ---- Réclamations ------------------------------------------------------------
 
-export type CreateClaimFormState = { error: string | null };
+export type CreateClaimFormState = { error: string | null; savedAt?: number };
 
 export async function createClaimAction(
   grantProjectId: string,
@@ -189,13 +190,15 @@ export async function createClaimAction(
       due_date,
       status: "planned",
     });
+    // Recréer à la main une réclamation automatique supprimée (ex. « DDR 2026-05 ») : elle n'est plus « supprimée ».
+    if (claim_number) await scheduleDismissalsService(supabase).clear(grantProjectId, "claim", claim_number);
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Erreur d'enregistrement" };
   }
 
   revalidatePath(`/grants/${grantProjectId}`);
   revalidatePath("/echeancier");
-  return { error: null };
+  return { error: null, savedAt: Date.now() };
 }
 
 export type UpdateClaimStatusFormState = { error: string | null };
@@ -223,7 +226,7 @@ export async function updateClaimStatusAction(
 
 // ---- Tâches -----------------------------------------------------------------
 
-export type CreateTaskFormState = { error: string | null };
+export type CreateTaskFormState = { error: string | null; savedAt?: number };
 
 export async function createTaskAction(
   grantProjectId: string,
@@ -266,14 +269,14 @@ export async function createTaskAction(
       ...(claim_id ? { claim_id } : {}),
     });
     await logDossierEvent(supabase, ctx, { grant_project_id: grantProjectId, client_id: clientId, kind: "task_created", title: `Tâche créée : ${title}`, source: "manual" });
-    await notifyUser(supabase, ctx, { userId: assigned_to, type: "task_assigned", message: `Une tâche t'a été assignée : ${title}`, href: `/grants/${grantProjectId}`, entity_type: "task" });
+    await notifyUser(supabase, ctx, { userId: assigned_to, type: "task_assigned", message: `Une tâche t'a été assignée : ${title}`, href: `/grants/${grantProjectId}?tab=echeancier`, entity_type: "task" });
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Erreur d'enregistrement" };
   }
 
   revalidatePath(`/grants/${grantProjectId}`);
   revalidatePath("/echeancier");
-  return { error: null };
+  return { error: null, savedAt: Date.now() };
 }
 
 export type UpdateTaskStatusFormState = { error: string | null };
@@ -326,14 +329,6 @@ export async function updateMilestoneStatusAction(
   return { error: null };
 }
 
-export async function deleteMilestoneAction(grantProjectId: string, milestoneId: string): Promise<void> {
-  await requireOrgContext();
-  const supabase = await createClient();
-  await milestonesService(supabase).remove(milestoneId);
-  revalidatePath(`/grants/${grantProjectId}`);
-  revalidatePath("/echeancier");
-}
-
 export type SuggestMilestonesState = { error: string | null; created: number; skipped: number };
 
 export async function suggestMilestonesAction(
@@ -355,6 +350,8 @@ export async function suggestMilestonesAction(
       };
     }
 
+    // Demande explicite : les échéances suggérées supprimées auparavant sont de nouveau proposées.
+    await scheduleDismissalsService(supabase).clear(grantProjectId, "milestone");
     const result = await milestonesService(supabase).suggestForProject(ctx.organizationId, grantProjectId, {
       eligible_expense_period_start: agreement.eligible_expense_period_start,
       eligible_expense_period_end: agreement.eligible_expense_period_end,

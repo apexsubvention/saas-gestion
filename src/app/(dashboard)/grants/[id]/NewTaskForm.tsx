@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { createTaskAction, type CreateTaskFormState } from "./actions";
 
@@ -30,9 +31,14 @@ export function NewTaskForm({
   const action = createTaskAction.bind(null, grantProjectId, clientId);
   const initialState: CreateTaskFormState = { error: null };
   const [state, formAction] = useFormState(action, initialState);
+  // Formulaire remis à zéro une fois l'élément ajouté (évite un doublon par double envoi).
+  const formRef = useRef<HTMLFormElement>(null);
+  useEffect(() => {
+    if (state.savedAt) formRef.current?.reset();
+  }, [state.savedAt]);
 
   return (
-    <form action={formAction} className="flex flex-wrap items-end gap-3">
+    <form ref={formRef} action={formAction} className="flex flex-wrap items-end gap-3">
       <div className="min-w-[220px] flex-1 space-y-1">
         <label className="text-sm font-medium text-neutral-700">Titre</label>
         <input

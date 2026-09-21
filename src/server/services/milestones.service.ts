@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { milestonesRepository } from "@/server/repositories/milestones.repository";
 import { suggestMilestonesFromAgreement } from "@/server/scheduling/suggestMilestones";
 import { MILESTONE_STATUS_LABELS } from "@/features/grants/constants";
+import { milestoneDedupeKey } from "@/features/schedule/dismissals";
 
 export function milestonesService(supabase: SupabaseClient) {
   const repo = milestonesRepository(supabase);
@@ -15,6 +16,7 @@ export function milestonesService(supabase: SupabaseClient) {
       return repo.updateStatus(id, status);
     },
 
+    create: (input: Parameters<typeof repo.create>[0]) => repo.create(input),
     remove: (id: string) => repo.remove(id),
     updateDueDate: (id: string, dueDate: string) => repo.updateDueDate(id, dueDate),
 
@@ -32,7 +34,8 @@ export function milestonesService(supabase: SupabaseClient) {
       organizationId: string,
       grantProjectId: string,
       agreement: { eligible_expense_period_start: string | null; eligible_expense_period_end: string | null; project_end: string | null },
-      opts: { skipClaimSuggestions?: boolean } = {}
+      // dismissed : clés d'éléments automatiques que l'utilisateur a supprimés à la main -> jamais recréés.
+      opts: { skipClaimSuggestions?: boolean; dismissed?: Set<string> } = {}
     ) {
       // Régime mensuel (DDR) : les réclamations sont de vrais dossiers créés à part, on ne suggère
       // donc que les dates de fin de projet / d'admissibilité.
@@ -43,14 +46,14 @@ export function milestonesService(supabase: SupabaseClient) {
 
       const existing = await repo.listByProject(grantProjectId);
       const aiProposed = existing.filter((m) => m.source === "ai_proposed");
-      const dedupeKey = (type: string, title: string) => (type === "claim" ? `claim:${title}` : `type:${type}`);
+      const dedupeKey = milestoneDedupeKey;
       const existingKeys = new Set(aiProposed.map((m) => dedupeKey(m.type, m.title)));
 
       let created = 0;
       let skipped = 0;
       for (const s of suggestions) {
         const key = dedupeKey(s.type, s.title);
-        if (existingKeys.has(key)) {
+        if (existingKeys.has(key) || opts.dismissed?.has(key)) {
           skipped += 1;
           continue;
         }

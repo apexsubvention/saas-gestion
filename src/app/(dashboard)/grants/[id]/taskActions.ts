@@ -48,7 +48,7 @@ export async function updateTaskDetailsAction(grantProjectId: string, input: Tas
     if ((before.due_date ?? null) !== fields.due_date) changes.push("échéance modifiée");
     if (before.priority !== fields.priority) changes.push("priorité modifiée");
     if (before.assigned_to !== fields.assigned_to) {
-      await notifyUser(supabase, ctx, { userId: fields.assigned_to, type: "task_assigned", message: `Une tâche t'a été assignée : ${fields.title}`, href: `/grants/${grantProjectId}`, entity_type: "task", entity_id: id });
+      await notifyUser(supabase, ctx, { userId: fields.assigned_to, type: "task_assigned", message: `Une tâche t'a été assignée : ${fields.title}`, href: `/grants/${grantProjectId}?tab=echeancier`, entity_type: "task", entity_id: id });
     }
     if (changes.length > 0) {
       await logDossierEvent(supabase, ctx, {

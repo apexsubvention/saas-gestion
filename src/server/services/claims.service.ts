@@ -26,6 +26,7 @@ export function claimsService(supabase: SupabaseClient) {
       }
       return repo.updateStatus(id, status);
     },
+    remove: (id: string) => repo.remove(id),
     updateDueDate: (id: string, dueDate: string) => repo.updateDueDate(id, dueDate),
   };
 }

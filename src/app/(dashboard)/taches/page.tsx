@@ -105,7 +105,7 @@ export default async function MyTasksPage({ searchParams }: { searchParams?: Sea
             <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {groups[k].map((t) => {
                 const clientName = t.clients?.name ?? t.grant_projects?.clients?.name;
-                const href = t.grant_project_id ? `/grants/${t.grant_project_id}` : t.client_id ? `/clients/${t.client_id}` : "#";
+                const href = t.grant_project_id ? `/grants/${t.grant_project_id}?tab=echeancier` : t.client_id ? `/clients/${t.client_id}` : "#";
                 return (
                   <li key={t.id} className="flex flex-col justify-between rounded-lg border border-neutral-200 bg-white p-4">
                     <div>

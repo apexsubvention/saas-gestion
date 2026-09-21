@@ -132,7 +132,7 @@ export function buildScheduleRows(input: {
       missingCount: null,
       estimated: false,
       origin: TASK_ORIGIN_LABELS[t.source ?? "manual"] ?? null,
-      href: t.grant_project_id ? `/grants/${t.grant_project_id}` : t.client_id ? `/clients/${t.client_id}` : "#",
+      href: t.grant_project_id ? `/grants/${t.grant_project_id}?tab=echeancier` : t.client_id ? `/clients/${t.client_id}` : "#",
     });
   }
 
@@ -157,7 +157,7 @@ export function buildScheduleRows(input: {
       missingCount: null,
       estimated: m.source === "ai_proposed",
       origin: MILESTONE_ORIGIN_LABELS[m.source] ?? null,
-      href: `/grants/${m.grant_project_id}`,
+      href: `/grants/${m.grant_project_id}?tab=echeancier`,
     });
   }
 
@@ -182,7 +182,7 @@ export function buildScheduleRows(input: {
       missingCount: input.missingCountByClaimId?.[c.id] ?? null,
       estimated: false,
       origin: c.claim_number?.startsWith("DDR ") ? "Générée par Apex (DDR mensuel)" : "Réclamation",
-      href: `/grants/${c.grant_project_id}`,
+      href: `/grants/${c.grant_project_id}?tab=echeancier`,
     });
   }
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { createClaimAction, type CreateClaimFormState } from "./actions";
 
@@ -20,9 +21,14 @@ export function NewClaimForm({ grantProjectId }: { grantProjectId: string }) {
   const action = createClaimAction.bind(null, grantProjectId);
   const initialState: CreateClaimFormState = { error: null };
   const [state, formAction] = useFormState(action, initialState);
+  // Formulaire remis à zéro une fois l'élément ajouté (évite un doublon par double envoi).
+  const formRef = useRef<HTMLFormElement>(null);
+  useEffect(() => {
+    if (state.savedAt) formRef.current?.reset();
+  }, [state.savedAt]);
 
   return (
-    <form action={formAction} className="flex flex-wrap items-end gap-3">
+    <form ref={formRef} action={formAction} className="flex flex-wrap items-end gap-3">
       <div className="space-y-1">
         <label className="text-sm font-medium text-neutral-700">Étiquette</label>
         <input

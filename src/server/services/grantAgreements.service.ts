@@ -3,6 +3,7 @@ import { grantAgreementsRepository } from "@/server/repositories/grantAgreements
 import { grantProjectsService } from "@/server/services/grantProjects.service";
 import { milestonesService } from "@/server/services/milestones.service";
 import { claimsService } from "@/server/services/claims.service";
+import { scheduleDismissalsService } from "@/server/services/scheduleDismissals.service";
 import { programsService } from "@/server/services/programs.service";
 import { buildMonthlyClaims, DEFAULT_DUE_DELAY_DAYS, isMonthlyClaimProgram } from "@/server/scheduling/monthlyClaims";
 import type { SaveAgreementInput } from "@/features/grants/agreementSchema";
@@ -76,6 +77,7 @@ export function grantAgreementsService(supabase: SupabaseClient) {
       const monthly = isMonthlyClaimProgram(program?.name, fields.claim_frequency);
 
       const milestones = milestonesService(supabase);
+      const dismissals = scheduleDismissalsService(supabase);
       const { created, skipped } = await milestones.suggestForProject(
         organizationId,
         grantProjectId,
@@ -84,7 +86,7 @@ export function grantAgreementsService(supabase: SupabaseClient) {
           eligible_expense_period_end: fields.eligible_expense_period_end,
           project_end: fields.project_end,
         },
-        { skipClaimSuggestions: monthly }
+        { skipClaimSuggestions: monthly, dismissed: await dismissals.keys(grantProjectId, "milestone") }
       );
 
       // Régime mensuel (ex. PARI-CNRC) : un DDR par mois, du début à la fin du projet.
@@ -94,9 +96,11 @@ export function grantAgreementsService(supabase: SupabaseClient) {
       const monthlyStart = fields.project_start ?? fields.eligible_expense_period_start;
       const monthlyEnd = fields.project_end ?? fields.eligible_expense_period_end;
       if (monthly && monthlyStart && monthlyEnd) {
+        // Déjà présents, ou supprimés à la main par l'utilisateur : on ne les recrée pas.
         const existingNumbers = new Set((await claims.listByProject(grantProjectId)).map((c) => c.claim_number));
+        const dismissedClaims = await dismissals.keys(grantProjectId, "claim");
         for (const m of buildMonthlyClaims(monthlyStart, monthlyEnd, opts.dueDelayDays ?? DEFAULT_DUE_DELAY_DAYS)) {
-          if (existingNumbers.has(m.claim_number)) { claimsSkipped += 1; continue; }
+          if (existingNumbers.has(m.claim_number) || dismissedClaims.has(m.claim_number)) { claimsSkipped += 1; continue; }
           await claims.create(organizationId, grantProjectId, { ...m, status: "planned" });
           claimsCreated += 1;
         }
