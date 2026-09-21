@@ -7,6 +7,8 @@ import { programsRepository } from "@/server/repositories/programs.repository";
 import { draftingService } from "@/server/services/drafting.service";
 import { draftingAvailable } from "@/features/drafting/analyze";
 import { DraftingWorkspace } from "./DraftingWorkspace";
+import { QuestionnairePanel } from "./QuestionnairePanel";
+import { questionnaireService } from "@/server/services/questionnaire.service";
 
 // L'analyse d'un projet lit les documents du programme : jusqu'à ~1 minute.
 export const maxDuration = 60;
@@ -17,6 +19,7 @@ export default async function DraftingPage({ params }: { params: { id: string } 
   const project: any = await grantProjectsService(supabase).get(params.id);
   if (!project) notFound();
 
+  const questionnaire = await questionnaireService(supabase).get(params.id);
   const [program, history, clientRes] = await Promise.all([
     programsRepository(supabase).findById(project.program_id),
     draftingService(supabase).listAnalyses(params.id),
@@ -40,6 +43,15 @@ export default async function DraftingPage({ params }: { params: { id: string } 
         programDocuments={program?.required_documents ?? []}
         configured={draftingAvailable()}
       />
+
+      <section className="space-y-3">
+        <h2 className="text-base font-semibold text-neutral-900">5. Questionnaire de la demande et copilote de rédaction</h2>
+        {draftingAvailable() ? (
+          <QuestionnairePanel grantProjectId={params.id} items={questionnaire.items} />
+        ) : (
+          <p className="rounded-lg border border-dashed border-neutral-300 bg-white p-4 text-sm text-neutral-500">Le questionnaire nécessite la variable <code className="rounded bg-neutral-100 px-1">ANTHROPIC_API_KEY</code> dans Vercel.</p>
+        )}
+      </section>
     </div>
   );
 }
