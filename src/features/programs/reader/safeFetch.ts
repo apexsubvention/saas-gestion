@@ -91,7 +91,7 @@ export type FetchedPage = { url: string; contentType: string; html: string };
 
 const ACCEPTED_TYPES = ["text/html", "application/xhtml+xml", "text/plain"];
 
-async function readCapped(res: Response): Promise<Uint8Array> {
+async function readCapped(res: Response, maxBytes: number = MAX_BYTES): Promise<Uint8Array> {
   if (!res.body) return new Uint8Array();
   const reader = res.body.getReader();
   const chunks: Uint8Array[] = [];
@@ -100,7 +100,7 @@ async function readCapped(res: Response): Promise<Uint8Array> {
     const { done, value } = await reader.read();
     if (done) break;
     total += value.length;
-    if (total > MAX_BYTES) {
+    if (total > maxBytes) {
       await reader.cancel();
       break; // page tronquée : on garde ce qui a été lu
     }
@@ -154,6 +154,39 @@ export async function fetchPublicPage(rawUrl: string): Promise<FetchedPage> {
       html = new TextDecoder("utf-8").decode(bytes);
     }
     return { url: url.toString(), contentType, html };
+  }
+  throw new Error("Trop de redirections.");
+}
+
+// PDF officiel (guide du programme) : mêmes garde-fous SSRF que fetchPublicPage. Un PDF plus gros que
+// `maxBytes` est REFUSÉ (jamais tronqué : un guide coupé donnerait des réponses fausses).
+export async function fetchPublicPdf(rawUrl: string, maxBytes = 6_000_000): Promise<{ url: string; bytes: Uint8Array }> {
+  let url = parsePublicUrl(rawUrl);
+  const deadline = AbortSignal.timeout(20_000);
+
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
+    await assertPublicHost(url.hostname);
+    const res = await fetch(url, {
+      redirect: "manual",
+      cache: "no-store",
+      signal: deadline,
+      headers: { "User-Agent": "ApexProgramReader/1.0 (+lecture de guide)", Accept: "application/pdf" },
+    });
+    if (res.status >= 300 && res.status < 400) {
+      const location = res.headers.get("location");
+      if (!location) throw new Error(`Redirection sans destination (HTTP ${res.status}).`);
+      url = parsePublicUrl(new URL(location, url).toString());
+      continue;
+    }
+    if (!res.ok) throw new Error(`Le guide a répondu HTTP ${res.status}.`);
+    const declared = Number(res.headers.get("content-length") ?? 0);
+    if (declared > maxBytes) throw new Error("Guide trop volumineux pour être consulté.");
+    const contentType = (res.headers.get("content-type") ?? "").toLowerCase();
+    if (!contentType.includes("application/pdf") && !/\.pdf(\?|$)/i.test(url.pathname + url.search)) throw new Error("Ce lien n'est pas un PDF.");
+    const bytes = await readCapped(res, maxBytes + 1);
+    if (bytes.length > maxBytes) throw new Error("Guide trop volumineux pour être consulté.");
+    if (String.fromCharCode(...bytes.slice(0, 4)) !== "%PDF") throw new Error("Le fichier téléchargé n'est pas un PDF valide.");
+    return { url: url.toString(), bytes };
   }
   throw new Error("Trop de redirections.");
 }

@@ -5,6 +5,11 @@ import { programsService } from "@/server/services/programs.service";
 import { safeHref } from "@/lib/errors";
 import { supportsOpenCanadaAwards } from "@/features/watch/connectors/openCanadaAwards";
 import { EditProgramForm } from "./EditProgramForm";
+import { AskProgramPanel } from "./AskProgramPanel";
+import { programQaService } from "@/server/services/programQa.service";
+import { clientsService } from "@/server/services/clients.service";
+import { guideCandidates } from "@/features/programs/qa/bundle";
+import { qaAvailable } from "@/features/programs/qa/ask";
 import { findOpenCanadaExamplesAction, rereadProgramAction } from "./actions";
 
 // « Relire la page » télécharge et analyse plusieurs pages : plus long qu'un rendu normal.
@@ -80,6 +85,7 @@ export default async function ProgramDetailPage({
   const program = await service.get(params.id);
   if (!program) notFound();
   const examples = await service.listExamples(program.id);
+  const [qaHistory, allClients] = await Promise.all([programQaService(supabase).list(program.id), clientsService(supabase).list()]);
 
   const availability = AVAILABILITY_LABELS[program.availability_status] ?? AVAILABILITY_LABELS.unknown!;
   const notice = noticeText(searchParams?.notice);
@@ -232,6 +238,17 @@ export default async function ProgramDetailPage({
             })}
           </ul>
         )}
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="text-sm font-semibold text-neutral-900">Pose-moi tes questions sur ce programme</h2>
+        <AskProgramPanel
+          programId={program.id}
+          clients={allClients.map((c) => ({ id: c.id, name: c.name }))}
+          guideCount={guideCandidates(program).length}
+          history={qaHistory}
+          configured={qaAvailable()}
+        />
       </section>
 
       <details className="rounded-lg border border-neutral-200 bg-white p-4">

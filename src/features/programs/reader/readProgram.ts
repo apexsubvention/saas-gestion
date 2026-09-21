@@ -82,7 +82,8 @@ export async function readProgramFromUrl(rawUrl: string): Promise<ProgramReadRes
   const llmLinks: LlmLink[] = candidates.map((c, i) => ({ id: i, url: c.url, label: c.label }));
 
   const heuristic = heuristicExtract(mainText, extractTitle(mainHtml), extractMetaDescription(mainHtml));
-  const sourceText = pages.map((p) => p.text).join("\n\n---\n\n").slice(0, STORED_TEXT_LIMIT);
+  // Chaque page est précédée d'un marqueur « === PAGE : url === » : l'assistant de questions peut ainsi citer la page exacte.
+  const sourceText = pages.map((p) => `=== PAGE : ${p.url} ===\n${p.text}`).join("\n\n").slice(0, STORED_TEXT_LIMIT);
   const pagesRead = pages.map((p) => p.url);
 
   // Repli sur les liens détectés par mots-clés quand l'IA n'est pas utilisée.
