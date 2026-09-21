@@ -25,6 +25,7 @@ import { SubsidyPanel } from "./SubsidyPanel";
 import { SupplierFinanceTable } from "./SupplierFinanceTable";
 import { DossierTimeline } from "./DossierTimeline";
 import { SuggestionsPanel } from "./SuggestionsPanel";
+import { TasksManager } from "./TasksManager";
 import { aiSuggestionsService } from "@/server/services/aiSuggestions.service";
 import { listDossierEvents } from "@/server/services/audit";
 import { supplierLedgerService } from "@/server/services/supplierLedger.service";
@@ -143,6 +144,9 @@ export default async function GrantProjectPage({ params }: { params: { id: strin
             clientId={project.client_id}
             claims={claims.map((c) => ({ id: c.id, label: c.claim_number || `Réclamation (${c.period_start ?? "—"})` }))}
           />
+          <div className="mt-4">
+            <TasksManager grantProjectId={project.id} tasks={tasks} assignees={assignees} />
+          </div>
         </div>
         <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
           {documents.length > 0 ? (

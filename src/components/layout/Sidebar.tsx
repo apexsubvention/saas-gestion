@@ -8,6 +8,7 @@ import {
   FileText,
   CalendarClock,
   Settings,
+  ListChecks,
 } from "lucide-react";
 import type { OrgRole } from "@/lib/permissions";
 
@@ -18,6 +19,7 @@ const NAV = [
   { href: "/grants", label: "Dossiers", icon: FolderKanban },
   { href: "/programs", label: "Programmes", icon: Landmark },
   { href: "/documents", label: "Documents", icon: FileText },
+  { href: "/taches", label: "Mes tâches", icon: ListChecks },
   { href: "/echeancier", label: "Échéancier", icon: CalendarClock },
 ] as const;
 

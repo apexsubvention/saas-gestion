@@ -30,6 +30,22 @@ export function tasksRepository(supabase: SupabaseClient) {
       return data as TaskRow[];
     },
 
+    async update(
+      id: string,
+      patch: Partial<Pick<TaskRow, "title" | "description" | "due_date" | "priority" | "status" | "assigned_to">> & { claim_id?: string | null }
+    ): Promise<TaskRow> {
+      const { data, error } = await supabase.from("tasks").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", id).select().single();
+      if (error) throw error;
+      return data as TaskRow;
+    },
+
+    // Nombre de lignes supprimées : 0 = refusé par la RLS (ou déjà supprimée).
+    async remove(id: string): Promise<number> {
+      const { data, error } = await supabase.from("tasks").delete().eq("id", id).select("id");
+      if (error) throw error;
+      return data?.length ?? 0;
+    },
+
     async create(input: {
       organization_id: string;
       title: string;

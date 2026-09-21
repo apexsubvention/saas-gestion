@@ -27,6 +27,16 @@ export function tasksService(supabase: SupabaseClient) {
       }
       return repo.create({ organization_id: organizationId, ...input });
     },
+    async update(
+      id: string,
+      patch: { title?: string; description?: string | null; due_date?: string | null; priority?: string; status?: string; assigned_to?: string | null }
+    ) {
+      if (patch.title !== undefined && patch.title.trim().length === 0) throw new Error("Le titre de la tâche est requis.");
+      if (patch.status !== undefined && !(patch.status in TASK_STATUS_LABELS)) throw new Error(`Statut de tâche invalide : ${patch.status}`);
+      if (patch.priority !== undefined && !["low", "normal", "high", "urgent"].includes(patch.priority)) throw new Error("Priorité invalide.");
+      return repo.update(id, patch);
+    },
+    remove: (id: string) => repo.remove(id),
     async updateStatus(id: string, status: string) {
       if (!(status in TASK_STATUS_LABELS)) {
         throw new Error(`Statut de tâche invalide : ${status}`);
