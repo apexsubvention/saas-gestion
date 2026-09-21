@@ -9,7 +9,8 @@ import { supplierLedgerService } from "@/server/services/supplierLedger.service"
 import { projectSuppliersService } from "@/server/services/projectSuppliers.service";
 import { documentsService } from "@/server/services/documents.service";
 import { expensesRepository } from "@/server/repositories/expenses.repository";
-import { logAudit } from "@/server/services/audit";
+import { logAudit, logDossierEvent } from "@/server/services/audit";
+import { claimsService } from "@/server/services/claims.service";
 
 // Actions du tableau fournisseurs / factures d'un dossier. Chaque action revérifie que les
 // identifiants reçus appartiennent bien à CE dossier (la RLS protège l'accès, pas la cohérence).
@@ -58,10 +59,12 @@ export async function saveSupplierAction(grantProjectId: string, input: Supplier
       const owned = (await projectSuppliersService(supabase).listByProject(grantProjectId)).some((s) => s.id === id);
       if (!owned) return { error: "Fournisseur introuvable dans ce dossier." };
       await supplierLedgerService(supabase).saveSupplier(id, fields);
+      await logDossierEvent(supabase, ctx, { grant_project_id: grantProjectId, kind: "supplier_updated", title: `Fournisseur modifié : ${fields.name}`, source: "manual", ref_type: "project_supplier", ref_id: id });
       revalidatePath(`/grants/${grantProjectId}`);
       return { error: null, id };
     }
     const created = await projectSuppliersService(supabase).create(ctx.organizationId, grantProjectId, fields);
+    await logDossierEvent(supabase, ctx, { grant_project_id: grantProjectId, kind: "supplier_added", title: `Fournisseur ajouté : ${fields.name}`, source: "manual", ref_type: "project_supplier", ref_id: created.id });
     revalidatePath(`/grants/${grantProjectId}`);
     return { error: null, id: created.id };
   } catch (e) {
@@ -70,13 +73,14 @@ export async function saveSupplierAction(grantProjectId: string, input: Supplier
 }
 
 export async function deleteSupplierAction(grantProjectId: string, supplierId: string): Promise<LedgerActionResult> {
-  await requireOrgContext();
+  const ctx = await requireOrgContext();
   const supabase = await createClient();
   try {
-    const owned = (await projectSuppliersService(supabase).listByProject(grantProjectId)).some((s) => s.id === supplierId);
-    if (!owned) return { error: "Fournisseur introuvable dans ce dossier." };
+    const target = (await projectSuppliersService(supabase).listByProject(grantProjectId)).find((s) => s.id === supplierId);
+    if (!target) return { error: "Fournisseur introuvable dans ce dossier." };
     const removed = await supplierLedgerService(supabase).removeSupplier(supplierId);
     if (removed === 0) return { error: "Suppression refusée : tu n'as pas accès à ce dossier." };
+    await logDossierEvent(supabase, ctx, { grant_project_id: grantProjectId, kind: "supplier_removed", title: `Fournisseur supprimé : ${target.name}`, detail: "Ses factures sont conservées, sans fournisseur.", source: "manual" });
     revalidatePath(`/grants/${grantProjectId}`);
     return { error: null };
   } catch (e) {
@@ -105,6 +109,7 @@ export async function saveInvoiceAction(grantProjectId: string, input: InvoiceIn
       if (!ok) return { error: "Facture introuvable dans ce dossier." };
     }
     const savedId = await supplierLedgerService(supabase).saveInvoice(ctx.organizationId, grantProjectId, id, fields);
+    await logDossierEvent(supabase, ctx, { grant_project_id: grantProjectId, kind: id ? "invoice_updated" : "invoice_added", title: id ? "Facture modifiée" : "Facture ajoutée", detail: [fields.invoice_number && `N° ${fields.invoice_number}`, fields.amount != null && `${fields.amount} $ avant taxes`, fields.invoice_date].filter(Boolean).join(" · ") || null, source: "manual", ref_type: "expense", ref_id: savedId });
     revalidatePath(`/grants/${grantProjectId}`);
     return { error: null, id: savedId };
   } catch (e) {
@@ -117,11 +122,12 @@ async function ownedInvoice(supabase: Awaited<ReturnType<typeof createClient>>, 
 }
 
 export async function confirmInvoiceAction(grantProjectId: string, invoiceId: string): Promise<LedgerActionResult> {
-  await requireOrgContext();
+  const ctx = await requireOrgContext();
   const supabase = await createClient();
   try {
     if (!(await ownedInvoice(supabase, grantProjectId, invoiceId))) return { error: "Facture introuvable dans ce dossier." };
     await supplierLedgerService(supabase).confirmInvoice(invoiceId);
+    await logDossierEvent(supabase, ctx, { grant_project_id: grantProjectId, kind: "invoice_confirmed", title: "Facture lue par Apex confirmée", source: "manual", ref_type: "expense", ref_id: invoiceId });
     revalidatePath(`/grants/${grantProjectId}`);
     return { error: null };
   } catch (e) {
@@ -130,12 +136,13 @@ export async function confirmInvoiceAction(grantProjectId: string, invoiceId: st
 }
 
 export async function deleteInvoiceAction(grantProjectId: string, invoiceId: string): Promise<LedgerActionResult> {
-  await requireOrgContext();
+  const ctx = await requireOrgContext();
   const supabase = await createClient();
   try {
     if (!(await ownedInvoice(supabase, grantProjectId, invoiceId))) return { error: "Facture introuvable dans ce dossier." };
     const removed = await supplierLedgerService(supabase).removeInvoice(invoiceId);
     if (removed === 0) return { error: "Suppression refusée : tu n'as pas accès à ce dossier." };
+    await logDossierEvent(supabase, ctx, { grant_project_id: grantProjectId, kind: "invoice_deleted", title: "Facture supprimée du tableau", detail: "Le document téléversé est conservé.", source: "manual" });
     revalidatePath(`/grants/${grantProjectId}`);
     return { error: null };
   } catch (e) {
@@ -170,6 +177,52 @@ export async function setSupplierOverrideAction(
       after: { field: column, value },
     });
     revalidatePath(`/grants/${grantProjectId}`);
+    return { error: null };
+  } catch (e) {
+    return { error: formatCaughtError(e) };
+  }
+}
+
+export async function moveSupplierAction(grantProjectId: string, supplierId: string, direction: "up" | "down"): Promise<LedgerActionResult> {
+  await requireOrgContext();
+  if (direction !== "up" && direction !== "down") return { error: "Direction invalide." };
+  const supabase = await createClient();
+  try {
+    const owned = (await projectSuppliersService(supabase).listByProject(grantProjectId)).some((s) => s.id === supplierId);
+    if (!owned) return { error: "Fournisseur introuvable dans ce dossier." };
+    await supplierLedgerService(supabase).moveSupplier(grantProjectId, supplierId, direction);
+    revalidatePath(`/grants/${grantProjectId}`);
+    return { error: null };
+  } catch (e) {
+    return { error: formatCaughtError(e) };
+  }
+}
+
+// Lier une facture à une réclamation (ou la délier) : c'est ce qui alimente « Réclamé à ce jour » automatiquement.
+export async function linkInvoiceClaimAction(grantProjectId: string, invoiceId: string, claimId: string | null, claimedAmount: number | null): Promise<LedgerActionResult> {
+  const ctx = await requireOrgContext();
+  if (claimId && !z.string().uuid().safeParse(claimId).success) return { error: "Réclamation invalide." };
+  if (claimedAmount != null && (!Number.isFinite(claimedAmount) || claimedAmount < 0 || claimedAmount > 100_000_000)) return { error: "Montant invalide." };
+  const supabase = await createClient();
+  try {
+    if (!(await ownedInvoice(supabase, grantProjectId, invoiceId))) return { error: "Facture introuvable dans ce dossier." };
+    let claimLabel: string | null = null;
+    if (claimId) {
+      const claim = (await claimsService(supabase).listByProject(grantProjectId)).find((c) => c.id === claimId);
+      if (!claim) return { error: "Réclamation introuvable dans ce dossier." };
+      claimLabel = claim.claim_number ?? "réclamation";
+    }
+    await supplierLedgerService(supabase).linkInvoiceToClaim(ctx.organizationId, invoiceId, claimId, claimedAmount);
+    await logDossierEvent(supabase, ctx, {
+      grant_project_id: grantProjectId,
+      kind: claimId ? "invoice_claimed" : "invoice_unclaimed",
+      title: claimId ? `Facture liée à ${claimLabel}` : "Facture retirée d'une réclamation",
+      source: "manual",
+      ref_type: "expense",
+      ref_id: invoiceId,
+    });
+    revalidatePath(`/grants/${grantProjectId}`);
+    revalidatePath("/echeancier");
     return { error: null };
   } catch (e) {
     return { error: formatCaughtError(e) };

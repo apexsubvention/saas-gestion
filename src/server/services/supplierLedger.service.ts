@@ -17,6 +17,7 @@ export type LedgerInvoice = {
   status: string;
   source: "manual" | "ai";
   document: { id: string; filename: string; storage_path: string } | null;
+  claim: { claim_id: string; claimed_amount: number | null } | null; // réclamation où cette facture est réclamée
 };
 
 // Valeur effective = override manuel ?? valeur automatique ?? calcul de repli.
@@ -76,6 +77,7 @@ export function supplierLedgerService(supabase: SupabaseClient) {
         status: e.status,
         source: e.source ?? "manual",
         document: docByExpense.get(e.id) ?? null,
+        claim: null,
       }));
 
       const bySupplier = new Map<string, LedgerInvoice[]>();
@@ -91,9 +93,12 @@ export function supplierLedgerService(supabase: SupabaseClient) {
       // Réclamé automatiquement = montants réclamés (claim_expenses) sur les factures de chaque fournisseur.
       const claimedByExpense = new Map<string, number>();
       if (expenses.length > 0) {
-        const { data: claimRows } = await supabase.from("claim_expenses").select("expense_id, claimed_amount").in("expense_id", expenses.map((e) => e.id));
-        for (const r of (claimRows ?? []) as Array<{ expense_id: string; claimed_amount: number | null }>) {
+        const { data: claimRows } = await supabase.from("claim_expenses").select("expense_id, claim_id, claimed_amount").in("expense_id", expenses.map((e) => e.id));
+        const byId = new Map(invoices.map((i) => [i.id, i]));
+        for (const r of (claimRows ?? []) as Array<{ expense_id: string; claim_id: string; claimed_amount: number | null }>) {
           claimedByExpense.set(r.expense_id, (claimedByExpense.get(r.expense_id) ?? 0) + (num(r.claimed_amount) ?? 0));
+          const inv = byId.get(r.expense_id);
+          if (inv) inv.claim = { claim_id: r.claim_id, claimed_amount: num(r.claimed_amount) };
         }
       }
 
@@ -147,6 +152,52 @@ export function supplierLedgerService(supabase: SupabaseClient) {
       );
     },
     removeSupplier: (id: string) => suppliersRepo.remove(id),
+
+    // Déplace un fournisseur d'un cran (haut/bas). Les positions sont d'abord normalisées (0..n-1 dans l'ordre affiché)
+    // puis les deux voisins sont échangés : marche aussi tant que toutes les positions valent encore 0.
+    async moveSupplier(grantProjectId: string, supplierId: string, direction: "up" | "down") {
+      const list = await suppliersRepo.listByProject(grantProjectId);
+      const from = list.findIndex((s) => s.id === supplierId);
+      const to = direction === "up" ? from - 1 : from + 1;
+      if (from < 0 || to < 0 || to >= list.length) return false;
+      const order = list.map((s) => s.id);
+      [order[from], order[to]] = [order[to]!, order[from]!];
+      for (const [index, id] of order.entries()) {
+        const current = list.find((s) => s.id === id)!;
+        if (current.position !== index) await suppliersRepo.update(id, { position: index });
+      }
+      return true;
+    },
+
+    // Lie une facture à UNE réclamation (ou la délie : claimId = null). « Réclamé à ce jour » du fournisseur est
+    // calculé à partir de ces liens ; le total de chaque réclamation touchée est recalculé.
+    async linkInvoiceToClaim(organizationId: string, expenseId: string, claimId: string | null, claimedAmount: number | null) {
+      const { data: existing, error: readError } = await supabase.from("claim_expenses").select("claim_id").eq("expense_id", expenseId);
+      if (readError) throw readError;
+      const touched = new Set<string>(((existing ?? []) as Array<{ claim_id: string }>).map((r) => r.claim_id));
+
+      const { error: delError } = await supabase.from("claim_expenses").delete().eq("expense_id", expenseId);
+      if (delError) throw delError;
+
+      if (claimId) {
+        const { data: expense, error: expError } = await supabase.from("expenses").select("eligible_amount, subtotal, total").eq("id", expenseId).maybeSingle();
+        if (expError) throw expError;
+        const e = expense as { eligible_amount: number | null; subtotal: number | null; total: number | null } | null;
+        const amount = claimedAmount ?? num(e?.eligible_amount) ?? num(e?.subtotal) ?? num(e?.total) ?? 0;
+        const { error: insError } = await supabase.from("claim_expenses").insert({ organization_id: organizationId, claim_id: claimId, expense_id: expenseId, claimed_amount: amount });
+        if (insError) throw insError;
+        touched.add(claimId);
+      }
+
+      // Recalcul du montant réclamé de chaque réclamation touchée (somme de ses lignes).
+      for (const id of touched) {
+        const { data: rows, error } = await supabase.from("claim_expenses").select("claimed_amount").eq("claim_id", id);
+        if (error) throw error;
+        const total = Math.round(((rows ?? []) as Array<{ claimed_amount: number | null }>).reduce((sum, r) => sum + (num(r.claimed_amount) ?? 0), 0) * 100) / 100;
+        const { error: upError } = await supabase.from("claims").update({ claimed_amount: total }).eq("id", id);
+        if (upError) throw upError;
+      }
+    },
 
     async saveInvoice(organizationId: string, grantProjectId: string, expenseId: string | null, input: SaveInvoiceInput) {
       const amounts = { subtotal: input.amount, eligible_amount: input.amount };

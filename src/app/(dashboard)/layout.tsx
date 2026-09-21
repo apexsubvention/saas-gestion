@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { requireOrgContext } from "@/lib/permissions";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
+import { createClient } from "@/lib/supabase/server";
+import { notificationsService } from "@/server/services/notifications.service";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const ctx = await requireOrgContext();
@@ -13,11 +15,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
     redirect("/portal");
   }
 
+  const unreadCount = await notificationsService(await createClient()).unreadCount();
+
   return (
     <div className="flex h-screen bg-slate-50">
       <Sidebar role={ctx.role} />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <Header fullName={ctx.fullName} />
+        <Header fullName={ctx.fullName} unreadCount={unreadCount} />
         <main className="flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-[1600px] p-6 lg:p-8">{children}</div>
         </main>

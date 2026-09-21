@@ -1,5 +1,7 @@
 "use server";
 
+import { programSnapshotService } from "@/server/services/programSnapshot.service";
+import { logDossierEvent } from "@/server/services/audit";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { grantProjectsService } from "@/server/services/grantProjects.service";
@@ -60,6 +62,10 @@ export async function createGrantProjectAction(
   } catch (e) {
     return { error: formatCaughtError(e) };
   }
+
+  // Règles du programme figées à la création + première ligne du journal (best effort : n'échouent jamais la création).
+  await programSnapshotService(supabase).takeOnCreation(ctx, project.id, parsed.data.program_id);
+  await logDossierEvent(supabase, ctx, { grant_project_id: project.id, client_id: parsed.data.client_id, kind: "dossier_created", title: `Dossier créé : ${parsed.data.name}`, detail: "Règles du programme figées à cette date.", source: "manual" });
 
   redirect(`/grants/${project.id}`);
 }

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { programsRepository, type ProgramRow } from "@/server/repositories/programs.repository";
+import { programExamplesRepository, type ProgramExampleRow } from "@/server/repositories/programExamples.repository";
 import { grantProjectsService } from "@/server/services/grantProjects.service";
 import { projectSuppliersService } from "@/server/services/projectSuppliers.service";
 import { apexSheetText, clientInfoText, splitSourcePages } from "@/features/programs/qa/bundle";
@@ -9,7 +10,7 @@ import { GRANT_PROJECT_STATUS_LABELS } from "@/features/grants/constants";
 
 export type AnalysisRow = { id: string; description: string; result: AnalysisResult; score: number | null; created_at: string };
 
-type Loaded = { program: ProgramRow; docs: SourceDoc[]; context: string; clientNeeds: string | null };
+type Loaded = { program: ProgramRow; docs: SourceDoc[]; context: string; clientNeeds: string | null; examples: ProgramExampleRow[] };
 
 const money = (n: unknown) => (n == null ? "non précisé" : new Intl.NumberFormat("fr-CA", { style: "currency", currency: "CAD", maximumFractionDigits: 0 }).format(Number(n)));
 
@@ -25,9 +26,16 @@ export function draftingService(supabase: SupabaseClient) {
     const suppliers = await projectSuppliersService(supabase).listByProject(grantProjectId);
     const budgetTotal = suppliers.reduce((s, x) => s + (x.budget_amount != null ? Number(x.budget_amount) : 0), 0);
 
+    // Projets déjà financés enregistrés pour ce programme (pages officielles ou Subventions ouvertes du Canada).
+    let examples: ProgramExampleRow[] = [];
+    try { examples = (await programExamplesRepository(supabase).listByProgram(program.id)).slice(0, 25); } catch { /* facultatif */ }
+
     const docs: SourceDoc[] = [
       ...splitSourcePages(program.source_text, program.source_url).map((p, i) => ({ title: p.url ?? `Page officielle ${i + 1}`, text: p.text.slice(0, 40_000) })),
       { title: "Fiche Apex (données structurées)", text: apexSheetText(program) },
+      ...(examples.length > 0
+        ? [{ title: "Exemples de projets financés", text: examples.map((e, i) => `${i + 1}. ${e.title}${e.recipient_name ? ` — ${e.recipient_name}` : ""}${e.amount != null ? ` — ${money(e.amount)}` : ""}${e.description ? ` : ${e.description.slice(0, 300)}` : ""}`).join("\n") }]
+        : []),
     ];
     const context = [
       client ? clientInfoText(client as Parameters<typeof clientInfoText>[0]) : `Client : ${project.clients?.name ?? "—"}`,
@@ -35,7 +43,7 @@ export function draftingService(supabase: SupabaseClient) {
       `Coût total du projet : ${money(project.total_project_cost)} ; subvention approuvée : ${money(project.approved_grant_amount)} ; taux : ${project.grant_rate == null ? "non précisé" : `${Math.round(Number(project.grant_rate) * 10000) / 100} %`}`,
       suppliers.length > 0 ? `Budget prévu des fournisseurs : ${money(budgetTotal)} (${suppliers.map((s) => s.name).join(", ")})` : null,
     ].filter(Boolean).join("\n");
-    return { program, docs, context, clientNeeds: (client as { current_needs: string | null } | null)?.current_needs ?? null };
+    return { program, docs, context, examples, clientNeeds: (client as { current_needs: string | null } | null)?.current_needs ?? null };
   }
 
   return {
@@ -46,7 +54,7 @@ export function draftingService(supabase: SupabaseClient) {
       if (text.length < 20) throw new Error("Décris le projet en quelques phrases (20 caractères minimum).");
       if (text.length > MAX_PROJECT_TEXT) throw new Error(`Description trop longue (maximum ${MAX_PROJECT_TEXT} caractères).`);
       const loaded = await load(grantProjectId);
-      const { result, model } = await runAnalysis({ docs: loaded.docs, context: loaded.context, projectText: text });
+      const { result, model } = await runAnalysis({ docs: loaded.docs, context: loaded.context, projectText: text, exampleTitles: loaded.examples.map((e) => e.title) });
 
       let id: string | null = null;
       try {

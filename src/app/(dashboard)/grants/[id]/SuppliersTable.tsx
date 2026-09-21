@@ -6,6 +6,8 @@ import {
   confirmInvoiceAction,
   deleteInvoiceAction,
   deleteSupplierAction,
+  linkInvoiceClaimAction,
+  moveSupplierAction,
   saveInvoiceAction,
   saveSupplierAction,
   type LedgerActionResult,
@@ -14,6 +16,7 @@ import type { LedgerInvoice, LedgerSupplier } from "@/server/services/supplierLe
 
 type DocOption = { id: string; filename: string; category: string };
 type ClientOption = { id: string; name: string };
+type ClaimOption = { id: string; label: string };
 
 const input = "w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm";
 const smallBtn = "rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50";
@@ -65,6 +68,7 @@ function InvoiceRow({
   invoice,
   supplierId,
   documents,
+  claims,
   supplierChoices,
   onCancel,
 }: {
@@ -72,6 +76,7 @@ function InvoiceRow({
   invoice: LedgerInvoice | null;
   supplierId: string | null;
   documents: DocOption[];
+  claims: ClaimOption[];
   supplierChoices?: Array<{ id: string; name: string }>; // factures sans fournisseur : on choisit lequel
   onCancel?: () => void;
 }) {
@@ -81,7 +86,16 @@ function InvoiceRow({
   const [amount, setAmount] = useState(invoice?.amount != null ? String(invoice.amount) : "");
   const [supplier, setSupplier] = useState(supplierId ?? "");
   const [saved, setSaved] = useState(false);
+  const [claimId, setClaimId] = useState(invoice?.claim?.claim_id ?? "");
+  const [claimAmount, setClaimAmount] = useState(invoice?.claim?.claimed_amount != null ? String(invoice.claim.claimed_amount) : "");
   const { pending, error, run } = useLedgerAction();
+  const claimDirty = !!invoice && (claimId !== (invoice.claim?.claim_id ?? "") || (claimId !== "" && claimAmount !== (invoice.claim?.claimed_amount != null ? String(invoice.claim.claimed_amount) : "")));
+
+  function saveClaim() {
+    const parsed = parseAmount(claimAmount);
+    if (Number.isNaN(parsed)) return run(async () => ({ error: "Montant réclamé invalide." }));
+    run(() => linkInvoiceClaimAction(grantProjectId, invoice!.id, claimId || null, claimId ? parsed : null));
+  }
 
   const dirty =
     !invoice ||
@@ -122,6 +136,22 @@ function InvoiceRow({
         {invoice?.document && docId === invoice.document.id && (
           <div className="mt-1"><OpenDocumentButton storagePath={invoice.document.storage_path} filename={invoice.document.filename} /></div>
         )}
+        {invoice && claims.length > 0 && (
+          <div className="mt-2 space-y-1 rounded-md bg-white p-2 ring-1 ring-neutral-200">
+            <label className="block text-[11px] font-medium text-neutral-500">Réclamée dans
+              <select value={claimId} onChange={(e) => { setClaimId(e.target.value); if (!e.target.value) setClaimAmount(""); else if (!claimAmount && invoice.amount != null) setClaimAmount(String(invoice.amount)); }} className={input}>
+                <option value="">Pas encore réclamée</option>
+                {claims.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+              </select>
+            </label>
+            {claimId && (
+              <label className="block text-[11px] font-medium text-neutral-500">Montant réclamé ($)
+                <input inputMode="decimal" value={claimAmount} onChange={(e) => setClaimAmount(e.target.value)} className={input} />
+              </label>
+            )}
+            {claimDirty && <button onClick={saveClaim} disabled={pending} className={`${smallBtn} bg-neutral-900 text-white hover:bg-neutral-800`}>{pending ? "…" : "Enregistrer le lien"}</button>}
+          </div>
+        )}
       </td>
       <td className="px-3 py-2"><input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={input} /></td>
       <td className="px-3 py-2"><input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Avant taxes" className={input} /></td>
@@ -153,7 +183,7 @@ function InvoiceRow({
   );
 }
 
-function SupplierGroup({ grantProjectId, supplier, documents, clients }: { grantProjectId: string; supplier: LedgerSupplier; documents: DocOption[]; clients: ClientOption[] }) {
+function SupplierGroup({ grantProjectId, supplier, documents, clients, claims, isFirst, isLast }: { grantProjectId: string; supplier: LedgerSupplier; documents: DocOption[]; clients: ClientOption[]; claims: ClaimOption[]; isFirst: boolean; isLast: boolean }) {
   const [name, setName] = useState(supplier.name);
   const [budget, setBudget] = useState(supplier.budget_amount != null ? String(supplier.budget_amount) : "");
   const [contact, setContact] = useState(supplier.contact ?? "");
@@ -210,6 +240,8 @@ function SupplierGroup({ grantProjectId, supplier, documents, clients }: { grant
         <td className="px-3 py-2">
           <div className="flex flex-wrap items-center gap-1">
             {dirty && <button onClick={save} disabled={pending} className={`${smallBtn} bg-neutral-900 text-white hover:bg-neutral-800`}>{pending ? "…" : "Enregistrer"}</button>}
+            <button onClick={() => run(() => moveSupplierAction(grantProjectId, supplier.id, "up"))} disabled={pending || isFirst} className={smallBtn} title="Monter" aria-label="Monter">↑</button>
+            <button onClick={() => run(() => moveSupplierAction(grantProjectId, supplier.id, "down"))} disabled={pending || isLast} className={smallBtn} title="Descendre" aria-label="Descendre">↓</button>
             <button onClick={() => setAddingInvoice(true)} className={smallBtn}>+ Facture</button>
             <button onClick={() => setShowDetails((v) => !v)} className={smallBtn}>{showDetails ? "Masquer" : "Détails"}</button>
             <button
@@ -248,9 +280,9 @@ function SupplierGroup({ grantProjectId, supplier, documents, clients }: { grant
         </tr>
       )}
       {supplier.invoices.map((inv) => (
-        <InvoiceRow key={`${inv.id}-${inv.status}`} grantProjectId={grantProjectId} invoice={inv} supplierId={supplier.id} documents={documents} />
+        <InvoiceRow key={`${inv.id}-${inv.status}`} grantProjectId={grantProjectId} invoice={inv} supplierId={supplier.id} documents={documents} claims={claims} />
       ))}
-      {addingInvoice && <InvoiceRow grantProjectId={grantProjectId} invoice={null} supplierId={supplier.id} documents={documents} onCancel={() => setAddingInvoice(false)} />}
+      {addingInvoice && <InvoiceRow grantProjectId={grantProjectId} invoice={null} supplierId={supplier.id} documents={documents} claims={claims} onCancel={() => setAddingInvoice(false)} />}
     </>
   );
 }
@@ -288,6 +320,7 @@ export function SuppliersTable({
   unassigned,
   documents,
   clients,
+  claims,
   totals,
 }: {
   grantProjectId: string;
@@ -295,6 +328,7 @@ export function SuppliersTable({
   unassigned: LedgerInvoice[];
   documents: DocOption[];
   clients: ClientOption[];
+  claims: ClaimOption[];
   totals: { budget: number; spent: number };
 }) {
   const choices = suppliers.map((s) => ({ id: s.id, name: s.name }));
@@ -312,14 +346,14 @@ export function SuppliersTable({
           </tr>
         </thead>
         <tbody>
-          {suppliers.map((s) => (
-            <SupplierGroup key={s.id} grantProjectId={grantProjectId} supplier={s} documents={documents} clients={clients} />
+          {suppliers.map((s, i) => (
+            <SupplierGroup key={s.id} grantProjectId={grantProjectId} supplier={s} documents={documents} clients={clients} claims={claims} isFirst={i === 0} isLast={i === suppliers.length - 1} />
           ))}
           {unassigned.length > 0 && (
             <>
               <tr className="border-b border-neutral-100 bg-amber-50"><td colSpan={6} className="px-3 py-2 text-xs font-medium text-amber-900">Factures sans fournisseur — choisis le fournisseur de chacune.</td></tr>
               {unassigned.map((inv) => (
-                <InvoiceRow key={`${inv.id}-${inv.status}`} grantProjectId={grantProjectId} invoice={inv} supplierId={null} documents={documents} supplierChoices={choices} />
+                <InvoiceRow key={`${inv.id}-${inv.status}`} grantProjectId={grantProjectId} invoice={inv} supplierId={null} documents={documents} claims={claims} supplierChoices={choices} />
               ))}
             </>
           )}

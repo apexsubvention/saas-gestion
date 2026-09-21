@@ -109,6 +109,15 @@ function AnalysisView({ analysis }: { analysis: AnalysisResult }) {
       </div>
       <List title="Questions à poser au client" items={a.questions_to_ask} />
       <List title="Suggestions de positionnement (présenter honnêtement le projet réel)" items={a.positioning_suggestions} tone="good" />
+      {(a.comparable_projects ?? []).length > 0 && (
+        <section className="space-y-1 rounded-md border border-neutral-200 bg-neutral-50 p-3">
+          <h4 className="text-sm font-semibold text-neutral-900">Projets comparables déjà financés par ce programme</h4>
+          <ul className="space-y-1 text-sm text-neutral-700">
+            {a.comparable_projects.map((c, i) => <li key={i}><span className="font-medium">{c.title}</span>{c.note ? <span className="text-neutral-500"> — {c.note}</span> : null}</li>)}
+          </ul>
+          <p className="text-xs text-neutral-500">Ils servent à comprendre les types de projets financés, le vocabulaire et l&apos;ampleur. Ils ne signifient <strong>pas</strong> qu&apos;un projet similaire sera accepté.</p>
+        </section>
+      )}
       <p className="text-xs text-neutral-400">Sources consultées : {analysis.sourcesChecked.join(" ; ")}</p>
     </div>
   );

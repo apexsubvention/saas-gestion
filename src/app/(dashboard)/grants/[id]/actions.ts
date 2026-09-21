@@ -15,6 +15,7 @@ import { saveAgreementSchema } from "@/features/grants/agreementSchema";
 import { GRANT_PROJECT_STATUS_LABELS } from "@/features/grants/constants";
 import { formatCaughtError } from "@/lib/errors";
 import { logDossierEvent } from "@/server/services/audit";
+import { notifyUser } from "@/server/services/notifications.service";
 import { aiSuggestionsService } from "@/server/services/aiSuggestions.service";
 import { analyzeConventionFile, hasAgreementTerms } from "@/features/conventions/analyzeConvention";
 import { supplierLedgerService } from "@/server/services/supplierLedger.service";
@@ -41,6 +42,8 @@ async function analyzeUploadedConvention(
     if (!extraction.is_agreement) return "Document téléversé, mais il ne ressemble pas à une convention ou à une entente : aucune proposition.";
     const count = await aiSuggestionsService(supabase).createFromConvention(ctx, grantProjectId, clientId, documentId, extraction);
     if (count === 0) return "Convention lue, mais aucune information exploitable n'a été trouvée.";
+    const { data: owner } = await supabase.from("grant_projects").select("owner_id, name").eq("id", grantProjectId).maybeSingle();
+    await notifyUser(supabase, ctx, { userId: (owner as { owner_id: string | null } | null)?.owner_id ?? null, type: "ai_review", message: `${count} proposition(s) à confirmer dans la convention téléversée (${(owner as { name: string } | null)?.name ?? "dossier"})`, href: `/grants/${grantProjectId}`, entity_type: "grant_project", entity_id: grantProjectId });
     return `Convention lue : ${count} proposition(s) à confirmer dans le panneau « Apex a détecté… » ci-dessous (fournisseurs${hasAgreementTerms(extraction) ? ", montant, taux et dates" : ""}).`;
   } catch (e) {
     return `Document téléversé, mais sa lecture automatique a échoué (${formatCaughtError(e)}).`;
@@ -263,6 +266,7 @@ export async function createTaskAction(
       ...(claim_id ? { claim_id } : {}),
     });
     await logDossierEvent(supabase, ctx, { grant_project_id: grantProjectId, client_id: clientId, kind: "task_created", title: `Tâche créée : ${title}`, source: "manual" });
+    await notifyUser(supabase, ctx, { userId: assigned_to, type: "task_assigned", message: `Une tâche t'a été assignée : ${title}`, href: `/grants/${grantProjectId}`, entity_type: "task" });
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Erreur d'enregistrement" };
   }

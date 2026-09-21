@@ -27,6 +27,9 @@ import { SupplierFinanceTable } from "./SupplierFinanceTable";
 import { DossierTimeline } from "./DossierTimeline";
 import { SuggestionsPanel } from "./SuggestionsPanel";
 import { TasksManager } from "./TasksManager";
+import { ProgramRulesSnapshot } from "./ProgramRulesSnapshot";
+import { programSnapshotService } from "@/server/services/programSnapshot.service";
+import { programsRepository } from "@/server/repositories/programs.repository";
 import { aiSuggestionsService } from "@/server/services/aiSuggestions.service";
 import { listDossierEvents } from "@/server/services/audit";
 import { supplierLedgerService } from "@/server/services/supplierLedger.service";
@@ -72,6 +75,7 @@ export default async function GrantProjectPage({ params }: { params: { id: strin
   const ledger = await supplierLedgerService(supabase).load(params.id, rateForLedger);
   const dossierEvents = await listDossierEvents(supabase, params.id);
   const suggestions = await aiSuggestionsService(supabase).listProposed(params.id);
+  const [snapshots, currentProgram] = await Promise.all([programSnapshotService(supabase).list(params.id), programsRepository(supabase).findById(project.program_id)]);
   const { data: staffRows } = await supabase.from("organization_users").select("id, full_name, email").eq("active", true).in("role", ["admin", "employee"]);
   const assignees = (staffRows ?? []).map((u) => ({ id: u.id, name: u.full_name || u.email || "Membre de l'équipe" }));
   const subsidy = computeSubsidy(resolveSubsidyInputs(project, agreement, ledger.spent));
@@ -198,6 +202,7 @@ export default async function GrantProjectPage({ params }: { params: { id: strin
           unassigned={ledger.unassigned}
           documents={documents.map((d) => ({ id: d.id, filename: d.filename, category: d.category }))}
           clients={allClients.map((c) => ({ id: c.id, name: c.name }))}
+          claims={claims.map((c) => ({ id: c.id, label: c.claim_number || `Réclamation (${c.period_start ?? "—"})` }))}
           totals={{ budget: ledger.supplierBudgetTotal, spent: ledger.spent }}
         />
         <details className="rounded-lg border border-neutral-200 bg-white p-4">
@@ -312,6 +317,8 @@ export default async function GrantProjectPage({ params }: { params: { id: strin
           <AgreementForm grantProjectId={project.id} agreement={agreement} />
         </div>
       </section>
+
+      <ProgramRulesSnapshot grantProjectId={project.id} program={currentProgram} snapshots={snapshots} />
 
       <DossierTimeline events={dossierEvents} />
 

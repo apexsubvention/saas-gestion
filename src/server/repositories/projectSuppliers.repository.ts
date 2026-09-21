@@ -12,6 +12,7 @@ export type ProjectSupplierRow = {
   invoice_description_requirements: string | null;
   notes: string | null;
   supplier_client_id: string | null;
+  position: number; // ordre d'affichage (0036/0038)
   // Traçabilité (0036) : valeur automatique / modification manuelle, jamais détruite
   accepted_subsidy_auto: number | null;
   accepted_subsidy_override: number | null;
@@ -33,7 +34,9 @@ export function projectSuppliersRepository(supabase: SupabaseClient) {
       const { data, error } = await supabase
         .from("project_suppliers")
         .select("*")
-        .eq("grant_project_id", grantProjectId);
+        .eq("grant_project_id", grantProjectId)
+        .order("position", { ascending: true })
+        .order("name", { ascending: true });
       if (error) throw error;
       return data as ProjectSupplierRow[];
     },
