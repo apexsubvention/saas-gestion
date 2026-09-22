@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { Loader2 } from "lucide-react";
 import { analyzeProjectAction, checkExpenseAction } from "./actions";
 import type { AnalysisResult, Confidence, CriterionStatus } from "@/features/drafting/analyze";
@@ -174,18 +174,130 @@ function ExpensePanel({ grantProjectId }: { grantProjectId: string }) {
   );
 }
 
+// Courriel prêt à copier-coller pour demander au client ce qui manque avant le dépôt --
+// assemblage déterministe (pas d'appel IA) à partir de champs déjà produits et
+// vérifiés par l'analyse (missing_documents/missing_info/questions_to_ask) : rien n'est
+// inventé ici, on ne fait que mettre en forme des données déjà présentes à l'écran.
+// Cohérent avec la décision prise plus tôt dans le projet de ne jamais envoyer de
+// courriel automatiquement (brouillon seulement, envoyé à la main par Jade).
+function buildClientEmail(input: {
+  clientName: string | null;
+  programName: string | null;
+  projectName: string;
+  authorName: string | null;
+  missingDocuments: string[];
+  missingInfo: string[];
+  questionsToAsk: string[];
+}): { subject: string; body: string } {
+  const program = input.programName ?? "votre demande de subvention";
+  const subject = `Documents et informations à nous transmettre — ${program}`;
+
+  const lines: string[] = [];
+  lines.push(`Bonjour${input.clientName ? ` ${input.clientName}` : ""},`);
+  lines.push("");
+  lines.push(
+    `Afin de pouvoir compléter le dépôt de votre dossier « ${input.projectName} »${input.programName ? ` (${input.programName})` : ""}, il nous manque encore les éléments suivants :`
+  );
+
+  if (input.missingDocuments.length > 0) {
+    lines.push("");
+    lines.push("Documents à nous transmettre :");
+    for (const d of input.missingDocuments) lines.push(`- ${d}`);
+  }
+
+  const infoItems = [...new Map([...input.missingInfo, ...input.questionsToAsk].map((s) => [s.trim().toLowerCase(), s.trim()])).values()];
+  if (infoItems.length > 0) {
+    lines.push("");
+    lines.push("Informations à préciser :");
+    for (const i of infoItems) lines.push(`- ${i}`);
+  }
+
+  if (input.missingDocuments.length === 0 && infoItems.length === 0) {
+    lines.push("");
+    lines.push("[Aucun élément manquant identifié pour l'instant — complète ce courriel au besoin avant de l'envoyer.]");
+  }
+
+  lines.push("");
+  lines.push("N'hésitez pas à nous écrire si vous avez des questions.");
+  lines.push("");
+  lines.push("Merci,");
+  lines.push(input.authorName ?? "L'équipe Apex");
+
+  return { subject, body: lines.join("\n") };
+}
+
+function ClientEmailPanel({
+  clientName,
+  programName,
+  projectName,
+  authorName,
+  missingDocuments,
+  missingInfo,
+  questionsToAsk,
+}: {
+  clientName: string | null;
+  programName: string | null;
+  projectName: string;
+  authorName: string | null;
+  missingDocuments: string[];
+  missingInfo: string[];
+  questionsToAsk: string[];
+}) {
+  const [copied, setCopied] = useState(false);
+  const { subject, body } = useMemo(
+    () => buildClientEmail({ clientName, programName, projectName, authorName, missingDocuments, missingInfo, questionsToAsk }),
+    [clientName, programName, projectName, authorName, missingDocuments, missingInfo, questionsToAsk]
+  );
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(`Objet : ${subject}\n\n${body}`);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Presse-papier indisponible (permissions navigateur) -- le texte reste sélectionnable manuellement.
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <p className="text-sm text-neutral-500">
+        Recap des documents et informations encore manquants pour le dépôt, mis en forme en courriel prêt à envoyer au client. Relis-le avant
+        de l&apos;envoyer — rien n&apos;est envoyé automatiquement.
+      </p>
+      <div className="rounded-lg border border-neutral-200 bg-white p-3">
+        <p className="text-xs font-medium text-neutral-500">Objet</p>
+        <p className="mb-2 text-sm text-neutral-900">{subject}</p>
+        <p className="text-xs font-medium text-neutral-500">Message</p>
+        <textarea readOnly value={body} rows={Math.min(18, body.split("\n").length + 1)} className="mt-1 w-full rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-800" />
+      </div>
+      <button onClick={copy} className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white">
+        {copied ? "Copié ✓" : "Copier le courriel"}
+      </button>
+    </div>
+  );
+}
+
 export function DraftingWorkspace({
   grantProjectId,
   initialText,
   history,
   programDocuments,
   configured,
+  clientName,
+  programName,
+  projectName,
+  authorName,
 }: {
   grantProjectId: string;
   initialText: string;
   history: AnalysisRow[];
   programDocuments: string[];
   configured: boolean;
+  clientName: string | null;
+  programName: string | null;
+  projectName: string;
+  authorName: string | null;
 }) {
   const [text, setText] = useState(initialText);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(history[0]?.result ?? null);
@@ -252,6 +364,19 @@ export function DraftingWorkspace({
             <p className="text-xs text-neutral-400">Cette liste est un aide-mémoire (les coches ne sont pas enregistrées). La demande automatique au client depuis son portail viendra avec la phase portail.</p>
           </>
         )}
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-base font-semibold text-neutral-900">5. Courriel pour le client — éléments manquants</h2>
+        <ClientEmailPanel
+          clientName={clientName}
+          programName={programName}
+          projectName={projectName}
+          authorName={authorName}
+          missingDocuments={wanted.filter((d) => !checked.has(d))}
+          missingInfo={analysis?.assessment.missing_info ?? []}
+          questionsToAsk={analysis?.assessment.questions_to_ask ?? []}
+        />
       </section>
 
       {history.length > 0 && (

@@ -14,7 +14,7 @@ import { questionnaireService } from "@/server/services/questionnaire.service";
 export const maxDuration = 60;
 
 export default async function DraftingPage({ params }: { params: { id: string } }) {
-  await requireOrgContext();
+  const ctx = await requireOrgContext();
   const supabase = await createClient();
   const project: any = await grantProjectsService(supabase).get(params.id);
   if (!project) notFound();
@@ -42,10 +42,14 @@ export default async function DraftingPage({ params }: { params: { id: string } 
         history={history}
         programDocuments={program?.required_documents ?? []}
         configured={draftingAvailable()}
+        clientName={project.clients?.name ?? null}
+        programName={program?.name ?? project.grant_programs?.name ?? null}
+        projectName={project.name}
+        authorName={ctx.fullName}
       />
 
       <section className="space-y-3">
-        <h2 className="text-base font-semibold text-neutral-900">5. Questionnaire de la demande et copilote de rédaction</h2>
+        <h2 className="text-base font-semibold text-neutral-900">6. Questionnaire de la demande et copilote de rédaction</h2>
         {draftingAvailable() ? (
           <QuestionnairePanel grantProjectId={params.id} items={questionnaire.items} />
         ) : (
