@@ -1,9 +1,12 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { requireOrgContext } from "@/lib/permissions";
 import { grantProjectsService } from "@/server/services/grantProjects.service";
 import { GRANT_PROJECT_STATUS_LABELS, grantProjectStatusBadgeClass } from "@/features/grants/constants";
+import { DeleteGrantProjectButton } from "./DeleteGrantProjectButton";
 
 export default async function GrantsPage() {
+  const ctx = await requireOrgContext();
   const supabase = await createClient();
   const projects = await grantProjectsService(supabase).list();
 
@@ -25,6 +28,7 @@ export default async function GrantsPage() {
               <th className="px-4 py-2 font-medium">Programme</th>
               <th className="px-4 py-2 font-medium">Statut</th>
               <th className="px-4 py-2 font-medium">Montant approuvé</th>
+              {ctx.role === "admin" && <th className="px-4 py-2 font-medium"></th>}
             </tr>
           </thead>
           <tbody>
@@ -48,6 +52,11 @@ export default async function GrantsPage() {
                 <td className="px-4 py-2 text-neutral-600">
                   {p.approved_grant_amount ? `${Number(p.approved_grant_amount).toLocaleString("fr-CA")} $` : "—"}
                 </td>
+                {ctx.role === "admin" && (
+                  <td className="px-4 py-2 text-right">
+                    <DeleteGrantProjectButton grantProjectId={p.id} name={p.name} />
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

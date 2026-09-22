@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { requireOrgContext } from "@/lib/permissions";
 import { grantProjectsService } from "@/server/services/grantProjects.service";
 import { documentsService } from "@/server/services/documents.service";
 import { claimsService } from "@/server/services/claims.service";
@@ -29,6 +30,7 @@ import { supplierLedgerService } from "@/server/services/supplierLedger.service"
 import { computeSubsidy, resolveSubsidyInputs } from "@/features/grants/subsidyMath";
 import { grantAgreementsService } from "@/server/services/grantAgreements.service";
 import { NewSupplierForm } from "./NewSupplierForm";
+import { DeleteGrantProjectButton } from "../DeleteGrantProjectButton";
 import { DOCUMENT_CATEGORY_LABELS } from "@/features/grants/constants";
 
 // Le téléversement d'une facture déclenche sa lecture automatique (jusqu'à ~1 min).
@@ -36,6 +38,7 @@ export const maxDuration = 60;
 
 export default async function GrantProjectPage({ params, searchParams }: { params: { id: string }; searchParams?: { tab?: string } }) {
   const tab = searchParams?.tab === "echeancier" ? "echeancier" : "dossier";
+  const ctx = await requireOrgContext();
   const supabase = await createClient();
   const project: any = await grantProjectsService(supabase).get(params.id);
 
@@ -251,6 +254,16 @@ export default async function GrantProjectPage({ params, searchParams }: { param
           <div className="rounded-lg border border-dashed border-neutral-300 bg-white p-6 text-sm text-neutral-400">
             Onglets Application / Budget / Expenses détaillés — arrivent à l&apos;Étape 3 (moteur opérationnel).
           </div>
+
+          {ctx.role === "admin" && (
+            <section className="space-y-2 rounded-lg border border-red-200 bg-white p-4">
+              <h2 className="text-sm font-semibold text-red-800">Zone dangereuse</h2>
+              <p className="text-xs text-neutral-500">
+                Supprime définitivement ce dossier : documents, entente, réclamations, échéances, tâches, fournisseurs, questionnaire et journal. Action irréversible.
+              </p>
+              <DeleteGrantProjectButton grantProjectId={project.id} name={project.name} redirectAfter size="md" />
+            </section>
+          )}
         </>
       )}
     </div>
