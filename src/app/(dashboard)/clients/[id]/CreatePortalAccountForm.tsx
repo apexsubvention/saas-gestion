@@ -37,12 +37,11 @@ export function CreatePortalAccountForm({ clientId }: { clientId: string }) {
         <div className="w-full rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
           <p className="font-medium">Compte créé pour {state.createdEmail}.</p>
           <p className="mt-1">
-            Mot de passe temporaire (affiché une seule fois — copie-le maintenant) :{" "}
-            <code className="rounded bg-white px-1.5 py-0.5 font-mono">{state.tempPassword}</code>
+            Mot de passe : <code className="rounded bg-white px-1.5 py-0.5 font-mono">{state.tempPassword}</code>
           </p>
           <p className="mt-1 text-xs text-amber-700">
-            Transmets ces identifiants toi-même à la personne concernée. Aucun courriel n&apos;est envoyé
-            automatiquement.
+            Transmets ces identifiants toi-même à la personne concernée (aucun courriel n&apos;est envoyé
+            automatiquement) — tu pourras le revoir et le régénérer en tout temps depuis cette page.
           </p>
         </div>
       )}

@@ -710,6 +710,7 @@ export type Database = {
           active: boolean
           client_id: string
           created_at: string
+          current_password: string | null
           id: string
           organization_id: string
           user_id: string
@@ -718,6 +719,7 @@ export type Database = {
           active?: boolean
           client_id: string
           created_at?: string
+          current_password?: string | null
           id?: string
           organization_id: string
           user_id: string
@@ -726,6 +728,7 @@ export type Database = {
           active?: boolean
           client_id?: string
           created_at?: string
+          current_password?: string | null
           id?: string
           organization_id?: string
           user_id?: string

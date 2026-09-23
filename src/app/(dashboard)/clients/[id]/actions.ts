@@ -189,6 +189,7 @@ export async function createPortalAccountAction(
       client_id: clientId,
       user_id: authUserId,
       active: true,
+      current_password: tempPassword,
     });
     if (portalError) throw portalError;
   } catch (e) {
@@ -212,4 +213,66 @@ export async function setPortalAccountActiveAction(
   const supabase = await createClient();
   await supabase.from("client_portal_users").update({ active }).eq("id", portalUserRowId);
   revalidatePath(`/clients/${clientId}`);
+}
+
+export type PortalActionResult = { error: string | null };
+export type RegeneratePortalPasswordResult = { error: string | null; newPassword: string | null };
+
+// Génère un nouveau mot de passe à la demande (ex. le client l'a perdu, ou Jade veut le lui
+// retransmettre) -- remplace le mot de passe Supabase Auth ET la copie conservée dans
+// client_portal_users.current_password (voir 0043_client_portal_password.sql). L'ancien mot de
+// passe cesse de fonctionner immédiatement. Réservé aux admins, comme la création de compte.
+export async function regeneratePortalPasswordAction(clientId: string, portalUserRowId: string): Promise<RegeneratePortalPasswordResult> {
+  const ctx = await requireOrgContext();
+  if (ctx.role !== "admin") return { error: "Réservé aux administrateurs.", newPassword: null };
+
+  const admin = createAdminClient();
+  const newPassword = generateTempPassword();
+  try {
+    const { data: row, error: rowError } = await admin
+      .from("client_portal_users")
+      .select("user_id")
+      .eq("id", portalUserRowId)
+      .single();
+    if (rowError) throw rowError;
+
+    const { error: authError } = await admin.auth.admin.updateUserById((row as { user_id: string }).user_id, { password: newPassword });
+    if (authError) throw authError;
+
+    const { error: updateError } = await admin.from("client_portal_users").update({ current_password: newPassword }).eq("id", portalUserRowId);
+    if (updateError) throw updateError;
+  } catch (e) {
+    return { error: formatCaughtError(e), newPassword: null };
+  }
+
+  revalidatePath(`/clients/${clientId}`);
+  return { error: null, newPassword };
+}
+
+// Supprime complètement le compte portail (pas juste « désactiver ») : révoque l'accès
+// immédiatement et libère le courriel pour un nouveau compte. Supprimer l'utilisateur Supabase Auth
+// entraîne la suppression en cascade de client_portal_users, client_access et organization_users
+// pour ce compte (toutes les FK vers auth.users/organization_users sont "on delete cascade" --
+// voir 0001_organizations_and_users.sql) : rien d'autre à nettoyer manuellement.
+export async function deletePortalAccountAction(clientId: string, portalUserRowId: string): Promise<PortalActionResult> {
+  const ctx = await requireOrgContext();
+  if (ctx.role !== "admin") return { error: "Réservé aux administrateurs." };
+
+  const admin = createAdminClient();
+  try {
+    const { data: row, error: rowError } = await admin
+      .from("client_portal_users")
+      .select("user_id")
+      .eq("id", portalUserRowId)
+      .single();
+    if (rowError) throw rowError;
+
+    const { error: deleteError } = await admin.auth.admin.deleteUser((row as { user_id: string }).user_id);
+    if (deleteError) throw deleteError;
+  } catch (e) {
+    return { error: formatCaughtError(e) };
+  }
+
+  revalidatePath(`/clients/${clientId}`);
+  return { error: null };
 }

@@ -10,6 +10,8 @@ import { CompatiblePrograms } from "./CompatiblePrograms";
 import { SetParentForm } from "./SetParentForm";
 import { CreatePortalAccountForm } from "./CreatePortalAccountForm";
 import { PortalAccountToggle } from "./PortalAccountToggle";
+import { PortalPasswordBox } from "./PortalPasswordBox";
+import { DeletePortalAccountButton } from "./DeletePortalAccountButton";
 import { ClientTabs } from "./ClientTabs";
 import { GRANT_PROJECT_STATUS_LABELS, grantProjectStatusBadgeClass } from "@/features/grants/constants";
 
@@ -29,7 +31,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
 
   const { data: portalAccount } = await supabase
     .from("client_portal_users")
-    .select("id, active, user_id")
+    .select("id, active, user_id, current_password")
     .eq("client_id", client.id)
     .maybeSingle();
 
@@ -95,8 +97,8 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
         </p>
         <div className="rounded-lg border border-neutral-200 bg-white p-4">
           {portalAccount ? (
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
                 <p className="text-sm text-neutral-900">
                   {portalAccountEmail ?? "Compte portail"}{" "}
                   <span
@@ -107,8 +109,12 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
                     {portalAccount.active ? "Actif" : "Désactivé"}
                   </span>
                 </p>
+                <PortalAccountToggle clientId={client.id} portalUserRowId={portalAccount.id} active={portalAccount.active} />
               </div>
-              <PortalAccountToggle clientId={client.id} portalUserRowId={portalAccount.id} active={portalAccount.active} />
+              <PortalPasswordBox clientId={client.id} portalUserRowId={portalAccount.id} initialPassword={portalAccount.current_password} />
+              <div className="border-t border-neutral-100 pt-3">
+                <DeletePortalAccountButton clientId={client.id} portalUserRowId={portalAccount.id} email={portalAccountEmail} />
+              </div>
             </div>
           ) : (
             <CreatePortalAccountForm clientId={client.id} />
