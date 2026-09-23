@@ -10,6 +10,7 @@ import { CompatiblePrograms } from "./CompatiblePrograms";
 import { SetParentForm } from "./SetParentForm";
 import { CreatePortalAccountForm } from "./CreatePortalAccountForm";
 import { PortalAccountToggle } from "./PortalAccountToggle";
+import { ClientTabs } from "./ClientTabs";
 import { GRANT_PROJECT_STATUS_LABELS, grantProjectStatusBadgeClass } from "@/features/grants/constants";
 
 export default async function ClientDetailPage({ params }: { params: { id: string } }) {
@@ -43,20 +44,8 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
     portalAccountEmail = ou?.email ?? null;
   }
 
-  return (
-    <div className="space-y-6">
-      <div className="rounded-lg border border-neutral-200 bg-white p-6">
-        <p className="text-xs uppercase tracking-wide text-neutral-400">{client.status}</p>
-        <h1 className="mt-1 text-lg font-semibold text-neutral-900">{client.name}</h1>
-        <p className="mt-1 font-mono text-xs text-neutral-400">{client.id}</p>
-        {client.sector && <p className="mt-2 text-sm text-neutral-600">Secteur : {client.sector}</p>}
-        {client.website && (
-          <a href={client.website} target="_blank" className="text-sm text-blue-600 hover:underline">
-            {client.website}
-          </a>
-        )}
-      </div>
-
+  const overview = (
+    <>
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-neutral-900">Hiérarchie</h2>
         <p className="text-xs text-neutral-500">
@@ -150,12 +139,16 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
         </p>
         <CompatiblePrograms supabase={supabase} needs={client.current_needs} />
       </section>
+    </>
+  );
 
+  const dossiers = (
+    <>
       <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-neutral-900">Projets de subvention</h2>
+          <h2 className="text-sm font-semibold text-neutral-900">Dossiers</h2>
           <Link href={`/grants/new?client_id=${client.id}`} className="text-sm text-neutral-500 hover:text-neutral-900">
-            + Nouveau projet
+            + Nouveau dossier
           </Link>
         </div>
         <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
@@ -184,7 +177,11 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
           )}
         </div>
       </section>
+    </>
+  );
 
+  const documentsTab = (
+    <>
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-neutral-900">Documents</h2>
         <div className="rounded-lg border border-neutral-200 bg-white p-4">
@@ -210,6 +207,24 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
           )}
         </div>
       </section>
+    </>
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-lg border border-neutral-200 bg-white p-6">
+        <p className="text-xs uppercase tracking-wide text-neutral-400">{client.status}</p>
+        <h1 className="mt-1 text-lg font-semibold text-neutral-900">{client.name}</h1>
+        <p className="mt-1 font-mono text-xs text-neutral-400">{client.id}</p>
+        {client.sector && <p className="mt-2 text-sm text-neutral-600">Secteur : {client.sector}</p>}
+        {client.website && (
+          <a href={client.website} target="_blank" className="text-sm text-blue-600 hover:underline">
+            {client.website}
+          </a>
+        )}
+      </div>
+
+      <ClientTabs overview={overview} dossiers={dossiers} documents={documentsTab} />
     </div>
   );
 }
