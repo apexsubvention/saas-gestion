@@ -29,7 +29,11 @@ function DeleteNoteButton({ noteId }: { noteId: string }) {
     <button
       type="button"
       disabled={isPending}
-      onClick={() => startTransition(() => deletePortalNoteAction(noteId))}
+      onClick={() =>
+        startTransition(async () => {
+          await deletePortalNoteAction(noteId);
+        })
+      }
       className="text-xs text-neutral-400 hover:text-red-600 disabled:opacity-50"
     >
       Supprimer

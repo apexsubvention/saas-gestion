@@ -29,7 +29,11 @@ function DeleteNoteButton({ noteId, grantProjectId }: { noteId: string; grantPro
     <button
       type="button"
       disabled={isPending}
-      onClick={() => startTransition(() => deleteDossierNoteAction(noteId, grantProjectId))}
+      onClick={() =>
+        startTransition(async () => {
+          await deleteDossierNoteAction(noteId, grantProjectId);
+        })
+      }
       className="text-xs text-neutral-400 hover:text-red-600 disabled:opacity-50"
     >
       Supprimer
