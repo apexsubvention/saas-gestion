@@ -8,7 +8,7 @@
 import { useTransition } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import type { DossierNoteView } from "@/server/services/dossierNotes.service";
-import { addPortalNoteAction, deletePortalNoteAction, type AddPortalNoteFormState } from "../notesActions";
+import { addPortalNoteAction, deletePortalNoteAction, type AddPortalNoteFormState } from "./notesActions";
 
 function formatDateTime(iso: string): string {
   return new Intl.DateTimeFormat("fr-CA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
