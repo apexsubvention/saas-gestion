@@ -79,11 +79,16 @@ export function documentsRepository(supabase: SupabaseClient) {
     },
 
     // Une facture a au plus UN document associé : on remplace le lien existant.
-    async setInvoiceDocument(expenseId: string, documentId: string | null): Promise<void> {
+    // organizationId : requis par le type Insert généré (colonne not null sans défaut
+    // SQL) même si le trigger enforce_document_link_integrity la réécrit toujours à
+    // partir du document -- voir linkToEntity ci-dessous pour la même remarque.
+    async setInvoiceDocument(organizationId: string, expenseId: string, documentId: string | null): Promise<void> {
       const { error: delError } = await supabase.from("document_links").delete().eq("entity_type", "expense_invoice").eq("entity_id", expenseId);
       if (delError) throw delError;
       if (!documentId) return;
-      const { error } = await supabase.from("document_links").insert({ document_id: documentId, entity_type: "expense_invoice", entity_id: expenseId });
+      const { error } = await supabase
+        .from("document_links")
+        .insert({ organization_id: organizationId, document_id: documentId, entity_type: "expense_invoice", entity_id: expenseId });
       if (error) throw error;
     },
 
@@ -106,7 +111,12 @@ export function documentsRepository(supabase: SupabaseClient) {
       }));
     },
 
+    // organization_id : requis par le type Insert généré (colonne not null sans défaut
+    // SQL, seulement réécrite par un trigger) -- le trigger enforce_document_link_integrity
+    // ignore de toute façon la valeur envoyée et la recalcule depuis document_id, donc ceci
+    // ne change aucun comportement, seulement le typage.
     async linkToEntity(input: {
+      organization_id: string;
       document_id: string;
       entity_type: "expense_invoice" | "expense_payment_proof" | "document_request" | "claim_requirement" | "claim" | "grant_agreement" | "application_answer";
       entity_id: string;

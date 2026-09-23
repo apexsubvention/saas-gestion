@@ -84,7 +84,12 @@ export async function uploadRequestedDocumentAction(
 
     const { error: linkError } = await admin
       .from("document_links")
-      .insert({ document_id: (doc as { id: string }).id, entity_type: "document_request", entity_id: requestId });
+      .insert({
+        organization_id: request.organization_id,
+        document_id: (doc as { id: string }).id,
+        entity_type: "document_request",
+        entity_id: requestId,
+      });
     if (linkError) throw linkError;
 
     const { error: statusError } = await admin

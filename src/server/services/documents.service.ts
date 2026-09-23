@@ -49,6 +49,7 @@ export function documentsService(supabase: SupabaseClient) {
 
       if (params.linkToClaimId) {
         await repo.linkToEntity({
+          organization_id: params.organizationId,
           document_id: doc.id,
           entity_type: "claim",
           entity_id: params.linkToClaimId,

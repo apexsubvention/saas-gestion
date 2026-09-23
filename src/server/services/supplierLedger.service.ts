@@ -217,7 +217,7 @@ export function supplierLedgerService(supabase: SupabaseClient) {
         });
         id = created.id;
       }
-      await documentsRepo.setInvoiceDocument(id, input.document_id);
+      await documentsRepo.setInvoiceDocument(organizationId, id, input.document_id);
       return id;
     },
 
@@ -262,7 +262,7 @@ export function supplierLedgerService(supabase: SupabaseClient) {
         status: "to_review",
         source: "ai",
       });
-      await documentsRepo.setInvoiceDocument(expense.id, documentId);
+      await documentsRepo.setInvoiceDocument(organizationId, expense.id, documentId);
       return { status: "recorded", supplierName: supplier.name, supplierCreated, amount };
     },
   };
