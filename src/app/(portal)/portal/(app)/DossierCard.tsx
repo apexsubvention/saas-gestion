@@ -1,0 +1,165 @@
+"use client";
+
+// Carte dépliable pour un dossier du portail client -- statut/dates, réclamations (avec
+// documents manquants), et texte rédigé du questionnaire (pour révision par le client).
+// Repliée par défaut : le client ouvre celle qui l'intéresse plutôt que de tout voir
+// d'un coup, surtout utile pour un compte parent qui voit aussi les dossiers de ses
+// clients enfants (hiérarchie, cf. 0028).
+import { useState } from "react";
+import type { PortalDossier } from "@/server/services/portalDossiers.service";
+import {
+  CLAIM_STATUS_LABELS,
+  claimStatusBadgeClass,
+  CLAIM_REQUIREMENT_STATUS_LABELS,
+  claimRequirementStatusBadgeClass,
+  grantProjectStatusBadgeClass,
+} from "@/features/grants/constants";
+
+const REDACTION_STAGE_LABELS: Record<PortalDossier["redaction"][number]["stage"], string> = {
+  final: "Texte final",
+  user_draft: "Brouillon (révisé)",
+  ai_draft: "Brouillon (proposé par IA — à réviser)",
+};
+
+function redactionStageBadgeClass(stage: PortalDossier["redaction"][number]["stage"]): string {
+  switch (stage) {
+    case "final":
+      return "bg-emerald-50 text-emerald-700";
+    case "user_draft":
+      return "bg-indigo-50 text-indigo-700";
+    default:
+      return "bg-amber-50 text-amber-800";
+  }
+}
+
+function formatDate(iso: string | null): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("fr-CA");
+}
+
+function formatAmount(amount: number | null): string {
+  if (amount == null) return "—";
+  return `${Number(amount).toLocaleString("fr-CA", { minimumFractionDigits: 2 })} $`;
+}
+
+export function DossierCard({ dossier }: { dossier: PortalDossier }) {
+  const [expanded, setExpanded] = useState(false);
+  const openRequirementsCount = dossier.claims.reduce((sum, c) => sum + c.openRequirements.length, 0);
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="flex w-full flex-wrap items-center justify-between gap-3 px-4 py-3 text-left hover:bg-neutral-50"
+      >
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-medium text-neutral-900">{dossier.name}</span>
+            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${grantProjectStatusBadgeClass(dossier.status)}`}>
+              {dossier.statusLabel}
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-neutral-500">
+            {dossier.clientName && <span className="mr-2">{dossier.clientName}</span>}
+            {dossier.programName && <span>{dossier.programName}</span>}
+          </p>
+        </div>
+        <div className="flex items-center gap-4 text-xs text-neutral-500">
+          <span>{dossier.claims.length} réclamation{dossier.claims.length !== 1 ? "s" : ""}</span>
+          {openRequirementsCount > 0 && (
+            <span className="rounded-full bg-amber-50 px-2 py-0.5 font-medium text-amber-800">
+              {openRequirementsCount} à fournir
+            </span>
+          )}
+          <span>{expanded ? "Réduire ▲" : "Détails ▼"}</span>
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="space-y-5 border-t border-neutral-100 px-4 py-4">
+          <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+            <div>
+              <p className="text-xs text-neutral-400">Début</p>
+              <p className="text-neutral-800">{formatDate(dossier.officialStartDate)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-neutral-400">Fin</p>
+              <p className="text-neutral-800">{formatDate(dossier.officialEndDate)}</p>
+            </div>
+            <div className="col-span-2">
+              <p className="text-xs text-neutral-400">Montant approuvé</p>
+              <p className="text-neutral-800">{formatAmount(dossier.approvedGrantAmount)}</p>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Réclamations</h3>
+            {dossier.claims.length > 0 ? (
+              <div className="space-y-2">
+                {dossier.claims.map((c) => (
+                  <div key={c.id} className="rounded-md border border-neutral-100 p-3 text-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-medium text-neutral-900">
+                        {c.claim_number ?? "Réclamation"}
+                        {c.period_start || c.period_end ? (
+                          <span className="ml-2 font-normal text-neutral-500">
+                            {formatDate(c.period_start)} – {formatDate(c.period_end)}
+                          </span>
+                        ) : null}
+                      </span>
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${claimStatusBadgeClass(c.status)}`}>
+                        {CLAIM_STATUS_LABELS[c.status] ?? c.status}
+                      </span>
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-4 text-xs text-neutral-500">
+                      {c.due_date && <span>Échéance : {formatDate(c.due_date)}</span>}
+                      {c.claimed_amount != null && <span>Réclamé : {formatAmount(c.claimed_amount)}</span>}
+                      {c.approved_amount != null && <span>Approuvé : {formatAmount(c.approved_amount)}</span>}
+                    </div>
+                    {c.openRequirements.length > 0 && (
+                      <div className="mt-2 space-y-1 border-t border-neutral-100 pt-2">
+                        <p className="text-xs font-medium text-neutral-500">Documents à fournir</p>
+                        {c.openRequirements.map((r) => (
+                          <div key={r.id} className="flex items-center justify-between text-xs">
+                            <span className="text-neutral-700">{r.label}</span>
+                            <span className={`rounded-full px-2 py-0.5 font-medium ${claimRequirementStatusBadgeClass(r.status)}`}>
+                              {CLAIM_REQUIREMENT_STATUS_LABELS[r.status] ?? r.status}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-neutral-400">Aucune réclamation pour l&apos;instant.</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Texte rédigé — pour révision</h3>
+            {dossier.redaction.length > 0 ? (
+              <div className="space-y-3">
+                {dossier.redaction.map((item) => (
+                  <div key={item.id} className="rounded-md border border-neutral-100 p-3 text-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-medium text-neutral-900">{item.prompt}</span>
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${redactionStageBadgeClass(item.stage)}`}>
+                        {REDACTION_STAGE_LABELS[item.stage]}
+                      </span>
+                    </div>
+                    <p className="mt-2 whitespace-pre-wrap text-neutral-700">{item.text}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-neutral-400">Rien de rédigé pour l&apos;instant.</p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

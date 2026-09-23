@@ -10,7 +10,9 @@ export type ClaimRequirementRow = {
 
 // Statuts qui ne comptent PAS comme "élément manquant" pour une réclamation --
 // tout le reste (missing/requested/received/issue) bloque encore la préparation.
-const OPEN_STATUSES = ["missing", "requested", "received", "issue"];
+// Exporté : réutilisé tel quel par le portail (portalDossiers.service.ts) pour afficher
+// "documents à fournir" à partir des mêmes règles, sans dupliquer la liste de statuts.
+export const OPEN_REQUIREMENT_STATUSES = ["missing", "requested", "received", "issue"];
 
 export function claimRequirementsRepository(supabase: SupabaseClient) {
   return {
@@ -36,7 +38,7 @@ export function claimRequirementsRepository(supabase: SupabaseClient) {
       if (error) throw error;
       const counts: Record<string, number> = {};
       for (const row of data as Array<{ claim_id: string; status: string }>) {
-        if (OPEN_STATUSES.includes(row.status)) {
+        if (OPEN_REQUIREMENT_STATUSES.includes(row.status)) {
           counts[row.claim_id] = (counts[row.claim_id] ?? 0) + 1;
         }
       }

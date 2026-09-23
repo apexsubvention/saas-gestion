@@ -223,6 +223,35 @@ export const DOCUMENT_CATEGORY_OPTIONS: Array<{ value: string; label: string }> 
   "other",
 ].map((value) => ({ value, label: DOCUMENT_CATEGORY_LABELS[value] ?? value }));
 
+// Étiquettes françaises pour claim_requirements.status (voir 0008_expenses_claims.sql).
+// Utilisées par le portail (« documents à fournir » par réclamation) et pourront l'être
+// côté interne si une UI dédiée est ajoutée plus tard.
+export const CLAIM_REQUIREMENT_STATUS_LABELS: Record<string, string> = {
+  missing: "Manquant",
+  requested: "Demandé",
+  received: "Reçu — à valider",
+  validated: "Validé",
+  not_required: "Non requis",
+  issue: "Problème",
+};
+
+export function claimRequirementStatusBadgeClass(status: string): string {
+  switch (status) {
+    case "validated":
+      return "bg-emerald-50 text-emerald-700";
+    case "received":
+      return "bg-indigo-50 text-indigo-700";
+    case "requested":
+      return "bg-amber-50 text-amber-800";
+    case "issue":
+      return "bg-red-50 text-red-700";
+    case "not_required":
+      return "bg-neutral-100 text-neutral-500";
+    default:
+      return "bg-slate-100 text-slate-600";
+  }
+}
+
 // Étiquettes/couleurs pour les seaux d'urgence de l'échéancier (voir
 // src/features/schedule/priority.ts) -- utilisées par les vues Priorités et Kanban.
 export const PRIORITY_BUCKET_LABELS: Record<string, string> = {

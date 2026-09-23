@@ -12,7 +12,11 @@ export type QuestionnaireData = { applicationId: string | null; items: QuestionI
 const EMPTY_ANSWER: AnswerRow = { id: null, ai_draft: null, user_draft: null, final_text: null, ai_meta: null, updated_at: null };
 
 // Questionnaire d'une demande : grant_applications -> application_sections -> application_questions -> application_answers
-// (tables existantes ; aucune structure dupliquée). Réservé au personnel (RLS, cf. 0038).
+// (tables existantes ; aucune structure dupliquée). Historiquement réservé au personnel
+// (RLS, cf. 0038) ; le portail y a maintenant aussi accès EN LECTURE SEULE (0044, décision
+// explicite de Jade) pour afficher le texte rédigé au client, pour révision -- voir
+// portalDossiers.service.ts. Rien n'a changé ici : c'est la RLS de la base, pas ce
+// service, qui distingue les deux cas.
 export function questionnaireService(supabase: SupabaseClient) {
   const drafting = draftingService(supabase);
 
