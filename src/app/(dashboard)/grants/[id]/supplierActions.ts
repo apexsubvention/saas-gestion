@@ -9,8 +9,11 @@ import { supplierLedgerService } from "@/server/services/supplierLedger.service"
 import { projectSuppliersService } from "@/server/services/projectSuppliers.service";
 import { documentsService } from "@/server/services/documents.service";
 import { expensesRepository } from "@/server/repositories/expenses.repository";
-import { logAudit, logDossierEvent } from "@/server/services/audit";
+import { logAudit, logDossierEvent, listDossierEventsByRef, type DossierEventRow } from "@/server/services/audit";
 import { claimsService } from "@/server/services/claims.service";
+
+const fmtMoney = (n: number) => new Intl.NumberFormat("fr-CA", { style: "currency", currency: "CAD", minimumFractionDigits: 2 }).format(n);
+const OVERRIDE_FIELD_LABELS = { accepted: "Subvention acceptée", claimed: "Réclamé à ce jour" } as const;
 
 // Actions du tableau fournisseurs / factures d'un dossier. Chaque action revérifie que les
 // identifiants reçus appartiennent bien à CE dossier (la RLS protège l'accès, pas la cohérence).
@@ -169,15 +172,46 @@ export async function setSupplierOverrideAction(
     if (!before) return { error: "Fournisseur introuvable dans ce dossier." };
     await supplierLedgerService(supabase).setOverride(supplierId, field, value, ctx.organizationUserId);
     const column = field === "accepted" ? "accepted_subsidy_override" : "claimed_override";
+    const beforeValue = (before as unknown as Record<string, unknown>)[column] as number | null | undefined;
     await logAudit(supabase, ctx, {
       action: value == null ? "override_reverted" : "override_set",
       entity_type: "project_supplier",
       entity_id: supplierId,
-      before: { field: column, value: (before as unknown as Record<string, unknown>)[column] ?? null },
+      before: { field: column, value: beforeValue ?? null },
       after: { field: column, value },
+    });
+    // Journalisé aussi dans dossier_events (pas seulement audit_logs, réservé aux admins) : c'est ce qui
+    // alimente le bouton « Historique » du tableau fournisseurs, visible par tout le personnel du dossier.
+    const label = OVERRIDE_FIELD_LABELS[field];
+    await logDossierEvent(supabase, ctx, {
+      grant_project_id: grantProjectId,
+      kind: value == null ? "supplier_override_reverted" : "supplier_override_set",
+      title: value == null ? `${label} : retour au calcul automatique` : `${label} modifiée manuellement : ${fmtMoney(value)}`,
+      detail: value == null
+        ? beforeValue != null ? `Valeur manuelle effacée : ${fmtMoney(beforeValue)}` : null
+        : beforeValue != null ? `Valeur manuelle précédente : ${fmtMoney(beforeValue)}` : null,
+      source: "manual",
+      ref_type: "project_supplier",
+      ref_id: supplierId,
     });
     revalidatePath(`/grants/${grantProjectId}`);
     return { error: null };
+  } catch (e) {
+    return { error: formatCaughtError(e) };
+  }
+}
+
+// Historique des modifications d'UN fournisseur (ajout, champs modifiés, valeurs ajustées à la main) --
+// alimente le bouton « Historique » du tableau fournisseurs. Chargé à la demande (pas au chargement de
+// la page) pour ne pas multiplier les requêtes tant que personne ne l'ouvre.
+export async function getSupplierHistoryAction(grantProjectId: string, supplierId: string): Promise<{ error: string | null; events?: DossierEventRow[] }> {
+  await requireOrgContext();
+  const supabase = await createClient();
+  try {
+    const owned = (await projectSuppliersService(supabase).listByProject(grantProjectId)).some((s) => s.id === supplierId);
+    if (!owned) return { error: "Fournisseur introuvable dans ce dossier." };
+    const events = await listDossierEventsByRef(supabase, grantProjectId, "project_supplier", supplierId);
+    return { error: null, events };
   } catch (e) {
     return { error: formatCaughtError(e) };
   }

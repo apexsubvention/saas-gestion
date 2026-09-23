@@ -17,7 +17,6 @@ import { OpenDocumentButton } from "./OpenDocumentButton";
 import { AgreementForm } from "./AgreementForm";
 import { SuppliersTable } from "./SuppliersTable";
 import { SubsidyPanel } from "./SubsidyPanel";
-import { SupplierFinanceTable } from "./SupplierFinanceTable";
 import { DossierTimeline } from "./DossierTimeline";
 import { SchedulePanel } from "./SchedulePanel";
 import { SuggestionsPanel } from "./SuggestionsPanel";
@@ -208,16 +207,10 @@ export default async function GrantProjectPage({ params, searchParams }: { param
             <h2 className="text-sm font-semibold text-neutral-900">Fournisseurs et factures</h2>
             <SuggestionsPanel grantProjectId={project.id} suggestions={suggestions} />
             <SubsidyPanel summary={subsidy} supplierBudgetTotal={ledger.supplierBudgetTotal} />
-            <SupplierFinanceTable
-              grantProjectId={project.id}
-              suppliers={ledger.suppliers}
-              totals={ledger.totals}
-              documents={documents.map((d) => ({ id: d.id, filename: d.filename }))}
-              clients={allClients.map((c) => ({ id: c.id, name: c.name }))}
-            />
             <p className="text-xs text-neutral-500">
-              Modifie, ajoute ou supprime les fournisseurs, même ceux générés automatiquement. Une facture téléversée dans « Documents »
-              (catégorie Facture) est lue automatiquement et ajoutée ici sous son fournisseur ; tu peux aussi associer un document toi-même.
+              Un seul tableau, automatique et manuel : modifie, ajoute ou supprime les fournisseurs, même ceux générés automatiquement. Une facture
+              téléversée dans « Documents » (catégorie Facture) est lue automatiquement et ajoutée ici sous son fournisseur ; tu peux aussi associer
+              un document toi-même. Ouvre « Détails » sur un fournisseur pour voir l&apos;historique de ses modifications.
             </p>
             <SuppliersTable
               grantProjectId={project.id}
@@ -226,7 +219,7 @@ export default async function GrantProjectPage({ params, searchParams }: { param
               documents={documents.map((d) => ({ id: d.id, filename: d.filename, category: d.category }))}
               clients={allClients.map((c) => ({ id: c.id, name: c.name }))}
               claims={claims.map((c) => ({ id: c.id, label: c.claim_number || `Réclamation (${c.period_start ?? "—"})` }))}
-              totals={{ budget: ledger.supplierBudgetTotal, spent: ledger.spent }}
+              totals={ledger.totals}
             />
             <details className="rounded-lg border border-neutral-200 bg-white p-4">
               <summary className="cursor-pointer text-sm font-medium text-neutral-800">Ajouter un fournisseur avec ses détails de facturation</summary>

@@ -83,3 +83,28 @@ export async function listDossierEvents(supabase: SupabaseClient, grantProjectId
     return [];
   }
 }
+
+// Historique d'UN élément précis (ex. un fournisseur) : mêmes événements que le journal du dossier,
+// filtrés par ref_type/ref_id -- utilisé pour un « Historique » ciblé plutôt que le journal complet.
+export async function listDossierEventsByRef(
+  supabase: SupabaseClient,
+  grantProjectId: string,
+  refType: string,
+  refId: string,
+  limit = 100
+): Promise<DossierEventRow[]> {
+  try {
+    const { data, error } = await supabase
+      .from("dossier_events")
+      .select("id, kind, title, detail, source, occurred_at")
+      .eq("grant_project_id", grantProjectId)
+      .eq("ref_type", refType)
+      .eq("ref_id", refId)
+      .order("occurred_at", { ascending: false })
+      .limit(limit);
+    if (error) return [];
+    return (data ?? []) as DossierEventRow[];
+  } catch {
+    return [];
+  }
+}

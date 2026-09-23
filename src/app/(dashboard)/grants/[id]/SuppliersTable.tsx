@@ -1,18 +1,26 @@
 "use client";
 
+// Tableau fournisseurs unique : identité + suivi financier (subvention acceptée / réclamé / solde) +
+// factures, avec historique des modifications. Avant, ces informations étaient réparties sur deux
+// tableaux empilés (un « auto », un « manuel ») -- fusionnés ici en un seul, où chaque valeur suivie
+// reste modifiable à la main même quand elle est calculée automatiquement (mention AUTO / CALCULÉE /
+// MODIFIÉE MANUELLEMENT, « revenir au calcul automatique » sans jamais perdre la valeur auto).
 import { useState, useTransition } from "react";
 import { OpenDocumentButton } from "./OpenDocumentButton";
 import {
   confirmInvoiceAction,
   deleteInvoiceAction,
   deleteSupplierAction,
+  getSupplierHistoryAction,
   linkInvoiceClaimAction,
   moveSupplierAction,
   saveInvoiceAction,
   saveSupplierAction,
+  setSupplierOverrideAction,
   type LedgerActionResult,
 } from "./supplierActions";
-import type { LedgerInvoice, LedgerSupplier } from "@/server/services/supplierLedger.service";
+import type { LedgerInvoice, LedgerSupplier, Tracked } from "@/server/services/supplierLedger.service";
+import type { DossierEventRow } from "@/server/services/audit";
 
 type DocOption = { id: string; filename: string; category: string };
 type ClientOption = { id: string; name: string };
@@ -27,7 +35,7 @@ function money(n: number | null | undefined) {
 
 // « 1 234,56 », « 1234.5 $ » -> nombre ; vide -> null ; invalide -> NaN
 function parseAmount(text: string): number | null {
-  const cleaned = text.replace(/\s| /g, "").replace(",", ".").replace(/\$/g, "");
+  const cleaned = text.replace(/\s| /g, "").replace(",", ".").replace(/\$/g, "");
   if (!cleaned) return null;
   const n = Number(cleaned);
   return Number.isFinite(n) ? n : Number.NaN;
@@ -46,6 +54,117 @@ function useLedgerAction() {
     });
   }
   return { pending, error, run };
+}
+
+const MODE_BADGE: Record<Tracked["mode"], { label: string; className: string } | null> = {
+  auto: { label: "AUTO", className: "bg-emerald-50 text-emerald-700" },
+  calculated: { label: "CALCULÉE", className: "bg-slate-100 text-slate-600" },
+  manual: { label: "MODIFIÉE MANUELLEMENT", className: "bg-amber-100 text-amber-800" },
+  none: null,
+};
+
+// Une valeur suivie : effective + mention AUTO / CALCULÉE / MODIFIÉE MANUELLEMENT, modification à la
+// main et « Revenir au calcul automatique » (la valeur automatique n'est jamais détruite).
+function TrackedCell({ grantProjectId, supplierId, field, tracked }: { grantProjectId: string; supplierId: string; field: "accepted" | "claimed"; tracked: Tracked }) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(tracked.effective != null ? String(tracked.effective) : "");
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const badge = MODE_BADGE[tracked.mode];
+
+  function run(value: number | null) {
+    setError(null);
+    startTransition(async () => {
+      const r = await setSupplierOverrideAction(grantProjectId, supplierId, field, value);
+      if (r.error) setError(r.error);
+      else setEditing(false);
+    });
+  }
+
+  function save() {
+    const v = parseAmount(text);
+    if (v == null || Number.isNaN(v)) return setError("Montant invalide.");
+    run(v);
+  }
+
+  return (
+    <div className="space-y-1">
+      {editing ? (
+        <div className="flex items-center gap-1">
+          <input value={text} onChange={(e) => setText(e.target.value)} inputMode="decimal" className="w-28 rounded-md border border-neutral-300 px-2 py-1 text-sm" autoFocus />
+          <button onClick={save} disabled={pending} className="rounded-md bg-neutral-900 px-2 py-1 text-xs font-medium text-white disabled:opacity-50">{pending ? "…" : "OK"}</button>
+          <button onClick={() => setEditing(false)} className="rounded-md border border-neutral-300 px-2 py-1 text-xs">Annuler</button>
+        </div>
+      ) : (
+        <button onClick={() => { setText(tracked.effective != null ? String(tracked.effective) : ""); setEditing(true); }} className="text-left text-sm font-medium text-neutral-900 hover:underline" title="Modifier à la main">
+          {money(tracked.effective)}
+        </button>
+      )}
+      <div className="flex flex-wrap items-center gap-1">
+        {badge && <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${badge.className}`}>{badge.label}</span>}
+        {tracked.mode === "manual" && (
+          <button onClick={() => run(null)} disabled={pending} className="text-[11px] text-blue-600 underline disabled:opacity-50" title={tracked.auto != null ? `Valeur automatique : ${money(tracked.auto)}` : undefined}>
+            Revenir au calcul automatique{tracked.auto != null ? ` (${money(tracked.auto)})` : ""}
+          </button>
+        )}
+      </div>
+      {error && <p className="text-xs text-red-600">{error}</p>}
+    </div>
+  );
+}
+
+const SOURCE_LABELS: Record<string, string> = { manual: "Saisie manuelle", ai: "Lue par IA", convention: "Convention", import: "Import" };
+const CONFIDENCE_LABELS: Record<string, string> = { high: "confiance élevée", medium: "confiance moyenne", low: "confiance faible" };
+const EVENT_SOURCE_LABELS: Record<DossierEventRow["source"], { label: string; className: string }> = {
+  manual: { label: "Manuel", className: "bg-slate-100 text-slate-600" },
+  system: { label: "Apex", className: "bg-indigo-50 text-indigo-700" },
+  ai: { label: "IA", className: "bg-violet-50 text-violet-700" },
+  portal: { label: "Client", className: "bg-emerald-50 text-emerald-700" },
+};
+
+function SupplierHistory({ grantProjectId, supplierId }: { grantProjectId: string; supplierId: string }) {
+  const [loaded, setLoaded] = useState(false);
+  const [events, setEvents] = useState<DossierEventRow[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  if (!loaded && !pending) {
+    startTransition(async () => {
+      const r = await getSupplierHistoryAction(grantProjectId, supplierId);
+      if (r.error) setError(r.error);
+      else setEvents(r.events ?? []);
+      setLoaded(true);
+    });
+  }
+
+  return (
+    <div className="space-y-2 border-t border-neutral-200 pt-3">
+      <h4 className="text-xs font-semibold text-neutral-700">🕐 Historique des modifications</h4>
+      {pending && <p className="text-xs text-neutral-400">Chargement…</p>}
+      {error && <p className="text-xs text-red-600">{error}</p>}
+      {!pending && !error && events.length === 0 && <p className="text-xs text-neutral-400">Aucune modification enregistrée pour l&apos;instant.</p>}
+      {events.length > 0 && (
+        <ol className="space-y-1.5">
+          {events.map((e) => {
+            const src = EVENT_SOURCE_LABELS[e.source] ?? EVENT_SOURCE_LABELS.system;
+            return (
+              <li key={e.id} className="flex gap-3 text-xs">
+                <time className="w-24 shrink-0 text-neutral-400" dateTime={e.occurred_at}>
+                  {new Intl.DateTimeFormat("fr-CA", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(e.occurred_at))}
+                </time>
+                <div className="min-w-0 flex-1">
+                  <p className="text-neutral-800">
+                    {e.title} <span className={`ml-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${src.className}`}>{src.label}</span>
+                  </p>
+                  {e.detail && <p className="text-neutral-500">{e.detail}</p>}
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+    </div>
+  );
 }
 
 function DocumentSelect({ value, onChange, documents }: { value: string; onChange: (v: string) => void; documents: DocOption[] }) {
@@ -131,7 +250,7 @@ function InvoiceRow({
       <td className="px-3 py-2">
         <input value={number} onChange={(e) => setNumber(e.target.value)} placeholder="N° de facture" className={input} />
       </td>
-      <td className="px-3 py-2">
+      <td className="px-3 py-2" colSpan={2}>
         <DocumentSelect value={docId} onChange={setDocId} documents={documents} />
         {invoice?.document && docId === invoice.document.id && (
           <div className="mt-1"><OpenDocumentButton storagePath={invoice.document.storage_path} filename={invoice.document.filename} /></div>
@@ -204,9 +323,6 @@ function SupplierGroup({ grantProjectId, supplier, documents, clients, claims, i
     requirements !== (supplier.invoice_description_requirements ?? "") ||
     clientId !== (supplier.supplier_client_id ?? "");
 
-  const budgetNumber = supplier.budget_amount != null ? Number(supplier.budget_amount) : null;
-  const left = budgetNumber != null ? budgetNumber - supplier.invoiced : null;
-
   function save() {
     const b = parseAmount(budget);
     const d = day.trim() ? Number(day) : null;
@@ -228,15 +344,16 @@ function SupplierGroup({ grantProjectId, supplier, documents, clients, claims, i
 
   return (
     <>
-      <tr className="border-b border-neutral-100 bg-white">
+      <tr className="border-b border-neutral-100 bg-white align-top">
         <td className="px-3 py-2"><input value={name} onChange={(e) => setName(e.target.value)} className={`${input} font-medium`} aria-label="Nom du fournisseur" /></td>
         <td className="px-3 py-2"><input inputMode="decimal" value={budget} onChange={(e) => setBudget(e.target.value)} placeholder="Budget $" className={input} aria-label="Budget" /></td>
+        <td className="px-3 py-2"><TrackedCell grantProjectId={grantProjectId} supplierId={supplier.id} field="accepted" tracked={supplier.accepted} /></td>
+        <td className="px-3 py-2"><TrackedCell grantProjectId={grantProjectId} supplierId={supplier.id} field="claimed" tracked={supplier.claimed} /></td>
+        <td className={`px-3 py-2 text-sm font-semibold ${supplier.remaining != null && supplier.remaining < 0 ? "text-red-700" : "text-neutral-900"}`}>{money(supplier.remaining)}</td>
         <td className="px-3 py-2 text-xs text-neutral-500">
           {supplier.invoices.length} facture{supplier.invoices.length > 1 ? "s" : ""}
-          {left != null && <span className={left < 0 ? " text-red-700" : ""}> · reste {money(left)} au budget</span>}
+          <div>{money(supplier.invoiced)} facturé</div>
         </td>
-        <td className="px-3 py-2 text-xs text-neutral-400">—</td>
-        <td className="px-3 py-2 text-sm font-semibold text-neutral-900">{money(supplier.invoiced)}</td>
         <td className="px-3 py-2">
           <div className="flex flex-wrap items-center gap-1">
             {dirty && <button onClick={save} disabled={pending} className={`${smallBtn} bg-neutral-900 text-white hover:bg-neutral-800`}>{pending ? "…" : "Enregistrer"}</button>}
@@ -260,7 +377,7 @@ function SupplierGroup({ grantProjectId, supplier, documents, clients, claims, i
       </tr>
       {showDetails && (
         <tr className="border-b border-neutral-100 bg-neutral-50">
-          <td colSpan={6} className="px-3 py-3">
+          <td colSpan={7} className="px-3 py-3">
             <p className="mb-2 text-xs text-neutral-500">
               Informations de facturation. Quand ce fournisseur est un client Apex (ex. Sitegrow), elles sont visibles dans son portail.
             </p>
@@ -275,6 +392,9 @@ function SupplierGroup({ grantProjectId, supplier, documents, clients, claims, i
                   {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </label>
+            </div>
+            <div className="mt-3">
+              <SupplierHistory grantProjectId={grantProjectId} supplierId={supplier.id} />
             </div>
           </td>
         </tr>
@@ -305,7 +425,7 @@ function AddSupplierRow({ grantProjectId }: { grantProjectId: string }) {
     <tr className="bg-neutral-50">
       <td className="px-3 py-2"><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nouveau fournisseur" className={input} /></td>
       <td className="px-3 py-2"><input inputMode="decimal" value={budget} onChange={(e) => setBudget(e.target.value)} placeholder="Budget $" className={input} /></td>
-      <td colSpan={3} className="px-3 py-2 text-xs text-neutral-400">Ajoute un fournisseur, puis ses factures avec « + Facture ».</td>
+      <td colSpan={4} className="px-3 py-2 text-xs text-neutral-400">Ajoute un fournisseur, puis ses factures avec « + Facture ». Le suivi financier (subvention acceptée, réclamé) s&apos;ajuste ensuite dans son tableau.</td>
       <td className="px-3 py-2">
         <button onClick={add} disabled={pending || !name.trim()} className={`${smallBtn} bg-neutral-900 text-white hover:bg-neutral-800`}>{pending ? "…" : "+ Ajouter"}</button>
         {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
@@ -329,46 +449,56 @@ export function SuppliersTable({
   documents: DocOption[];
   clients: ClientOption[];
   claims: ClaimOption[];
-  totals: { budget: number; spent: number };
+  totals: { budget: number; accepted: number; claimed: number; remaining: number };
 }) {
   const choices = suppliers.map((s) => ({ id: s.id, name: s.name }));
   return (
-    <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
-      <table className="w-full min-w-[860px] text-sm">
-        <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
-          <tr>
-            <th className="px-3 py-2 font-medium">Nom</th>
-            <th className="px-3 py-2 font-medium">Budget</th>
-            <th className="px-3 py-2 font-medium">Facture associée</th>
-            <th className="px-3 py-2 font-medium">Date de la facture</th>
-            <th className="px-3 py-2 font-medium">Montant (avant taxes)</th>
-            <th className="px-3 py-2 font-medium" />
-          </tr>
-        </thead>
-        <tbody>
-          {suppliers.map((s, i) => (
-            <SupplierGroup key={s.id} grantProjectId={grantProjectId} supplier={s} documents={documents} clients={clients} claims={claims} isFirst={i === 0} isLast={i === suppliers.length - 1} />
-          ))}
-          {unassigned.length > 0 && (
-            <>
-              <tr className="border-b border-neutral-100 bg-amber-50"><td colSpan={6} className="px-3 py-2 text-xs font-medium text-amber-900">Factures sans fournisseur — choisis le fournisseur de chacune.</td></tr>
-              {unassigned.map((inv) => (
-                <InvoiceRow key={`${inv.id}-${inv.status}`} grantProjectId={grantProjectId} invoice={inv} supplierId={null} documents={documents} claims={claims} supplierChoices={choices} />
-              ))}
-            </>
-          )}
-          <AddSupplierRow grantProjectId={grantProjectId} />
-        </tbody>
-        <tfoot className="border-t border-neutral-200 bg-neutral-50 text-sm">
-          <tr>
-            <td className="px-3 py-2 font-medium text-neutral-700">Total</td>
-            <td className="px-3 py-2 font-medium text-neutral-900">{money(totals.budget)}</td>
-            <td colSpan={2} />
-            <td className="px-3 py-2 font-semibold text-neutral-900">{money(totals.spent)}</td>
-            <td />
-          </tr>
-        </tfoot>
-      </table>
+    <div className="space-y-2">
+      <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
+        <table className="w-full min-w-[1180px] text-sm">
+          <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
+            <tr>
+              <th className="px-3 py-2 font-medium">Nom</th>
+              <th className="px-3 py-2 font-medium">Budget prévu</th>
+              <th className="px-3 py-2 font-medium">Subvention acceptée</th>
+              <th className="px-3 py-2 font-medium">Réclamé à ce jour</th>
+              <th className="px-3 py-2 font-medium">Solde restant</th>
+              <th className="px-3 py-2 font-medium">Factures</th>
+              <th className="px-3 py-2 font-medium" />
+            </tr>
+          </thead>
+          <tbody>
+            {suppliers.map((s, i) => (
+              <SupplierGroup key={s.id} grantProjectId={grantProjectId} supplier={s} documents={documents} clients={clients} claims={claims} isFirst={i === 0} isLast={i === suppliers.length - 1} />
+            ))}
+            {unassigned.length > 0 && (
+              <>
+                <tr className="border-b border-neutral-100 bg-amber-50"><td colSpan={7} className="px-3 py-2 text-xs font-medium text-amber-900">Factures sans fournisseur — choisis le fournisseur de chacune.</td></tr>
+                {unassigned.map((inv) => (
+                  <InvoiceRow key={`${inv.id}-${inv.status}`} grantProjectId={grantProjectId} invoice={inv} supplierId={null} documents={documents} claims={claims} supplierChoices={choices} />
+                ))}
+              </>
+            )}
+            <AddSupplierRow grantProjectId={grantProjectId} />
+          </tbody>
+          <tfoot className="border-t border-neutral-300 bg-neutral-50 text-sm font-semibold text-neutral-900">
+            <tr>
+              <td className="px-3 py-2">TOTAL</td>
+              <td className="px-3 py-2">{money(totals.budget)}</td>
+              <td className="px-3 py-2">{money(totals.accepted)}</td>
+              <td className="px-3 py-2">{money(totals.claimed)}</td>
+              <td className="px-3 py-2">{money(totals.remaining)}</td>
+              <td colSpan={2} />
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <p className="text-xs text-neutral-400">
+        « Subvention acceptée » et « Réclamé à ce jour » se calculent automatiquement (AUTO/CALCULÉE) mais restent modifiables : clique sur le
+        montant pour l&apos;ajuster à la main (MODIFIÉE MANUELLEMENT), puis « Revenir au calcul automatique » pour annuler — la valeur automatique
+        n&apos;est jamais perdue. « Réclamé » vient des réclamations liées aux factures du fournisseur. Ouvre « Détails » sur un fournisseur pour
+        voir l&apos;historique complet de ses modifications (🕐).
+      </p>
     </div>
   );
 }
