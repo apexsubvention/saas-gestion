@@ -16,6 +16,7 @@ import type { ScheduleEntry } from "@/features/schedule/buildScheduleRows";
 import type { PriorityBucket } from "@/features/schedule/priority";
 import { PRIORITY_BUCKET_LABELS, priorityBucketBadgeClass } from "@/features/grants/constants";
 import { markScheduleEntryDoneAction, rescheduleScheduleEntryAction } from "./actions";
+import { DeleteTaskButton } from "./DeleteTaskButton";
 
 // "no_date" n'a pas sa propre colonne (voir le plan : regroupé visuellement dans "Plus
 // tard" pour ne pas ajouter une 7e colonne à un tableau déjà large) -- la vue Priorités
@@ -162,6 +163,11 @@ function KanbanCard({ entry }: { entry: ScheduleEntry }) {
         <p className="mt-1 font-medium text-red-600">
           {entry.missingCount} manquant{entry.missingCount > 1 ? "s" : ""}
         </p>
+      )}
+      {entry.kind === "task" && (
+        <div className="mt-1.5 border-t border-neutral-100 pt-1.5 text-right">
+          <DeleteTaskButton taskId={entry.id} title={entry.title} className="text-[10px] font-medium text-red-500 underline" />
+        </div>
       )}
     </div>
   );

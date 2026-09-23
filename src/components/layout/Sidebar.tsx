@@ -7,21 +7,24 @@ import {
   Landmark,
   CalendarClock,
   Settings,
-  ListChecks,
 } from "lucide-react";
 import type { OrgRole } from "@/lib/permissions";
 
 // « Documents » retiré du menu -- accessible depuis l'onglet Documents de chaque fiche
 // client (voir clients/[id]/ClientTabs.tsx). La page /documents (vue globale tous
 // clients) reste disponible par lien direct, simplement plus dans ce menu.
+//
+// « Mes tâches » et « Échéancier » fusionnés en une seule entrée « Échéanciers & Tâches » --
+// l'ajout/suppression manuelle de tâches se fait maintenant directement sur /echeancier
+// (voir QuickAddTaskForm.tsx). La page /taches reste disponible par lien direct, simplement
+// plus dans ce menu (même traitement que /documents ci-dessus).
 const NAV = [
   { href: "/dashboard", label: "Tableau de bord", icon: LayoutDashboard },
   { href: "/watch", label: "Veille des subventions", icon: Radar },
   { href: "/clients", label: "Clients", icon: Building2 },
   { href: "/grants", label: "Dossiers", icon: FolderKanban },
   { href: "/programs", label: "Programmes", icon: Landmark },
-  { href: "/taches", label: "Mes tâches", icon: ListChecks },
-  { href: "/echeancier", label: "Échéancier", icon: CalendarClock },
+  { href: "/echeancier", label: "Échéanciers & Tâches", icon: CalendarClock },
 ] as const;
 
 export function Sidebar({ role }: { role: OrgRole }) {

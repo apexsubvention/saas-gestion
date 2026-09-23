@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { ScheduleEntry } from "@/features/schedule/buildScheduleRows";
 import { PriorityView } from "./PriorityView";
 import { KanbanBoard } from "./KanbanBoard";
+import { DeleteTaskButton } from "./DeleteTaskButton";
 
 type Tab = "priorities" | "kanban" | "list";
 
@@ -70,12 +71,13 @@ function ListView({ entries }: { entries: ScheduleEntry[] }) {
             <th className="px-4 py-2 font-medium">Client / Dossier</th>
             <th className="px-4 py-2 font-medium">Date</th>
             <th className="px-4 py-2 font-medium">Statut</th>
+            <th className="px-4 py-2 font-medium" />
           </tr>
         </thead>
         <tbody>
           {sorted.length === 0 && (
             <tr>
-              <td colSpan={5} className="px-4 py-8 text-center text-neutral-400">
+              <td colSpan={6} className="px-4 py-8 text-center text-neutral-400">
                 Rien pour l&apos;instant.
               </td>
             </tr>
@@ -107,6 +109,7 @@ function ListView({ entries }: { entries: ScheduleEntry[] }) {
                   {entry.statusLabel}
                 </span>
               </td>
+              <td className="px-4 py-2 text-right">{entry.kind === "task" && <DeleteTaskButton taskId={entry.id} title={entry.title} />}</td>
             </tr>
           ))}
         </tbody>

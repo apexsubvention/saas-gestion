@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { ScheduleEntry } from "@/features/schedule/buildScheduleRows";
 import { PRIORITY_BUCKET_ORDER, type PriorityBucket } from "@/features/schedule/priority";
 import { PRIORITY_BUCKET_LABELS, priorityBucketBadgeClass } from "@/features/grants/constants";
+import { DeleteTaskButton } from "./DeleteTaskButton";
 
 const KIND_LABELS: Record<ScheduleEntry["kind"], string> = { task: "Tâche", milestone: "Échéance", claim: "Réclamation" };
 const KIND_BADGE: Record<ScheduleEntry["kind"], string> = {
@@ -114,6 +115,11 @@ function EntryCard({ entry }: { entry: ScheduleEntry }) {
           </span>
         )}
       </div>
+      {entry.kind === "task" && (
+        <div className="mt-2 border-t border-neutral-100 pt-2 text-right">
+          <DeleteTaskButton taskId={entry.id} title={entry.title} />
+        </div>
+      )}
     </Link>
   );
 }
