@@ -121,6 +121,9 @@ export default async function GrantProjectPage({ params, searchParams }: { param
           <Link href={`/grants/${project.id}/redaction`} className="inline-block rounded-md border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-100">
             Aide à la rédaction →
           </Link>
+          <Link href={`/grants/${project.id}/facturation`} className="inline-block rounded-md border border-purple-200 bg-purple-50 px-3 py-1.5 text-sm font-medium text-purple-700 hover:bg-purple-100">
+            Aide à la facturation →
+          </Link>
           {/(pari|irap)/i.test(project.grant_programs?.name ?? "") && (
             <Link href={`/grants/${project.id}/ddr`} className="inline-block rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-100">
               DDR (PARI CNRC) →

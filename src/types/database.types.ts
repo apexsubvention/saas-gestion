@@ -330,6 +330,123 @@ export type Database = {
           },
         ]
       }
+      billing_installments: {
+        Row: {
+          amount: number
+          created_at: string
+          generated_by: string
+          grant_project_id: string
+          id: string
+          installment_number: number
+          invoice_description: string | null
+          organization_id: string
+          period_end: string
+          period_start: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          generated_by?: string
+          grant_project_id: string
+          id?: string
+          installment_number: number
+          invoice_description?: string | null
+          organization_id: string
+          period_end: string
+          period_start: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          generated_by?: string
+          grant_project_id?: string
+          id?: string
+          installment_number?: number
+          invoice_description?: string | null
+          organization_id?: string
+          period_end?: string
+          period_start?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_installments_grant_project_id_fkey"
+            columns: ["grant_project_id"]
+            isOneToOne: false
+            referencedRelation: "grant_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_installments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_line_items: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string | null
+          grant_project_id: string
+          hours: number | null
+          id: string
+          label: string
+          organization_id: string
+          position: number
+          source: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          description?: string | null
+          grant_project_id: string
+          hours?: number | null
+          id?: string
+          label: string
+          organization_id: string
+          position?: number
+          source?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string | null
+          grant_project_id?: string
+          hours?: number | null
+          id?: string
+          label?: string
+          organization_id?: string
+          position?: number
+          source?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_line_items_grant_project_id_fkey"
+            columns: ["grant_project_id"]
+            isOneToOne: false
+            referencedRelation: "grant_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_line_items_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       budget_lines: {
         Row: {
           approved_amount: number
