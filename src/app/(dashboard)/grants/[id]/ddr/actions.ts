@@ -13,21 +13,38 @@ import { logDossierEvent } from "@/server/services/audit";
 
 export type DdrActionResult = { error: string | null; ok?: boolean };
 
-async function loadDdrContext(grantProjectId: string) {
+type DdrContext = {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  project: any;
+  clientName: string;
+  programName: string;
+  projectStart: string | null;
+  projectEnd: string | null;
+};
+
+// Union discriminée par `ok` -- plus fiable qu'un `"error" in context` pour que TypeScript
+// distingue correctement les deux branches (l'inférence d'un type de retour à la volée à travers
+// plusieurs `return` d'objets différents peut sinon laisser passer un `| undefined` inattendu).
+type DdrContextResult = { ok: true; context: DdrContext } | { ok: false; error: string };
+
+async function loadDdrContext(grantProjectId: string): Promise<DdrContextResult> {
   const supabase = await createClient();
   const project: any = await grantProjectsService(supabase).get(grantProjectId);
-  if (!project) return { error: "Dossier introuvable." as const };
+  if (!project) return { ok: false, error: "Dossier introuvable." };
   const agreements = await grantAgreementsService(supabase).listByProject(grantProjectId);
   const agreement = agreements[0] ?? null;
   const projectStart = agreement?.project_start ?? project.official_start_date ?? null;
   const projectEnd = agreement?.project_end ?? project.official_end_date ?? null;
   return {
-    supabase,
-    project,
-    clientName: project.clients?.name ?? "Client",
-    programName: project.grant_programs?.name ?? "Programme",
-    projectStart,
-    projectEnd,
+    ok: true,
+    context: {
+      supabase,
+      project,
+      clientName: project.clients?.name ?? "Client",
+      programName: project.grant_programs?.name ?? "Programme",
+      projectStart,
+      projectEnd,
+    },
   };
 }
 
@@ -74,8 +91,9 @@ export async function generateDdrScheduleAction(grantProjectId: string, _prev: D
   const parsedCount = countSchema.safeParse(formData.get("count"));
   if (!parsedCount.success) return { error: parsedCount.error.issues[0]?.message ?? "Nombre de DDR invalide." };
 
-  const context = await loadDdrContext(grantProjectId);
-  if ("error" in context) return { error: context.error };
+  const result = await loadDdrContext(grantProjectId);
+  if (!result.ok) return { error: result.error };
+  const context = result.context;
   if (!context.projectStart || !context.projectEnd) return { error: "Les dates de début et de fin du projet doivent être connues (entente ou dossier) avant de générer les DDR." };
 
   try {
@@ -111,8 +129,9 @@ export async function regenerateDdrRemainingAction(grantProjectId: string, _prev
   const parsedCount = countSchema.safeParse(formData.get("count"));
   if (!parsedCount.success) return { error: parsedCount.error.issues[0]?.message ?? "Nombre de DDR invalide." };
 
-  const context = await loadDdrContext(grantProjectId);
-  if ("error" in context) return { error: context.error };
+  const result = await loadDdrContext(grantProjectId);
+  if (!result.ok) return { error: result.error };
+  const context = result.context;
   if (!context.projectEnd) return { error: "La date de fin du projet doit être connue (entente ou dossier)." };
 
   try {
