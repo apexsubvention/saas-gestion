@@ -83,7 +83,9 @@ export function DdrReportCard({ grantProjectId, report }: { grantProjectId: stri
 
   function remove() {
     if (!confirm(`Supprimer le DDR ${report.ddr_number} ?`)) return;
-    startTransition(() => deleteDdrReportAction(grantProjectId, report.id));
+    startTransition(async () => {
+      await deleteDdrReportAction(grantProjectId, report.id);
+    });
   }
 
   const fullText = [
