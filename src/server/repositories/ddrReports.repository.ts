@@ -67,20 +67,20 @@ export function ddrReportsRepository(supabase: SupabaseClient) {
         .eq("grant_project_id", grantProjectId)
         .order("ddr_number", { ascending: true });
       if (error) throw error;
-      return data as DdrReportRow[];
+      return data as unknown as DdrReportRow[];
     },
 
     async insertMany(rows: DdrReportInsert[]): Promise<DdrReportRow[]> {
       if (rows.length === 0) return [];
       const { data, error } = await supabase.from("ddr_reports").insert(rows).select();
       if (error) throw error;
-      return data as DdrReportRow[];
+      return data as unknown as DdrReportRow[];
     },
 
     async update(id: string, patch: DdrReportUpdate): Promise<DdrReportRow> {
       const { data, error } = await supabase.from("ddr_reports").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", id).select().single();
       if (error) throw error;
-      return data as DdrReportRow;
+      return data as unknown as DdrReportRow;
     },
 
     async remove(id: string): Promise<number> {

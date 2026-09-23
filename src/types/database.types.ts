@@ -2096,6 +2096,7 @@ export type Database = {
           client_id: string
           created_at: string
           description: string | null
+          external_project_number: string | null
           grant_rate: number | null
           health_score: number | null
           id: string
@@ -2116,6 +2117,7 @@ export type Database = {
           client_id: string
           created_at?: string
           description?: string | null
+          external_project_number?: string | null
           grant_rate?: number | null
           health_score?: number | null
           id?: string
@@ -2136,6 +2138,7 @@ export type Database = {
           client_id?: string
           created_at?: string
           description?: string | null
+          external_project_number?: string | null
           grant_rate?: number | null
           health_score?: number | null
           id?: string
@@ -2177,6 +2180,135 @@ export type Database = {
             columns: ["program_id"]
             isOneToOne: false
             referencedRelation: "grant_programs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      grant_project_objectives: {
+        Row: {
+          created_at: string
+          grant_project_id: string
+          id: string
+          label: string
+          organization_id: string
+          position: number
+        }
+        Insert: {
+          created_at?: string
+          grant_project_id: string
+          id?: string
+          label: string
+          organization_id: string
+          position?: number
+        }
+        Update: {
+          created_at?: string
+          grant_project_id?: string
+          id?: string
+          label?: string
+          organization_id?: string
+          position?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grant_project_objectives_grant_project_id_fkey"
+            columns: ["grant_project_id"]
+            isOneToOne: false
+            referencedRelation: "grant_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grant_project_objectives_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ddr_reports: {
+        Row: {
+          activities_text: string | null
+          address_changed: boolean
+          company_name_changed: boolean
+          created_at: string
+          ddr_number: number
+          delay_justification: string | null
+          generated_by: string
+          grant_project_id: string
+          id: string
+          new_end_date: string | null
+          objectives_snapshot: Json
+          on_schedule: boolean
+          organization_id: string
+          period_end: string
+          period_start: string
+          prepared_by_name: string | null
+          prepared_by_title: string | null
+          signature_date: string | null
+          status: string
+          updated_at: string
+          variations_text: string | null
+        }
+        Insert: {
+          activities_text?: string | null
+          address_changed?: boolean
+          company_name_changed?: boolean
+          created_at?: string
+          ddr_number: number
+          delay_justification?: string | null
+          generated_by?: string
+          grant_project_id: string
+          id?: string
+          new_end_date?: string | null
+          objectives_snapshot?: Json
+          on_schedule?: boolean
+          organization_id: string
+          period_end: string
+          period_start: string
+          prepared_by_name?: string | null
+          prepared_by_title?: string | null
+          signature_date?: string | null
+          status?: string
+          updated_at?: string
+          variations_text?: string | null
+        }
+        Update: {
+          activities_text?: string | null
+          address_changed?: boolean
+          company_name_changed?: boolean
+          created_at?: string
+          ddr_number?: number
+          delay_justification?: string | null
+          generated_by?: string
+          grant_project_id?: string
+          id?: string
+          new_end_date?: string | null
+          objectives_snapshot?: Json
+          on_schedule?: boolean
+          organization_id?: string
+          period_end?: string
+          period_start?: string
+          prepared_by_name?: string | null
+          prepared_by_title?: string | null
+          signature_date?: string | null
+          status?: string
+          updated_at?: string
+          variations_text?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ddr_reports_grant_project_id_fkey"
+            columns: ["grant_project_id"]
+            isOneToOne: false
+            referencedRelation: "grant_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ddr_reports_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
