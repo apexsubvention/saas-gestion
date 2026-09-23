@@ -10,6 +10,7 @@ export type DocumentRow = {
   category: string;
   client_id: string | null;
   grant_project_id: string | null;
+  source: string;
   created_at: string;
 };
 
@@ -33,6 +34,19 @@ export function documentsRepository(supabase: SupabaseClient) {
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data as DocumentRow[];
+    },
+
+    // Bibliothèque de documents du portail (0045) : AUCUN filtre par client ici -- la RLS
+    // (documents_select_portal_full -> can_access_client/can_access_grant_project) filtre
+    // déjà au client du compte portail et à ses clients enfants (hiérarchie, cf. 0028).
+    // Même principe que grantProjectsRepository.list() côté portalDossiers.service.ts.
+    async listAllAccessible(): Promise<Array<DocumentRow & { clients: { name: string } | null; grant_projects: { name: string } | null }>> {
+      const { data, error } = await supabase
+        .from("documents")
+        .select("*, clients(name), grant_projects(name)")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data as any;
     },
 
     async create(input: {

@@ -116,3 +116,32 @@ export async function uploadRequestedDocumentAction(
   revalidatePath("/portal");
   return { error: null };
 }
+
+// Lien signé pour un document de la bibliothèque (0045). documents_select_portal_full
+// permet maintenant au compte portail de lire la LIGNE "documents" (métadonnées) --
+// mais la lecture du FICHIER dans le stockage suit une policy séparée
+// (apex_documents_read, 0033) qui ne couvre le portail que sur un autre chemin
+// (program-links), pas {organisation}/{client}/... utilisé pour ces documents-ci. Même
+// principe que le reste du portail : on vérifie l'accès avec le client normal (RLS sur
+// la table), puis on génère l'URL signée avec le client admin.
+export async function getPortalDocumentUrlAction(documentId: string): Promise<{ url: string | null; error: string | null }> {
+  await requirePortalContext();
+  const supabase = await createClient();
+  const { data: doc, error: findError } = await supabase
+    .from("documents")
+    .select("id, storage_path")
+    .eq("id", documentId)
+    .maybeSingle();
+  if (findError || !doc) {
+    return { url: null, error: "Document introuvable ou accès refusé." };
+  }
+
+  const admin = createAdminClient();
+  try {
+    const { data, error } = await admin.storage.from(BUCKET).createSignedUrl(doc.storage_path, 300);
+    if (error) throw error;
+    return { url: data.signedUrl, error: null };
+  } catch (e) {
+    return { url: null, error: formatCaughtError(e) };
+  }
+}
