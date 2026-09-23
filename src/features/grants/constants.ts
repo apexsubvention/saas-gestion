@@ -252,6 +252,43 @@ export function claimRequirementStatusBadgeClass(status: string): string {
   }
 }
 
+// Étiquettes françaises pour document_requests.status (voir 0009_document_requests_links.sql).
+// Mêmes statuts que claim_requirements sauf le premier ("not_requested" plutôt que
+// "missing") : ensembles distincts, labels distincts.
+export const DOCUMENT_REQUEST_STATUS_LABELS: Record<string, string> = {
+  not_requested: "Non demandé",
+  requested: "Demandé",
+  received: "Reçu — à valider",
+  validated: "Validé",
+  not_required: "Non requis",
+  issue: "Problème",
+};
+
+export const DOCUMENT_REQUEST_STATUS_OPTIONS: Array<{ value: string; label: string }> = [
+  "requested",
+  "received",
+  "validated",
+  "issue",
+  "not_required",
+].map((value) => ({ value, label: DOCUMENT_REQUEST_STATUS_LABELS[value] ?? value }));
+
+export function documentRequestStatusBadgeClass(status: string): string {
+  switch (status) {
+    case "validated":
+      return "bg-emerald-50 text-emerald-700";
+    case "received":
+      return "bg-indigo-50 text-indigo-700";
+    case "requested":
+      return "bg-amber-50 text-amber-800";
+    case "issue":
+      return "bg-red-50 text-red-700";
+    case "not_required":
+      return "bg-neutral-100 text-neutral-500";
+    default:
+      return "bg-slate-100 text-slate-600";
+  }
+}
+
 // Étiquettes/couleurs pour les seaux d'urgence de l'échéancier (voir
 // src/features/schedule/priority.ts) -- utilisées par les vues Priorités et Kanban.
 export const PRIORITY_BUCKET_LABELS: Record<string, string> = {

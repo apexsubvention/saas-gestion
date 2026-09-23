@@ -6,14 +6,41 @@
 // d'un coup, surtout utile pour un compte parent qui voit aussi les dossiers de ses
 // clients enfants (hiérarchie, cf. 0028).
 import { useState } from "react";
-import type { PortalDossier } from "@/server/services/portalDossiers.service";
+import type { PortalDossier, PortalDocumentRequestView } from "@/server/services/portalDossiers.service";
 import {
   CLAIM_STATUS_LABELS,
   claimStatusBadgeClass,
   CLAIM_REQUIREMENT_STATUS_LABELS,
   claimRequirementStatusBadgeClass,
+  documentRequestStatusBadgeClass,
   grantProjectStatusBadgeClass,
 } from "@/features/grants/constants";
+import { DocumentRequestUpload } from "./DocumentRequestUpload";
+
+// Un document demandé se réaffiche avec son formulaire de téléversement tant qu'il
+// n'est pas validé par le personnel -- "issue" (problème signalé) permet donc bien de
+// renvoyer un fichier corrigé, pas seulement "requested" (première fois).
+const UPLOADABLE_STATUSES = ["requested", "issue"];
+
+function DocumentRequestItem({ request }: { request: PortalDocumentRequestView }) {
+  return (
+    <div className="rounded-md border border-neutral-100 p-3 text-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="font-medium text-neutral-900">{request.title}</span>
+        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${documentRequestStatusBadgeClass(request.status)}`}>
+          {request.statusLabel}
+        </span>
+      </div>
+      {request.instructions && <p className="mt-1 text-xs text-neutral-500">{request.instructions}</p>}
+      {request.dueDate && <p className="mt-1 text-xs text-neutral-500">Échéance : {formatDate(request.dueDate)}</p>}
+      {UPLOADABLE_STATUSES.includes(request.status) ? (
+        <DocumentRequestUpload requestId={request.id} filename={request.filename} />
+      ) : (
+        request.filename && <p className="mt-2 text-xs text-emerald-700">Reçu : {request.filename}</p>
+      )}
+    </div>
+  );
+}
 
 const REDACTION_STAGE_LABELS: Record<PortalDossier["redaction"][number]["stage"], string> = {
   final: "Texte final",
@@ -45,6 +72,10 @@ function formatAmount(amount: number | null): string {
 export function DossierCard({ dossier }: { dossier: PortalDossier }) {
   const [expanded, setExpanded] = useState(false);
   const openRequirementsCount = dossier.claims.reduce((sum, c) => sum + c.openRequirements.length, 0);
+  const actionableRequestsCount =
+    dossier.documentRequests.filter((r) => UPLOADABLE_STATUSES.includes(r.status)).length +
+    dossier.claims.reduce((sum, c) => sum + c.documentRequests.filter((r) => UPLOADABLE_STATUSES.includes(r.status)).length, 0);
+  const toProvideCount = openRequirementsCount + actionableRequestsCount;
 
   return (
     <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
@@ -67,9 +98,9 @@ export function DossierCard({ dossier }: { dossier: PortalDossier }) {
         </div>
         <div className="flex items-center gap-4 text-xs text-neutral-500">
           <span>{dossier.claims.length} réclamation{dossier.claims.length !== 1 ? "s" : ""}</span>
-          {openRequirementsCount > 0 && (
+          {toProvideCount > 0 && (
             <span className="rounded-full bg-amber-50 px-2 py-0.5 font-medium text-amber-800">
-              {openRequirementsCount} à fournir
+              {toProvideCount} à fournir
             </span>
           )}
           <span>{expanded ? "Réduire ▲" : "Détails ▼"}</span>
@@ -130,6 +161,14 @@ export function DossierCard({ dossier }: { dossier: PortalDossier }) {
                         ))}
                       </div>
                     )}
+                    {c.documentRequests.length > 0 && (
+                      <div className="mt-2 space-y-2 border-t border-neutral-100 pt-2">
+                        <p className="text-xs font-medium text-neutral-500">Fichiers demandés</p>
+                        {c.documentRequests.map((r) => (
+                          <DocumentRequestItem key={r.id} request={r} />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -137,6 +176,17 @@ export function DossierCard({ dossier }: { dossier: PortalDossier }) {
               <p className="text-sm text-neutral-400">Aucune réclamation pour l&apos;instant.</p>
             )}
           </div>
+
+          {dossier.documentRequests.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Documents demandés</h3>
+              <div className="space-y-2">
+                {dossier.documentRequests.map((r) => (
+                  <DocumentRequestItem key={r.id} request={r} />
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="space-y-2">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Texte rédigé — pour révision</h3>

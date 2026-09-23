@@ -2,20 +2,25 @@ import { requirePortalContext } from "@/lib/portal/auth";
 import { createClient } from "@/lib/supabase/server";
 import { projectSuppliersService } from "@/server/services/projectSuppliers.service";
 import { portalDossiersService } from "@/server/services/portalDossiers.service";
-import { DossierCard } from "./DossierCard";
+import { DossiersList } from "./DossiersList";
 
 // Page d'accueil du portail : « Mes dossiers » -- pour chaque dossier accessible à ce
 // compte (le sien, et ceux de ses clients enfants s'il en a -- hiérarchie, cf. 0028),
-// une carte dépliable avec statut/dates, réclamations (+ documents à fournir) et le
-// texte rédigé du questionnaire, pour révision. Voir portalDossiers.service.ts : la RLS
-// (can_access_client / can_access_grant_project, étendue en lecture au questionnaire
-// par 0044) filtre déjà tout aux dossiers réellement accessibles, sans filtre ici.
+// une carte dépliable avec statut/dates, réclamations (+ documents à fournir), documents
+// demandés (téléversables) et le texte rédigé du questionnaire, pour révision. Voir
+// portalDossiers.service.ts : la RLS (can_access_client / can_access_grant_project,
+// étendue en lecture au questionnaire par 0044) filtre déjà tout aux dossiers réellement
+// accessibles, sans filtre ici -- le service filtre seulement les dossiers refusés
+// (Jade : un dossier refusé n'a plus sa place au quotidien dans le portail).
 //
 // La section « Facturation à préparer » (fournisseur) est un besoin différent -- ce
 // client facture pour le dossier d'UN AUTRE client (ex. Sitegrow facture pour ses
 // propres clients finaux, via project_suppliers.supplier_client_id, pas forcément un
 // lien de hiérarchie parent/enfant) -- donc conservée comme section distincte plutôt
 // que fusionnée dans les cartes de dossiers ci-dessus.
+const UPLOADABLE_STATUSES = ["requested", "issue"];
+const ACTIVE_CLAIM_STATUSES_EXCLUDED = ["paid", "rejected"];
+
 export default async function PortalHomePage() {
   const ctx = await requirePortalContext();
   const supabase = await createClient();
@@ -24,6 +29,19 @@ export default async function PortalHomePage() {
     portalDossiersService(supabase).listDossiers(),
     projectSuppliersService(supabase).listBySupplierClient(ctx.clientId),
   ]);
+
+  const upcomingClaims = dossiers.reduce(
+    (sum, d) => sum + d.claims.filter((c) => !ACTIVE_CLAIM_STATUSES_EXCLUDED.includes(c.status)).length,
+    0
+  );
+  const toProvideCount = dossiers.reduce((sum, d) => {
+    const projectLevel = d.documentRequests.filter((r) => UPLOADABLE_STATUSES.includes(r.status)).length;
+    const perClaim = d.claims.reduce(
+      (s, c) => s + c.openRequirements.length + c.documentRequests.filter((r) => UPLOADABLE_STATUSES.includes(r.status)).length,
+      0
+    );
+    return sum + projectLevel + perClaim;
+  }, 0);
 
   return (
     <div className="space-y-8">
@@ -35,15 +53,15 @@ export default async function PortalHomePage() {
         </p>
       </div>
 
-      <div className="space-y-3">
-        {dossiers.length > 0 ? (
-          dossiers.map((d) => <DossierCard key={d.id} dossier={d} />)
-        ) : (
-          <div className="rounded-lg border border-neutral-200 bg-white px-4 py-8 text-center text-sm text-neutral-400">
-            Aucun dossier pour l&apos;instant — ton contact chez Apex n&apos;a pas encore ajouté de dossier.
-          </div>
-        )}
-      </div>
+      {dossiers.length > 0 && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <SummaryTile label="Dossiers actifs" value={dossiers.length} />
+          <SummaryTile label="Réclamations en cours" value={upcomingClaims} />
+          <SummaryTile label="Éléments à fournir" value={toProvideCount} highlight={toProvideCount > 0} />
+        </div>
+      )}
+
+      <DossiersList dossiers={dossiers} />
 
       {supplierRows && supplierRows.length > 0 && (
         <div className="space-y-3">
@@ -86,6 +104,15 @@ export default async function PortalHomePage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function SummaryTile({ label, value, highlight }: { label: string; value: number; highlight?: boolean }) {
+  return (
+    <div className={`rounded-lg border p-3 ${highlight ? "border-amber-200 bg-amber-50" : "border-neutral-200 bg-white"}`}>
+      <p className={`text-xl font-semibold ${highlight ? "text-amber-800" : "text-neutral-900"}`}>{value}</p>
+      <p className={`text-xs ${highlight ? "text-amber-700" : "text-neutral-500"}`}>{label}</p>
     </div>
   );
 }

@@ -87,6 +87,25 @@ export function documentsRepository(supabase: SupabaseClient) {
       if (error) throw error;
     },
 
+    // Documents rattachés à des demandes de document (document_links.entity_type =
+    // 'document_request') -- même principe que listInvoiceLinks : une seule requête
+    // groupée pour tout le dossier plutôt qu'un aller-retour par demande.
+    async listDocumentRequestLinks(requestIds: string[]): Promise<Array<{ request_id: string; document_id: string; filename: string; storage_path: string }>> {
+      if (requestIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from("document_links")
+        .select("entity_id, document_id, documents(filename, storage_path)")
+        .eq("entity_type", "document_request")
+        .in("entity_id", requestIds);
+      if (error) throw error;
+      return (data ?? []).map((row: any) => ({
+        request_id: row.entity_id,
+        document_id: row.document_id,
+        filename: row.documents?.filename ?? "",
+        storage_path: row.documents?.storage_path ?? "",
+      }));
+    },
+
     async linkToEntity(input: {
       document_id: string;
       entity_type: "expense_invoice" | "expense_payment_proof" | "document_request" | "claim_requirement" | "claim" | "grant_agreement" | "application_answer";

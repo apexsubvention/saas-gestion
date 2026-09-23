@@ -10,6 +10,8 @@ import { milestonesService } from "@/server/services/milestones.service";
 import { projectSuppliersService } from "@/server/services/projectSuppliers.service";
 import { clientsService } from "@/server/services/clients.service";
 import { claimRequirementsService } from "@/server/services/claimRequirements.service";
+import { documentRequestsService } from "@/server/services/documentRequests.service";
+import { documentsRepository } from "@/server/repositories/documents.repository";
 import { buildScheduleRows } from "@/features/schedule/buildScheduleRows";
 import { StatusSelect } from "./StatusSelect";
 import { UploadProjectDocumentForm } from "./UploadProjectDocumentForm";
@@ -30,6 +32,8 @@ import { computeSubsidy, resolveSubsidyInputs } from "@/features/grants/subsidyM
 import { grantAgreementsService } from "@/server/services/grantAgreements.service";
 import { NewSupplierForm } from "./NewSupplierForm";
 import { DeleteGrantProjectButton } from "../DeleteGrantProjectButton";
+import { NewDocumentRequestForm } from "./NewDocumentRequestForm";
+import { DocumentRequestsList, type DocumentRequestListItem } from "./DocumentRequestsList";
 import { DOCUMENT_CATEGORY_LABELS } from "@/features/grants/constants";
 
 // Le téléversement d'une facture déclenche sa lecture automatique (jusqu'à ~1 min).
@@ -93,6 +97,27 @@ export default async function GrantProjectPage({ params, searchParams }: { param
   const missingCountByClaimId = await claimRequirementsService(supabase).countOpenByClaimIds(
     claims.map((c) => c.id)
   );
+
+  // Documents demandés au client (téléversés depuis le portail -- voir
+  // src/app/(portal)/portal/(app)/actions.ts) : une seule requête groupée pour associer
+  // le fichier reçu, s'il y en a un, à chaque demande.
+  const documentRequests = await documentRequestsService(supabase).listByProject(params.id);
+  const requestLinks = await documentsRepository(supabase).listDocumentRequestLinks(documentRequests.map((r) => r.id));
+  const linkByRequestId = new Map(requestLinks.map((l) => [l.request_id, l]));
+  const claimLabelById = new Map(claims.map((c) => [c.id, c.claim_number || `Réclamation (${c.period_start ?? "—"})`]));
+  const documentRequestItems: DocumentRequestListItem[] = documentRequests.map((r) => {
+    const file = linkByRequestId.get(r.id);
+    return {
+      id: r.id,
+      title: r.title,
+      instructions: r.instructions,
+      documentType: r.document_type,
+      dueDate: r.due_date,
+      status: r.status,
+      claimLabel: r.claim_id ? (claimLabelById.get(r.claim_id) ?? null) : null,
+      file: file ? { filename: file.filename, storagePath: file.storage_path } : null,
+    };
+  });
   const scheduleEntries = buildScheduleRows({
     tasks,
     milestones,
@@ -210,6 +235,24 @@ export default async function GrantProjectPage({ params, searchParams }: { param
                   existe déjà en format papier ou courriel.
                 </p>
               )}
+            </div>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-sm font-semibold text-neutral-900">Documents demandés au client</h2>
+            <p className="text-xs text-neutral-500">
+              Demande un document précis (lettre, facture, preuve de paiement...) — visible et téléversable
+              depuis le portail du client, pour un dépôt de programme ou pour une réclamation précise.
+            </p>
+            <div className="rounded-lg border border-neutral-200 bg-white p-4">
+              <NewDocumentRequestForm
+                grantProjectId={project.id}
+                clientId={project.client_id}
+                claims={claims.map((c) => ({ id: c.id, label: c.claim_number || `Réclamation (${c.period_start ?? "—"})` }))}
+              />
+            </div>
+            <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+              <DocumentRequestsList grantProjectId={project.id} items={documentRequestItems} />
             </div>
           </section>
 
