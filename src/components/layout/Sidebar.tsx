@@ -5,20 +5,21 @@ import {
   Building2,
   FolderKanban,
   Landmark,
-  FileText,
   CalendarClock,
   Settings,
   ListChecks,
 } from "lucide-react";
 import type { OrgRole } from "@/lib/permissions";
 
+// « Documents » retiré du menu -- accessible depuis l'onglet Documents de chaque fiche
+// client (voir clients/[id]/ClientTabs.tsx). La page /documents (vue globale tous
+// clients) reste disponible par lien direct, simplement plus dans ce menu.
 const NAV = [
   { href: "/dashboard", label: "Tableau de bord", icon: LayoutDashboard },
   { href: "/watch", label: "Veille des subventions", icon: Radar },
   { href: "/clients", label: "Clients", icon: Building2 },
   { href: "/grants", label: "Dossiers", icon: FolderKanban },
   { href: "/programs", label: "Programmes", icon: Landmark },
-  { href: "/documents", label: "Documents", icon: FileText },
   { href: "/taches", label: "Mes tâches", icon: ListChecks },
   { href: "/echeancier", label: "Échéancier", icon: CalendarClock },
 ] as const;
