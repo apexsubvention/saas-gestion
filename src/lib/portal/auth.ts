@@ -11,6 +11,12 @@ export type PortalContext = {
   clientId: string;
   clientName: string;
   fullName: string | null;
+  // organization_users.id de ce compte (role = 'client') -- nécessaire pour toute
+  // écriture RLS qui utilise current_org_user_id()/author_org_user_id (ex. dossier_notes,
+  // 0046). Normalement toujours présent (chaque compte portail a une ligne
+  // organization_users en plus de sa ligne client_portal_users -- voir 0028) ; nullable
+  // ici par prudence défensive seulement.
+  organizationUserId: string | null;
 };
 
 export async function requirePortalContext(): Promise<PortalContext> {
@@ -36,7 +42,7 @@ export async function requirePortalContext(): Promise<PortalContext> {
 
   const { data: orgUser } = await supabase
     .from("organization_users")
-    .select("full_name")
+    .select("id, full_name")
     .eq("user_id", user.id)
     .eq("organization_id", portalUser.organization_id)
     .maybeSingle();
@@ -47,5 +53,6 @@ export async function requirePortalContext(): Promise<PortalContext> {
     clientId: portalUser.client_id,
     clientName: (portalUser as unknown as { clients: { name: string } | null }).clients?.name ?? "",
     fullName: orgUser?.full_name ?? null,
+    organizationUserId: orgUser?.id ?? null,
   };
 }

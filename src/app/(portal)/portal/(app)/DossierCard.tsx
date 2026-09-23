@@ -16,6 +16,7 @@ import {
   grantProjectStatusBadgeClass,
 } from "@/features/grants/constants";
 import { DocumentRequestUpload } from "./DocumentRequestUpload";
+import { PortalNotes } from "./PortalNotes";
 
 // Un document demandé se réaffiche avec son formulaire de téléversement tant qu'il
 // n'est pas validé par le personnel -- "issue" (problème signalé) permet donc bien de
@@ -69,7 +70,7 @@ function formatAmount(amount: number | null): string {
   return `${Number(amount).toLocaleString("fr-CA", { minimumFractionDigits: 2 })} $`;
 }
 
-export function DossierCard({ dossier }: { dossier: PortalDossier }) {
+export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDossier; currentOrgUserId: string | null }) {
   const [expanded, setExpanded] = useState(false);
   const openRequirementsCount = dossier.claims.reduce((sum, c) => sum + c.openRequirements.length, 0);
   const actionableRequestsCount =
@@ -208,6 +209,8 @@ export function DossierCard({ dossier }: { dossier: PortalDossier }) {
               <p className="text-sm text-neutral-400">Rien de rédigé pour l&apos;instant.</p>
             )}
           </div>
+
+          <PortalNotes grantProjectId={dossier.id} clientId={dossier.clientId} notes={dossier.notes} currentOrgUserId={currentOrgUserId} />
         </div>
       )}
     </div>

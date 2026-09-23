@@ -11,7 +11,7 @@ function normalize(s: string): string {
   return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 }
 
-export function DossiersList({ dossiers }: { dossiers: PortalDossier[] }) {
+export function DossiersList({ dossiers, currentOrgUserId }: { dossiers: PortalDossier[]; currentOrgUserId: string | null }) {
   const [query, setQuery] = useState("");
 
   const filtered = useMemo(() => {
@@ -34,7 +34,7 @@ export function DossiersList({ dossiers }: { dossiers: PortalDossier[] }) {
         />
       )}
       {filtered.length > 0 ? (
-        filtered.map((d) => <DossierCard key={d.id} dossier={d} />)
+        filtered.map((d) => <DossierCard key={d.id} dossier={d} currentOrgUserId={currentOrgUserId} />)
       ) : (
         <div className="rounded-lg border border-neutral-200 bg-white px-4 py-8 text-center text-sm text-neutral-400">
           {dossiers.length === 0

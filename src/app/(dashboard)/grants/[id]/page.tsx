@@ -35,6 +35,8 @@ import { DeleteGrantProjectButton } from "../DeleteGrantProjectButton";
 import { NewDocumentRequestForm } from "./NewDocumentRequestForm";
 import { DocumentRequestsList, type DocumentRequestListItem } from "./DocumentRequestsList";
 import { DOCUMENT_CATEGORY_LABELS } from "@/features/grants/constants";
+import { dossierNotesService } from "@/server/services/dossierNotes.service";
+import { DossierNotes } from "./DossierNotes";
 
 // Le téléversement d'une facture déclenche sa lecture automatique (jusqu'à ~1 min).
 export const maxDuration = 60;
@@ -102,6 +104,7 @@ export default async function GrantProjectPage({ params, searchParams }: { param
   // src/app/(portal)/portal/(app)/actions.ts) : une seule requête groupée pour associer
   // le fichier reçu, s'il y en a un, à chaque demande.
   const documentRequests = await documentRequestsService(supabase).listByProject(params.id);
+  const dossierNotes = await dossierNotesService(supabase).listByProject(params.id);
   const requestLinks = await documentsRepository(supabase).listDocumentRequestLinks(documentRequests.map((r) => r.id));
   const linkByRequestId = new Map(requestLinks.map((l) => [l.request_id, l]));
   const claimLabelById = new Map(claims.map((c) => [c.id, c.claim_number || `Réclamation (${c.period_start ?? "—"})`]));
@@ -255,6 +258,8 @@ export default async function GrantProjectPage({ params, searchParams }: { param
               <DocumentRequestsList grantProjectId={project.id} items={documentRequestItems} />
             </div>
           </section>
+
+          <DossierNotes grantProjectId={project.id} clientId={project.client_id} notes={dossierNotes} />
 
           <section className="space-y-3">
             <h2 className="text-sm font-semibold text-neutral-900">Fournisseurs et factures</h2>

@@ -9,6 +9,7 @@ import {
 import { documentRequestsRepository, type DocumentRequestRow } from "@/server/repositories/documentRequests.repository";
 import { documentsRepository } from "@/server/repositories/documents.repository";
 import { questionnaireService } from "@/server/services/questionnaire.service";
+import { dossierNotesService, type DossierNoteView } from "@/server/services/dossierNotes.service";
 import { GRANT_PROJECT_STATUS_LABELS, DOCUMENT_REQUEST_STATUS_LABELS } from "@/features/grants/constants";
 
 // Assemble, pour le portail client, tout ce qui est associé à un dossier -- statut/dates,
@@ -58,6 +59,7 @@ export type PortalRedactionItem = {
 export type PortalDossier = {
   id: string;
   name: string;
+  clientId: string;
   clientName: string | null;
   programName: string | null;
   status: string;
@@ -70,6 +72,7 @@ export type PortalDossier = {
   // Documents demandés au niveau du dossier (claim_id vide -- ex. en vue d'un dépôt),
   // par opposition à ceux rattachés à une réclamation précise (déjà dans claims[].documentRequests).
   documentRequests: PortalDocumentRequestView[];
+  notes: DossierNoteView[];
 };
 
 export function portalDossiersService(supabase: SupabaseClient) {
@@ -79,12 +82,14 @@ export function portalDossiersService(supabase: SupabaseClient) {
   const documentRequests = documentRequestsRepository(supabase);
   const documents = documentsRepository(supabase);
   const questionnaire = questionnaireService(supabase);
+  const notes = dossierNotesService(supabase);
 
   return {
     async listDossiers(): Promise<PortalDossier[]> {
       const allProjects = (await grantProjects.list()) as Array<{
         id: string;
         name: string;
+        client_id: string;
         status: string;
         official_start_date: string | null;
         official_end_date: string | null;
@@ -96,10 +101,11 @@ export function portalDossiersService(supabase: SupabaseClient) {
 
       const dossiers = await Promise.all(
         projects.map(async (p): Promise<PortalDossier> => {
-          const [claimRows, questionnaireData, requestRows] = await Promise.all([
+          const [claimRows, questionnaireData, requestRows, noteRows] = await Promise.all([
             claims.listByProject(p.id),
             questionnaire.get(p.id),
             documentRequests.listByProject(p.id),
+            notes.listByProject(p.id),
           ]);
 
           const visibleRequests = requestRows.filter(
@@ -148,6 +154,7 @@ export function portalDossiersService(supabase: SupabaseClient) {
           return {
             id: p.id,
             name: p.name,
+            clientId: p.client_id,
             clientName: p.clients?.name ?? null,
             programName: p.grant_programs?.name ?? null,
             status: p.status,
@@ -158,6 +165,7 @@ export function portalDossiersService(supabase: SupabaseClient) {
             claims: claimsWithRequirements,
             redaction,
             documentRequests: projectLevelRequests,
+            notes: noteRows,
           };
         })
       );
