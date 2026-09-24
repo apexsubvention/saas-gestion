@@ -11,6 +11,7 @@ import { documentsRepository } from "@/server/repositories/documents.repository"
 import { questionnaireService } from "@/server/services/questionnaire.service";
 import { dossierNotesService, type DossierNoteView } from "@/server/services/dossierNotes.service";
 import { billingLineItemsService } from "@/server/services/billingLineItems.service";
+import { billingInstallmentsService } from "@/server/services/billingInstallments.service";
 import { grantAgreementsService } from "@/server/services/grantAgreements.service";
 import { GRANT_PROJECT_STATUS_LABELS, DOCUMENT_REQUEST_STATUS_LABELS } from "@/features/grants/constants";
 
@@ -63,6 +64,21 @@ export type PortalRedactionItem = {
 // factures. Lecture seule côté portail -- édité uniquement depuis l'aide à la facturation interne.
 export type PortalBillingLineItem = { id: string; label: string; description: string | null; amount: number; hours: number | null };
 
+// Versement de l'aide à la facturation (module/tâches déjà réparties sur une période précise, avec
+// son montant -- src/server/services/billingInstallments.service.ts) : répond directement au besoin
+// de Jade -- « quoi inscrire sur les factures comme montant et travaux effectués », déjà réparti
+// selon le nombre de réclamations/versements configuré côté interne (page Aide à la facturation).
+// Lecture seule côté portail.
+export type PortalBillingInstallment = {
+  id: string;
+  installmentNumber: number;
+  periodStart: string;
+  periodEnd: string;
+  amount: number;
+  invoiceDescription: string | null;
+  status: "draft" | "submitted";
+};
+
 export type PortalDossier = {
   id: string;
   name: string;
@@ -87,6 +103,7 @@ export type PortalDossier = {
   documentRequests: PortalDocumentRequestView[];
   notes: DossierNoteView[];
   billingLineItems: PortalBillingLineItem[];
+  billingInstallments: PortalBillingInstallment[];
 };
 
 export function portalDossiersService(supabase: SupabaseClient) {
@@ -98,6 +115,7 @@ export function portalDossiersService(supabase: SupabaseClient) {
   const questionnaire = questionnaireService(supabase);
   const notes = dossierNotesService(supabase);
   const billingLineItems = billingLineItemsService(supabase);
+  const billingInstallments = billingInstallmentsService(supabase);
   const grantAgreements = grantAgreementsService(supabase);
 
   return {
@@ -119,13 +137,14 @@ export function portalDossiersService(supabase: SupabaseClient) {
 
       const dossiers = await Promise.all(
         projects.map(async (p): Promise<PortalDossier> => {
-          const [claimRows, questionnaireData, requestRows, noteRows, lineItemRows, agreements] = await Promise.all([
+          const [claimRows, questionnaireData, requestRows, noteRows, lineItemRows, agreements, installmentRows] = await Promise.all([
             claims.listByProject(p.id),
             questionnaire.get(p.id),
             documentRequests.listByProject(p.id),
             notes.listByProject(p.id),
             billingLineItems.listByProject(p.id),
             grantAgreements.listByProject(p.id),
+            billingInstallments.listByProject(p.id),
           ]);
           const agreement = agreements[0] ?? null;
 
@@ -191,6 +210,15 @@ export function portalDossiersService(supabase: SupabaseClient) {
             documentRequests: projectLevelRequests,
             notes: noteRows,
             billingLineItems: lineItemRows.map((it) => ({ id: it.id, label: it.label, description: it.description, amount: Number(it.amount), hours: it.hours != null ? Number(it.hours) : null })),
+            billingInstallments: installmentRows.map((r) => ({
+              id: r.id,
+              installmentNumber: r.installment_number,
+              periodStart: r.period_start,
+              periodEnd: r.period_end,
+              amount: Number(r.amount),
+              invoiceDescription: r.invoice_description,
+              status: r.status,
+            })),
           };
         })
       );

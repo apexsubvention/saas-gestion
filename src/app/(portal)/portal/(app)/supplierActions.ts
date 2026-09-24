@@ -5,9 +5,11 @@ import { createClient } from "@/lib/supabase/server";
 import { projectSuppliersService } from "@/server/services/projectSuppliers.service";
 import { documentsService } from "@/server/services/documents.service";
 import { billingLineItemsService } from "@/server/services/billingLineItems.service";
+import { billingInstallmentsService } from "@/server/services/billingInstallments.service";
 import type { SupplierDossierView } from "@/server/repositories/projectSuppliers.repository";
 import type { DocumentRow } from "@/server/repositories/documents.repository";
 import type { BillingLineItemRow } from "@/server/repositories/billingLineItems.repository";
+import type { BillingInstallmentRow } from "@/server/repositories/billingInstallments.repository";
 import { formatCaughtError } from "@/lib/errors";
 
 // Détails d'un dossier pour un compte fournisseur (0047) -- chargés à la demande (quand la
@@ -23,6 +25,9 @@ export type SupplierDossierDetails = {
   // Postes budgétaires/activités acceptés (module/tâche + heures) -- ce qui doit être inscrit sur
   // les factures, déjà extrait de la convention côté interne (0042/0048). Lecture seule.
   billingLineItems: BillingLineItemRow[];
+  // Calendrier de facturation : montant et texte de facture déjà répartis par versement/réclamation
+  // (0042/0049). Lecture seule -- répond directement au besoin « montant + travaux effectués ».
+  billingInstallments: BillingInstallmentRow[];
   error: string | null;
 };
 
@@ -30,16 +35,17 @@ export async function getSupplierDossierDetailsAction(grantProjectId: string): P
   await requirePortalContext();
   const supabase = await createClient();
   try {
-    const [view, documents, billingLineItems] = await Promise.all([
+    const [view, documents, billingLineItems, billingInstallments] = await Promise.all([
       projectSuppliersService(supabase).getSupplierDossierView(grantProjectId),
       documentsService(supabase).listByProject(grantProjectId),
       billingLineItemsService(supabase).listByProject(grantProjectId),
+      billingInstallmentsService(supabase).listByProject(grantProjectId),
     ]);
     if (!view) {
-      return { view: null, documents: [], billingLineItems: [], error: "Ce dossier n'est plus accessible." };
+      return { view: null, documents: [], billingLineItems: [], billingInstallments: [], error: "Ce dossier n'est plus accessible." };
     }
-    return { view, documents, billingLineItems, error: null };
+    return { view, documents, billingLineItems, billingInstallments, error: null };
   } catch (e) {
-    return { view: null, documents: [], billingLineItems: [], error: formatCaughtError(e) };
+    return { view: null, documents: [], billingLineItems: [], billingInstallments: [], error: formatCaughtError(e) };
   }
 }

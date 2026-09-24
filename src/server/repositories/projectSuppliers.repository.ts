@@ -72,7 +72,7 @@ export function projectSuppliersRepository(supabase: SupabaseClient) {
     async listBySupplierClient(supplierClientId: string) {
       const { data, error } = await supabase
         .from("project_suppliers")
-        .select("*, grant_projects(name, client_id, clients(name))")
+        .select("*, grant_projects(name, client_id, clients(name), grant_programs(name))")
         .eq("supplier_client_id", supplierClientId);
       if (error) throw error;
       return data;

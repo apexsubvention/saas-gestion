@@ -78,11 +78,17 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
   // phrase -- voir src/features/billing/billingSummary.ts. spent=0 : on ne connaît pas les
   // dépenses déjà facturées ici (pas nécessaire, seule la cible totale compte pour ce résumé).
   const subsidy = computeSubsidy({ rate: dossier.grantRate, maxSubsidy: dossier.approvedGrantAmount, totalProjectCost: dossier.totalProjectCost, spent: 0 });
+  // Si le taux/coût total du projet n'est pas renseigné sur la fiche (ou l'entente), on retombe sur
+  // le total déjà validé des activités/postes acceptés (aide à la facturation) -- sinon la phrase ne
+  // s'affiche jamais sur un dossier où seule la convention a été lue, sans que le taux ait été
+  // reporté sur la fiche. Jamais de valeur inventée : simplement une autre source déjà existante.
+  const lineItemsTotal = dossier.billingLineItems.reduce((sum, it) => sum + it.amount, 0);
+  const billerAmount = subsidy.ready && subsidy.requiredSpend != null ? subsidy.requiredSpend : lineItemsTotal > 0 ? lineItemsTotal : null;
   const billingNarrative = buildBillingNarrative({
     clientName: dossier.clientName ?? "Le client",
     subsidy,
     billerLabel: null,
-    billerAmount: subsidy.requiredSpend,
+    billerAmount,
     deadline: dossier.billingDeadline,
   });
   const openRequirementsCount = dossier.claims.reduce((sum, c) => sum + c.openRequirements.length, 0);
@@ -140,21 +146,48 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
 
           {billingNarrative && <p className="rounded-md bg-indigo-50 px-3 py-2 text-sm text-indigo-900">{billingNarrative}</p>}
 
-          {dossier.billingLineItems.length > 0 && (
+          {dossier.billingInstallments.length > 0 ? (
             <div className="space-y-2">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">À inscrire sur les factures</h3>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Calendrier de facturation</h3>
+              <p className="text-xs text-neutral-400">
+                Montant et texte suggéré pour chaque facture à venir, déjà répartis sur les versements prévus.
+              </p>
               <div className="space-y-2">
-                {dossier.billingLineItems.map((it) => (
-                  <div key={it.id} className="rounded-md border border-neutral-100 p-3 text-sm">
+                {dossier.billingInstallments.map((inst) => (
+                  <div key={inst.id} className="rounded-md border border-neutral-100 p-3 text-sm">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="font-medium text-neutral-900">{it.label}</span>
-                      {it.hours != null && <span className="text-xs text-neutral-500">{it.hours} h</span>}
+                      <span className="font-medium text-neutral-900">
+                        Versement n°{inst.installmentNumber} — {formatDate(inst.periodStart)} au {formatDate(inst.periodEnd)}
+                      </span>
+                      <span className="flex items-center gap-2">
+                        <span className="text-neutral-800">{formatAmount(inst.amount)}</span>
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${inst.status === "submitted" ? "bg-emerald-50 text-emerald-700" : "bg-neutral-100 text-neutral-600"}`}>
+                          {inst.status === "submitted" ? "Facturé" : "À venir"}
+                        </span>
+                      </span>
                     </div>
-                    {it.description && <p className="mt-1 text-xs text-neutral-500">{it.description}</p>}
+                    {inst.invoiceDescription && <p className="mt-1 whitespace-pre-wrap text-xs text-neutral-500">{inst.invoiceDescription}</p>}
                   </div>
                 ))}
               </div>
             </div>
+          ) : (
+            dossier.billingLineItems.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">À inscrire sur les factures</h3>
+                <div className="space-y-2">
+                  {dossier.billingLineItems.map((it) => (
+                    <div key={it.id} className="rounded-md border border-neutral-100 p-3 text-sm">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-medium text-neutral-900">{it.label}</span>
+                        {it.hours != null && <span className="text-xs text-neutral-500">{it.hours} h</span>}
+                      </div>
+                      {it.description && <p className="mt-1 text-xs text-neutral-500">{it.description}</p>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
           )}
 
           <div className="space-y-2">

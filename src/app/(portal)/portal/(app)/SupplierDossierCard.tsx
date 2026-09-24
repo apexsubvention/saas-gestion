@@ -23,7 +23,7 @@ export type SupplierBillingRow = {
   billing_frequency: string | null;
   expected_invoice_day: number | null;
   invoice_description_requirements: string | null;
-  grant_projects: { name: string | null; clients: { name: string | null } | null } | null;
+  grant_projects: { name: string | null; clients: { name: string | null } | null; grant_programs: { name: string | null } | null } | null;
 };
 
 function formatDate(iso: string | null): string {
@@ -68,7 +68,10 @@ export function SupplierDossierCard({ row }: { row: SupplierBillingRow }) {
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-medium text-neutral-900">{row.grant_projects?.name ?? "Dossier"}</span>
           </div>
-          <p className="mt-1 text-xs text-neutral-500">{row.grant_projects?.clients?.name ?? "Client final"}</p>
+          <p className="mt-1 text-xs text-neutral-500">
+            {row.grant_projects?.clients?.name ?? "Client final"}
+            {row.grant_projects?.grant_programs?.name && <span className="ml-2">{row.grant_projects.grant_programs.name}</span>}
+          </p>
         </div>
         <div className="flex items-center gap-4 text-xs text-neutral-500">
           <span>Budget prévu : {formatAmount(row.budget_amount)}</span>
@@ -169,21 +172,50 @@ export function SupplierDossierCard({ row }: { row: SupplierBillingRow }) {
                 ) : null;
               })()}
 
-              {details.billingLineItems.length > 0 && (
+              {details.billingInstallments.length > 0 ? (
                 <div className="space-y-2">
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">À inscrire sur les factures</h3>
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Calendrier de facturation</h3>
+                  <p className="text-xs text-neutral-400">
+                    Montant et texte suggéré pour chaque facture à venir, pour l&apos;ensemble du dossier
+                    {details.view.other_suppliers_count > 0 ? " (réparti entre tous les sous-traitants, pas seulement toi)" : ""} —
+                    ta part prévue reste {formatAmount(row.budget_amount)} (ci-dessus).
+                  </p>
                   <div className="space-y-2">
-                    {details.billingLineItems.map((it) => (
-                      <div key={it.id} className="rounded-md border border-neutral-100 p-3 text-sm">
+                    {details.billingInstallments.map((inst) => (
+                      <div key={inst.id} className="rounded-md border border-neutral-100 p-3 text-sm">
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                          <span className="font-medium text-neutral-900">{it.label}</span>
-                          {it.hours != null && <span className="text-xs text-neutral-500">{it.hours} h</span>}
+                          <span className="font-medium text-neutral-900">
+                            Versement n°{inst.installment_number} — {formatDate(inst.period_start)} au {formatDate(inst.period_end)}
+                          </span>
+                          <span className="flex items-center gap-2">
+                            <span className="text-neutral-800">{formatAmount(inst.amount)}</span>
+                            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${inst.status === "submitted" ? "bg-emerald-50 text-emerald-700" : "bg-neutral-100 text-neutral-600"}`}>
+                              {inst.status === "submitted" ? "Facturé" : "À venir"}
+                            </span>
+                          </span>
                         </div>
-                        {it.description && <p className="mt-1 text-xs text-neutral-500">{it.description}</p>}
+                        {inst.invoice_description && <p className="mt-1 whitespace-pre-wrap text-xs text-neutral-500">{inst.invoice_description}</p>}
                       </div>
                     ))}
                   </div>
                 </div>
+              ) : (
+                details.billingLineItems.length > 0 && (
+                  <div className="space-y-2">
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">À inscrire sur les factures</h3>
+                    <div className="space-y-2">
+                      {details.billingLineItems.map((it) => (
+                        <div key={it.id} className="rounded-md border border-neutral-100 p-3 text-sm">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="font-medium text-neutral-900">{it.label}</span>
+                            {it.hours != null && <span className="text-xs text-neutral-500">{it.hours} h</span>}
+                          </div>
+                          {it.description && <p className="mt-1 text-xs text-neutral-500">{it.description}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
               )}
 
               <div>
