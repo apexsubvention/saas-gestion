@@ -6,6 +6,7 @@ export function projectSuppliersService(supabase: SupabaseClient) {
   return {
     listByProject: (grantProjectId: string) => repo.listByProject(grantProjectId),
     listBySupplierClient: (supplierClientId: string) => repo.listBySupplierClient(supplierClientId),
+    getSupplierDossierView: (grantProjectId: string) => repo.getSupplierDossierView(grantProjectId),
     async create(
       organizationId: string,
       grantProjectId: string,

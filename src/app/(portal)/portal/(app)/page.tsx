@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { projectSuppliersService } from "@/server/services/projectSuppliers.service";
 import { portalDossiersService } from "@/server/services/portalDossiers.service";
 import { DossiersList } from "./DossiersList";
+import { SupplierDossierCard, type SupplierBillingRow } from "./SupplierDossierCard";
 
 // Page d'accueil du portail : « Mes dossiers » -- pour chaque dossier accessible à ce
 // compte (le sien, et ceux de ses clients enfants s'il en a -- hiérarchie, cf. 0028),
@@ -17,7 +18,10 @@ import { DossiersList } from "./DossiersList";
 // client facture pour le dossier d'UN AUTRE client (ex. Sitegrow facture pour ses
 // propres clients finaux, via project_suppliers.supplier_client_id, pas forcément un
 // lien de hiérarchie parent/enfant) -- donc conservée comme section distincte plutôt
-// que fusionnée dans les cartes de dossiers ci-dessus.
+// que fusionnée dans les cartes de dossiers ci-dessus. Depuis 0047, chaque ligne est une
+// carte dépliable (SupplierDossierCard) donnant accès au budget complet du dossier, la
+// portion de subvention, tous les documents, et un total agrégé (jamais le détail) des
+// autres sous-traitants -- pas seulement le montant à facturer comme avant.
 const UPLOADABLE_STATUSES = ["requested", "issue"];
 const ACTIVE_CLAIM_STATUSES_EXCLUDED = ["paid", "rejected"];
 
@@ -68,39 +72,14 @@ export default async function PortalHomePage() {
           <div>
             <h2 className="text-sm font-semibold text-neutral-900">Facturation à préparer</h2>
             <p className="mt-1 text-xs text-neutral-500">
-              Pour chaque dossier ci-dessous, voici le montant prévu, la fréquence et ce qui doit apparaître sur
-              la facture.
+              Pour chaque dossier ci-dessous : ta facturation prévue. Déplie une carte pour voir le budget complet
+              du dossier, la portion de subvention, les documents et un aperçu des autres sous-traitants.
             </p>
           </div>
-          <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
-            <table className="w-full text-sm">
-              <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
-                <tr>
-                  <th className="px-4 py-2 font-medium">Client final</th>
-                  <th className="px-4 py-2 font-medium">Dossier</th>
-                  <th className="px-4 py-2 font-medium">Budget prévu</th>
-                  <th className="px-4 py-2 font-medium">Fréquence</th>
-                  <th className="px-4 py-2 font-medium">Jour attendu</th>
-                  <th className="px-4 py-2 font-medium">À inscrire sur la facture</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(supplierRows as any[]).map((s) => (
-                  <tr key={s.id} className="border-b border-neutral-100 last:border-0">
-                    <td className="px-4 py-2 text-neutral-900">{s.grant_projects?.clients?.name ?? "—"}</td>
-                    <td className="px-4 py-2 text-neutral-600">{s.grant_projects?.name ?? "—"}</td>
-                    <td className="px-4 py-2 text-neutral-600">
-                      {s.budget_amount != null
-                        ? `${Number(s.budget_amount).toLocaleString("fr-CA", { minimumFractionDigits: 2 })} $`
-                        : "—"}
-                    </td>
-                    <td className="px-4 py-2 text-neutral-600">{s.billing_frequency ?? "—"}</td>
-                    <td className="px-4 py-2 text-neutral-600">{s.expected_invoice_day ?? "—"}</td>
-                    <td className="px-4 py-2 text-neutral-600">{s.invoice_description_requirements ?? "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="space-y-3">
+            {(supplierRows as SupplierBillingRow[]).map((s) => (
+              <SupplierDossierCard key={s.id} row={s} />
+            ))}
           </div>
         </div>
       )}
