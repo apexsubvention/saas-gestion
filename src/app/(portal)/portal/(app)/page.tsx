@@ -61,7 +61,7 @@ export default async function PortalHomePage() {
         </div>
       )}
 
-      <DossiersList dossiers={dossiers} currentOrgUserId={ctx.organizationUserId} />
+      <DossiersList dossiers={dossiers} ownClientId={ctx.clientId} currentOrgUserId={ctx.organizationUserId} />
 
       {supplierRows && supplierRows.length > 0 && (
         <div className="space-y-3">
