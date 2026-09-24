@@ -87,7 +87,7 @@ export function projectSuppliersRepository(supabase: SupabaseClient) {
       const { data, error } = await supabase.rpc("portal_supplier_dossier_view", { p_grant_project_id: grantProjectId });
       if (error) throw error;
       const rows = data as SupplierDossierView[] | null;
-      return rows && rows.length > 0 ? rows[0] : null;
+      return rows?.[0] ?? null;
     },
 
     async update(id: string, patch: Partial<Omit<ProjectSupplierRow, "id" | "organization_id" | "grant_project_id">>): Promise<ProjectSupplierRow> {
