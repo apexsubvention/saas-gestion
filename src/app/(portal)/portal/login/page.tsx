@@ -69,6 +69,19 @@ function PortalLoginForm() {
         />
       </div>
 
+      <div className="flex items-center gap-2">
+        <input
+          id="remember"
+          name="remember"
+          type="checkbox"
+          defaultChecked
+          className="h-4 w-4 rounded border-neutral-300"
+        />
+        <label htmlFor="remember" className="text-sm text-neutral-600">
+          Rester connecté
+        </label>
+      </div>
+
       {state.error && <p className="text-sm text-red-600">{state.error}</p>}
 
       <SubmitButton />

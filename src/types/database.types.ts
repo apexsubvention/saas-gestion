@@ -712,6 +712,7 @@ export type Database = {
           created_at: string
           current_password: string | null
           id: string
+          must_change_password: boolean
           organization_id: string
           user_id: string
         }
@@ -721,6 +722,7 @@ export type Database = {
           created_at?: string
           current_password?: string | null
           id?: string
+          must_change_password?: boolean
           organization_id: string
           user_id: string
         }
@@ -730,6 +732,7 @@ export type Database = {
           created_at?: string
           current_password?: string | null
           id?: string
+          must_change_password?: boolean
           organization_id?: string
           user_id?: string
         }

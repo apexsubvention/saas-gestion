@@ -190,6 +190,7 @@ export async function createPortalAccountAction(
       user_id: authUserId,
       active: true,
       current_password: tempPassword,
+      must_change_password: true,
     });
     if (portalError) throw portalError;
   } catch (e) {
@@ -239,7 +240,10 @@ export async function regeneratePortalPasswordAction(clientId: string, portalUse
     const { error: authError } = await admin.auth.admin.updateUserById((row as { user_id: string }).user_id, { password: newPassword });
     if (authError) throw authError;
 
-    const { error: updateError } = await admin.from("client_portal_users").update({ current_password: newPassword }).eq("id", portalUserRowId);
+    const { error: updateError } = await admin
+      .from("client_portal_users")
+      .update({ current_password: newPassword, must_change_password: true })
+      .eq("id", portalUserRowId);
     if (updateError) throw updateError;
   } catch (e) {
     return { error: formatCaughtError(e), newPassword: null };

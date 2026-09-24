@@ -1,8 +1,9 @@
 "use client";
 
-import { LogOut } from "lucide-react";
+import { KeyRound, LogOut } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export function PortalHeader({ clientName, fullName }: { clientName: string; fullName: string | null }) {
   const router = useRouter();
@@ -22,6 +23,13 @@ export function PortalHeader({ clientName, fullName }: { clientName: string; ful
       </div>
       <div className="flex items-center gap-4">
         <div className="text-right text-sm text-slate-600">{fullName ?? ""}</div>
+        <Link
+          href="/portal/change-password"
+          className="rounded-lg border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
+          title="Changer le mot de passe"
+        >
+          <KeyRound className="h-4 w-4" />
+        </Link>
         <button
           onClick={handleSignOut}
           className="rounded-lg border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
