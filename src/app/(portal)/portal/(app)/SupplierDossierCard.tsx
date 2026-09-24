@@ -13,6 +13,8 @@ import { useState, useTransition } from "react";
 import { DOCUMENT_CATEGORY_LABELS, grantProjectStatusBadgeClass, GRANT_PROJECT_STATUS_LABELS } from "@/features/grants/constants";
 import { getSupplierDossierDetailsAction, type SupplierDossierDetails } from "./supplierActions";
 import { PortalOpenDocumentButton } from "./PortalOpenDocumentButton";
+import { computeSubsidy } from "@/features/grants/subsidyMath";
+import { buildBillingNarrative } from "@/features/billing/billingSummary";
 
 export type SupplierBillingRow = {
   id: string;
@@ -147,6 +149,42 @@ export function SupplierDossierCard({ row }: { row: SupplierBillingRow }) {
                   </div>
                 </div>
               </div>
+
+              {(() => {
+                const subsidy = computeSubsidy({
+                  rate: details.view.grant_rate,
+                  maxSubsidy: details.view.approved_grant_amount,
+                  totalProjectCost: details.view.total_project_cost,
+                  spent: 0,
+                });
+                const narrative = buildBillingNarrative({
+                  clientName: details.view.client_name,
+                  subsidy,
+                  billerLabel: "Vous",
+                  billerAmount: row.budget_amount,
+                  deadline: details.view.official_end_date,
+                });
+                return narrative ? (
+                  <p className="rounded-md bg-indigo-50 px-3 py-2 text-sm text-indigo-900">{narrative}</p>
+                ) : null;
+              })()}
+
+              {details.billingLineItems.length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">À inscrire sur les factures</h3>
+                  <div className="space-y-2">
+                    {details.billingLineItems.map((it) => (
+                      <div key={it.id} className="rounded-md border border-neutral-100 p-3 text-sm">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="font-medium text-neutral-900">{it.label}</span>
+                          {it.hours != null && <span className="text-xs text-neutral-500">{it.hours} h</span>}
+                        </div>
+                        {it.description && <p className="mt-1 text-xs text-neutral-500">{it.description}</p>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div>
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Autres sous-traitants</h3>

@@ -17,6 +17,8 @@ import {
 } from "@/features/grants/constants";
 import { DocumentRequestUpload } from "./DocumentRequestUpload";
 import { PortalNotes } from "./PortalNotes";
+import { computeSubsidy } from "@/features/grants/subsidyMath";
+import { buildBillingNarrative } from "@/features/billing/billingSummary";
 
 // Un document demandé se réaffiche avec son formulaire de téléversement tant qu'il
 // n'est pas validé par le personnel -- "issue" (problème signalé) permet donc bien de
@@ -72,6 +74,17 @@ function formatAmount(amount: number | null): string {
 
 export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDossier; currentOrgUserId: string | null }) {
   const [expanded, setExpanded] = useState(false);
+  // Résumé en langage clair (Jade) : mêmes chiffres que le tableau interne (SubsidyPanel), en
+  // phrase -- voir src/features/billing/billingSummary.ts. spent=0 : on ne connaît pas les
+  // dépenses déjà facturées ici (pas nécessaire, seule la cible totale compte pour ce résumé).
+  const subsidy = computeSubsidy({ rate: dossier.grantRate, maxSubsidy: dossier.approvedGrantAmount, totalProjectCost: dossier.totalProjectCost, spent: 0 });
+  const billingNarrative = buildBillingNarrative({
+    clientName: dossier.clientName ?? "Le client",
+    subsidy,
+    billerLabel: null,
+    billerAmount: subsidy.requiredSpend,
+    deadline: dossier.billingDeadline,
+  });
   const openRequirementsCount = dossier.claims.reduce((sum, c) => sum + c.openRequirements.length, 0);
   const actionableRequestsCount =
     dossier.documentRequests.filter((r) => UPLOADABLE_STATUSES.includes(r.status)).length +
@@ -124,6 +137,25 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
               <p className="text-neutral-800">{formatAmount(dossier.approvedGrantAmount)}</p>
             </div>
           </div>
+
+          {billingNarrative && <p className="rounded-md bg-indigo-50 px-3 py-2 text-sm text-indigo-900">{billingNarrative}</p>}
+
+          {dossier.billingLineItems.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">À inscrire sur les factures</h3>
+              <div className="space-y-2">
+                {dossier.billingLineItems.map((it) => (
+                  <div key={it.id} className="rounded-md border border-neutral-100 p-3 text-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-medium text-neutral-900">{it.label}</span>
+                      {it.hours != null && <span className="text-xs text-neutral-500">{it.hours} h</span>}
+                    </div>
+                    {it.description && <p className="mt-1 text-xs text-neutral-500">{it.description}</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="space-y-2">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Réclamations</h3>

@@ -21,6 +21,11 @@ import {
 } from "./supplierActions";
 import type { LedgerInvoice, LedgerSupplier, Tracked } from "@/server/services/supplierLedger.service";
 import type { DossierEventRow } from "@/server/services/audit";
+import { buildBillingNarrative, type BillingNarrativeInput } from "@/features/billing/billingSummary";
+
+// Contexte du dossier (mêmes chiffres que SubsidyPanel) nécessaire pour rédiger, par fournisseur,
+// le résumé « devra facturer X $ d'ici le ... » -- voir billingContext plus bas.
+export type SupplierBillingContext = Pick<BillingNarrativeInput, "clientName" | "subsidy" | "deadline">;
 
 type DocOption = { id: string; filename: string; category: string };
 type ClientOption = { id: string; name: string };
@@ -302,7 +307,7 @@ function InvoiceRow({
   );
 }
 
-function SupplierGroup({ grantProjectId, supplier, documents, clients, claims, isFirst, isLast }: { grantProjectId: string; supplier: LedgerSupplier; documents: DocOption[]; clients: ClientOption[]; claims: ClaimOption[]; isFirst: boolean; isLast: boolean }) {
+function SupplierGroup({ grantProjectId, supplier, documents, clients, claims, isFirst, isLast, billingContext }: { grantProjectId: string; supplier: LedgerSupplier; documents: DocOption[]; clients: ClientOption[]; claims: ClaimOption[]; isFirst: boolean; isLast: boolean; billingContext?: SupplierBillingContext }) {
   const [name, setName] = useState(supplier.name);
   const [budget, setBudget] = useState(supplier.budget_amount != null ? String(supplier.budget_amount) : "");
   const [contact, setContact] = useState(supplier.contact ?? "");
@@ -322,6 +327,20 @@ function SupplierGroup({ grantProjectId, supplier, documents, clients, claims, i
     day !== (supplier.expected_invoice_day != null ? String(supplier.expected_invoice_day) : "") ||
     requirements !== (supplier.invoice_description_requirements ?? "") ||
     clientId !== (supplier.supplier_client_id ?? "");
+
+  // Résumé en langage clair (Jade) : reprend le contexte du dossier (dépense totale requise,
+  // portion subventionnée -- mêmes chiffres que SubsidyPanel) et le budget prévu DE CE fournisseur
+  // comme montant à facturer -- jamais le total du projet, pour ne pas laisser croire qu'un
+  // fournisseur parmi d'autres doit à lui seul facturer tout le dossier.
+  const narrative = billingContext
+    ? buildBillingNarrative({
+        clientName: billingContext.clientName,
+        subsidy: billingContext.subsidy,
+        billerLabel: supplier.name,
+        billerAmount: supplier.budget_amount != null ? Number(supplier.budget_amount) : null,
+        deadline: billingContext.deadline,
+      })
+    : null;
 
   function save() {
     const b = parseAmount(budget);
@@ -381,6 +400,7 @@ function SupplierGroup({ grantProjectId, supplier, documents, clients, claims, i
             <p className="mb-2 text-xs text-neutral-500">
               Informations de facturation. Quand ce fournisseur est un client Apex (ex. Sitegrow), elles sont visibles dans son portail.
             </p>
+            {narrative && <p className="mb-3 rounded-md bg-indigo-50 px-3 py-2 text-sm text-indigo-900">{narrative}</p>}
             <div className="grid gap-3 sm:grid-cols-3">
               <label className="space-y-1 text-xs text-neutral-600">Contact<input value={contact} onChange={(e) => setContact(e.target.value)} className={input} /></label>
               <label className="space-y-1 text-xs text-neutral-600">Fréquence de facturation<input value={frequency} onChange={(e) => setFrequency(e.target.value)} className={input} /></label>
@@ -442,6 +462,7 @@ export function SuppliersTable({
   clients,
   claims,
   totals,
+  billingContext,
 }: {
   grantProjectId: string;
   suppliers: LedgerSupplier[];
@@ -450,6 +471,7 @@ export function SuppliersTable({
   clients: ClientOption[];
   claims: ClaimOption[];
   totals: { budget: number; accepted: number; claimed: number; remaining: number };
+  billingContext?: SupplierBillingContext;
 }) {
   const choices = suppliers.map((s) => ({ id: s.id, name: s.name }));
   return (
@@ -469,7 +491,7 @@ export function SuppliersTable({
           </thead>
           <tbody>
             {suppliers.map((s, i) => (
-              <SupplierGroup key={s.id} grantProjectId={grantProjectId} supplier={s} documents={documents} clients={clients} claims={claims} isFirst={i === 0} isLast={i === suppliers.length - 1} />
+              <SupplierGroup key={s.id} grantProjectId={grantProjectId} supplier={s} documents={documents} clients={clients} claims={claims} isFirst={i === 0} isLast={i === suppliers.length - 1} billingContext={billingContext} />
             ))}
             {unassigned.length > 0 && (
               <>

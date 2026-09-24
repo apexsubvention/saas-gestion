@@ -10,6 +10,8 @@ import { documentRequestsRepository, type DocumentRequestRow } from "@/server/re
 import { documentsRepository } from "@/server/repositories/documents.repository";
 import { questionnaireService } from "@/server/services/questionnaire.service";
 import { dossierNotesService, type DossierNoteView } from "@/server/services/dossierNotes.service";
+import { billingLineItemsService } from "@/server/services/billingLineItems.service";
+import { grantAgreementsService } from "@/server/services/grantAgreements.service";
 import { GRANT_PROJECT_STATUS_LABELS, DOCUMENT_REQUEST_STATUS_LABELS } from "@/features/grants/constants";
 
 // Assemble, pour le portail client, tout ce qui est associé à un dossier -- statut/dates,
@@ -56,6 +58,11 @@ export type PortalRedactionItem = {
   stage: "final" | "user_draft" | "ai_draft";
 };
 
+// Poste de facturation accepté (module/activité + heures, tel qu'extrait de la convention ou saisi à
+// la main -- src/server/services/billingLineItems.service.ts) : ce qui doit apparaître sur les
+// factures. Lecture seule côté portail -- édité uniquement depuis l'aide à la facturation interne.
+export type PortalBillingLineItem = { id: string; label: string; description: string | null; amount: number; hours: number | null };
+
 export type PortalDossier = {
   id: string;
   name: string;
@@ -67,12 +74,19 @@ export type PortalDossier = {
   officialStartDate: string | null;
   officialEndDate: string | null;
   approvedGrantAmount: number | null;
+  // Coût total du projet et taux d'aide : nécessaires (avec approvedGrantAmount) pour le résumé en
+  // langage clair côté portail -- voir src/features/billing/billingSummary.ts. L'entente (si
+  // renseignée) l'emporte sur la fiche du dossier, comme resolveSubsidyInputs côté interne.
+  totalProjectCost: number | null;
+  grantRate: number | null;
+  billingDeadline: string | null;
   claims: PortalClaimView[];
   redaction: PortalRedactionItem[];
   // Documents demandés au niveau du dossier (claim_id vide -- ex. en vue d'un dépôt),
   // par opposition à ceux rattachés à une réclamation précise (déjà dans claims[].documentRequests).
   documentRequests: PortalDocumentRequestView[];
   notes: DossierNoteView[];
+  billingLineItems: PortalBillingLineItem[];
 };
 
 export function portalDossiersService(supabase: SupabaseClient) {
@@ -83,6 +97,8 @@ export function portalDossiersService(supabase: SupabaseClient) {
   const documents = documentsRepository(supabase);
   const questionnaire = questionnaireService(supabase);
   const notes = dossierNotesService(supabase);
+  const billingLineItems = billingLineItemsService(supabase);
+  const grantAgreements = grantAgreementsService(supabase);
 
   return {
     async listDossiers(): Promise<PortalDossier[]> {
@@ -94,6 +110,8 @@ export function portalDossiersService(supabase: SupabaseClient) {
         official_start_date: string | null;
         official_end_date: string | null;
         approved_grant_amount: number | null;
+        total_project_cost: number | null;
+        grant_rate: number | null;
         clients: { name: string } | null;
         grant_programs: { name: string } | null;
       }>;
@@ -101,12 +119,15 @@ export function portalDossiersService(supabase: SupabaseClient) {
 
       const dossiers = await Promise.all(
         projects.map(async (p): Promise<PortalDossier> => {
-          const [claimRows, questionnaireData, requestRows, noteRows] = await Promise.all([
+          const [claimRows, questionnaireData, requestRows, noteRows, lineItemRows, agreements] = await Promise.all([
             claims.listByProject(p.id),
             questionnaire.get(p.id),
             documentRequests.listByProject(p.id),
             notes.listByProject(p.id),
+            billingLineItems.listByProject(p.id),
+            grantAgreements.listByProject(p.id),
           ]);
+          const agreement = agreements[0] ?? null;
 
           const visibleRequests = requestRows.filter(
             (r) => r.visible_in_client_portal && VISIBLE_REQUEST_STATUSES.includes(r.status)
@@ -162,10 +183,14 @@ export function portalDossiersService(supabase: SupabaseClient) {
             officialStartDate: p.official_start_date,
             officialEndDate: p.official_end_date,
             approvedGrantAmount: p.approved_grant_amount,
+            totalProjectCost: p.total_project_cost,
+            grantRate: p.grant_rate ?? agreement?.grant_rate ?? null,
+            billingDeadline: agreement?.project_end ?? p.official_end_date,
             claims: claimsWithRequirements,
             redaction,
             documentRequests: projectLevelRequests,
             notes: noteRows,
+            billingLineItems: lineItemRows.map((it) => ({ id: it.id, label: it.label, description: it.description, amount: Number(it.amount), hours: it.hours != null ? Number(it.hours) : null })),
           };
         })
       );

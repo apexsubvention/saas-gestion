@@ -16,7 +16,17 @@ function Stat({ label, value, hint, strong = false }: { label: string; value: st
 
 // Subvention restante : chaque dollar facturé rapporte « taux x dépense » de subvention, jusqu'au maximum.
 // Ex. 50 % sur un projet de 60 000 $ -> subvention max 30 000 $, atteinte avec 60 000 $ de dépenses.
-export function SubsidyPanel({ summary, supplierBudgetTotal }: { summary: SubsidySummary; supplierBudgetTotal: number }) {
+export function SubsidyPanel({
+  summary,
+  supplierBudgetTotal,
+  narrative,
+}: {
+  summary: SubsidySummary;
+  supplierBudgetTotal: number;
+  // Résumé en langage clair (src/features/billing/billingSummary.ts) -- mêmes chiffres que
+  // ci-dessous, en phrase. Demandé par Jade pour comprendre le dossier sans lire un tableau.
+  narrative?: string | null;
+}) {
   if (!summary.ready) {
     return (
       <p className="rounded-lg border border-dashed border-neutral-300 bg-white px-4 py-3 text-sm text-neutral-500">
@@ -30,6 +40,7 @@ export function SubsidyPanel({ summary, supplierBudgetTotal }: { summary: Subsid
 
   return (
     <div className="space-y-3 rounded-lg border border-neutral-200 bg-white p-4">
+      {narrative && <p className="rounded-md bg-indigo-50 px-3 py-2 text-sm text-indigo-900">{narrative}</p>}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat label="Taux d'aide" value={`${ratePct.toLocaleString("fr-CA")} %`} />
         <Stat label="Subvention maximale" value={money(summary.maxSubsidy)} />

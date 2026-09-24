@@ -29,6 +29,7 @@ import { aiSuggestionsService } from "@/server/services/aiSuggestions.service";
 import { listDossierEvents } from "@/server/services/audit";
 import { supplierLedgerService } from "@/server/services/supplierLedger.service";
 import { computeSubsidy, resolveSubsidyInputs } from "@/features/grants/subsidyMath";
+import { buildBillingNarrative } from "@/features/billing/billingSummary";
 import { grantAgreementsService } from "@/server/services/grantAgreements.service";
 import { NewSupplierForm } from "./NewSupplierForm";
 import { DeleteGrantProjectButton } from "../DeleteGrantProjectButton";
@@ -81,6 +82,18 @@ export default async function GrantProjectPage({ params, searchParams }: { param
   const { data: staffRows } = await supabase.from("organization_users").select("id, full_name, email").eq("active", true).in("role", ["admin", "employee"]);
   const assignees = (staffRows ?? []).map((u) => ({ id: u.id, name: u.full_name || u.email || "Membre de l'équipe" }));
   const subsidy = computeSubsidy(resolveSubsidyInputs(project, agreement, ledger.spent));
+  // Résumé en langage clair (demandé par Jade) : à partir des mêmes chiffres que SubsidyPanel,
+  // mais en phrase plutôt qu'en tableau. deadline = date de fin du projet (entente en priorité,
+  // sinon fiche du dossier -- même ordre que "Dates du projet" sur la page Facturation).
+  const clientName = project.clients?.name ?? "Le client";
+  const projectDeadline = agreement?.project_end ?? project.official_end_date ?? null;
+  const billingNarrative = buildBillingNarrative({
+    clientName,
+    subsidy,
+    billerLabel: null,
+    billerAmount: subsidy.requiredSpend,
+    deadline: projectDeadline,
+  });
   const otherClients = allClients.filter((c) => c.id !== project.client_id);
 
   const pendingMilestones = milestones.filter((m) => m.status === "pending" || m.status === "at_risk");
@@ -264,7 +277,7 @@ export default async function GrantProjectPage({ params, searchParams }: { param
           <section className="space-y-3">
             <h2 className="text-sm font-semibold text-neutral-900">Fournisseurs et factures</h2>
             <SuggestionsPanel grantProjectId={project.id} suggestions={suggestions} />
-            <SubsidyPanel summary={subsidy} supplierBudgetTotal={ledger.supplierBudgetTotal} />
+            <SubsidyPanel summary={subsidy} supplierBudgetTotal={ledger.supplierBudgetTotal} narrative={billingNarrative} />
             <p className="text-xs text-neutral-500">
               Un seul tableau, automatique et manuel : modifie, ajoute ou supprime les fournisseurs, même ceux générés automatiquement. Une facture
               téléversée dans « Documents » (catégorie Facture) est lue automatiquement et ajoutée ici sous son fournisseur ; tu peux aussi associer
@@ -278,6 +291,7 @@ export default async function GrantProjectPage({ params, searchParams }: { param
               clients={allClients.map((c) => ({ id: c.id, name: c.name }))}
               claims={claims.map((c) => ({ id: c.id, label: c.claim_number || `Réclamation (${c.period_start ?? "—"})` }))}
               totals={ledger.totals}
+              billingContext={{ clientName, subsidy, deadline: projectDeadline }}
             />
             <details className="rounded-lg border border-neutral-200 bg-white p-4">
               <summary className="cursor-pointer text-sm font-medium text-neutral-800">Ajouter un fournisseur avec ses détails de facturation</summary>
