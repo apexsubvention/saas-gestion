@@ -32,7 +32,12 @@ export default async function BillingAidPage({ params }: { params: { id: string 
   const projectStart = agreement?.project_start ?? project.official_start_date ?? null;
   const projectEnd = agreement?.project_end ?? project.official_end_date ?? null;
 
-  const totalAmount = lineItems.reduce((sum, it) => sum + Number(it.amount ?? 0), 0);
+  // Seuls les postes cochés « à facturer » (0050) comptent dans le total réparti sur les versements
+  // -- un coût interne (ex. salaire déjà payé par l'entreprise, remboursé directement par la
+  // subvention) ne donne jamais lieu à une facture.
+  const billableItems = lineItems.filter((it) => it.included_in_billing);
+  const totalAmount = billableItems.reduce((sum, it) => sum + Number(it.amount ?? 0), 0);
+  const totalAccepted = lineItems.reduce((sum, it) => sum + Number(it.amount ?? 0), 0);
   const lockedCount = installments.filter((r) => r.status === "submitted").length;
   const draftCount = installments.filter((r) => r.status === "draft").length;
 
@@ -63,7 +68,12 @@ export default async function BillingAidPage({ params }: { params: { id: string 
             donc de nouveaux id) à chaque lecture de convention ou enregistrement manuel -- sans ce key,
             l'état local du composant client ne se remettrait pas à jour après un nouvel upload. */}
         <LineItemsEditor key={lineItems.map((it) => it.id).join(",") || "empty"} grantProjectId={params.id} initialItems={lineItems} />
-        <p className="text-xs font-medium text-neutral-700">Total des activités acceptées : {money(totalAmount)}</p>
+        <p className="text-xs font-medium text-neutral-700">
+          Total à facturer : {money(totalAmount)}
+          {totalAccepted !== totalAmount && (
+            <span className="ml-1 font-normal text-neutral-500">(total accepté, incluant les coûts internes non facturés : {money(totalAccepted)})</span>
+          )}
+        </p>
       </section>
 
       <section className="space-y-2 rounded-lg border border-neutral-200 bg-white p-4 text-sm text-neutral-600">

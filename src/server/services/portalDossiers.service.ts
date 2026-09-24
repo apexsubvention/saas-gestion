@@ -62,7 +62,7 @@ export type PortalRedactionItem = {
 // Poste de facturation accepté (module/activité + heures, tel qu'extrait de la convention ou saisi à
 // la main -- src/server/services/billingLineItems.service.ts) : ce qui doit apparaître sur les
 // factures. Lecture seule côté portail -- édité uniquement depuis l'aide à la facturation interne.
-export type PortalBillingLineItem = { id: string; label: string; description: string | null; amount: number; hours: number | null };
+export type PortalBillingLineItem = { id: string; label: string; description: string | null; amount: number; hours: number | null; includedInBilling: boolean };
 
 // Versement de l'aide à la facturation (module/tâches déjà réparties sur une période précise, avec
 // son montant -- src/server/services/billingInstallments.service.ts) : répond directement au besoin
@@ -209,7 +209,7 @@ export function portalDossiersService(supabase: SupabaseClient) {
             redaction,
             documentRequests: projectLevelRequests,
             notes: noteRows,
-            billingLineItems: lineItemRows.map((it) => ({ id: it.id, label: it.label, description: it.description, amount: Number(it.amount), hours: it.hours != null ? Number(it.hours) : null })),
+            billingLineItems: lineItemRows.map((it) => ({ id: it.id, label: it.label, description: it.description, amount: Number(it.amount), hours: it.hours != null ? Number(it.hours) : null, includedInBilling: it.included_in_billing })),
             billingInstallments: installmentRows.map((r) => ({
               id: r.id,
               installmentNumber: r.installment_number,

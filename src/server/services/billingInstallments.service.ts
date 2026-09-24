@@ -84,8 +84,12 @@ export function billingInstallmentsService(supabase: SupabaseClient) {
       if (existing.length > 0) throw new Error("Des versements existent déjà pour ce dossier -- utilise « Ajuster les versements restants » pour les modifier.");
       const lineItems = await lineItemsRepo.listByProject(params.grantProjectId);
       if (lineItems.length === 0) throw new Error("Ajoute d'abord au moins une activité/poste budgétaire accepté.");
-      const total = lineItems.reduce((sum, it) => sum + Number(it.amount ?? 0), 0);
-      if (total <= 0) throw new Error("Le montant total des activités acceptées doit être supérieur à 0.");
+      // Seuls les postes cochés « à facturer » (0050) comptent -- un coût interne (ex. salaire)
+      // remboursé directement par la subvention ne doit jamais être réparti sur une facture.
+      const billableItems = lineItems.filter((it) => it.included_in_billing);
+      if (billableItems.length === 0) throw new Error("Aucune activité n'est cochée « à facturer » -- coche au moins un poste ci-dessus avant de générer les versements.");
+      const total = billableItems.reduce((sum, it) => sum + Number(it.amount ?? 0), 0);
+      if (total <= 0) throw new Error("Le montant total des activités à facturer doit être supérieur à 0.");
       if (params.count <= 0) throw new Error("Le nombre de versements doit être d'au moins 1.");
 
       const periods = computeBillingPeriods(params.projectStart, params.projectEnd, params.count, 1);
@@ -98,7 +102,7 @@ export function billingInstallmentsService(supabase: SupabaseClient) {
         projectName: params.projectName,
         periods,
         amounts,
-        activities: lineItems.map((it) => ({ label: it.label, description: it.description, amount: Number(it.amount ?? 0), hours: it.hours != null ? Number(it.hours) : null })),
+        activities: billableItems.map((it) => ({ label: it.label, description: it.description, amount: Number(it.amount ?? 0), hours: it.hours != null ? Number(it.hours) : null })),
         priorSummary: null,
       });
     },
@@ -125,7 +129,8 @@ export function billingInstallmentsService(supabase: SupabaseClient) {
       if (!remainingStart) throw new Error("Aucun calendrier de facturation existant : utilise plutôt « Générer les versements » pour créer le calendrier initial.");
 
       const lineItems = await lineItemsRepo.listByProject(params.grantProjectId);
-      const total = lineItems.reduce((sum, it) => sum + Number(it.amount ?? 0), 0);
+      const billableItems = lineItems.filter((it) => it.included_in_billing);
+      const total = billableItems.reduce((sum, it) => sum + Number(it.amount ?? 0), 0);
       const lockedTotal = locked.reduce((sum, r) => sum + Number(r.amount ?? 0), 0);
       const remainingTotal = Math.max(0, total - lockedTotal);
 
@@ -143,7 +148,7 @@ export function billingInstallmentsService(supabase: SupabaseClient) {
         projectName: params.projectName,
         periods,
         amounts,
-        activities: lineItems.map((it) => ({ label: it.label, description: it.description, amount: Number(it.amount ?? 0), hours: it.hours != null ? Number(it.hours) : null })),
+        activities: billableItems.map((it) => ({ label: it.label, description: it.description, amount: Number(it.amount ?? 0), hours: it.hours != null ? Number(it.hours) : null })),
         priorSummary,
       });
     },

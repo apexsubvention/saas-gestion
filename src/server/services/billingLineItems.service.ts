@@ -18,6 +18,7 @@ export function billingLineItemsService(supabase: SupabaseClient) {
           description: it.description && it.description.trim() ? it.description.trim().slice(0, 2000) : null,
           amount: clampAmount(it.amount),
           hours: it.hours != null && Number.isFinite(it.hours) && it.hours >= 0 ? Math.round(Math.min(it.hours, 100_000) * 100) / 100 : null,
+          included_in_billing: it.included_in_billing ?? true,
         }))
         .filter((it) => it.label.length > 0)
         .slice(0, 40);

@@ -82,7 +82,7 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
   // le total déjà validé des activités/postes acceptés (aide à la facturation) -- sinon la phrase ne
   // s'affiche jamais sur un dossier où seule la convention a été lue, sans que le taux ait été
   // reporté sur la fiche. Jamais de valeur inventée : simplement une autre source déjà existante.
-  const lineItemsTotal = dossier.billingLineItems.reduce((sum, it) => sum + it.amount, 0);
+  const lineItemsTotal = dossier.billingLineItems.filter((it) => it.includedInBilling).reduce((sum, it) => sum + it.amount, 0);
   const billerAmount = subsidy.ready && subsidy.requiredSpend != null ? subsidy.requiredSpend : lineItemsTotal > 0 ? lineItemsTotal : null;
   const billingNarrative = buildBillingNarrative({
     clientName: dossier.clientName ?? "Le client",
@@ -177,10 +177,13 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">À inscrire sur les factures</h3>
                 <div className="space-y-2">
                   {dossier.billingLineItems.map((it) => (
-                    <div key={it.id} className="rounded-md border border-neutral-100 p-3 text-sm">
+                    <div key={it.id} className={`rounded-md border border-neutral-100 p-3 text-sm ${it.includedInBilling ? "" : "opacity-70"}`}>
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <span className="font-medium text-neutral-900">{it.label}</span>
-                        {it.hours != null && <span className="text-xs text-neutral-500">{it.hours} h</span>}
+                        <span className="flex items-center gap-2 text-xs text-neutral-500">
+                          {it.hours != null && <span>{it.hours} h</span>}
+                          {!it.includedInBilling && <span className="rounded-full bg-neutral-100 px-2 py-0.5 font-medium text-neutral-600">Non facturé</span>}
+                        </span>
                       </div>
                       {it.description && <p className="mt-1 text-xs text-neutral-500">{it.description}</p>}
                     </div>

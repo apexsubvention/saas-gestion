@@ -74,7 +74,9 @@ export async function analyzeBillingConventionAction(grantProjectId: string, _pr
     await billingLineItemsService(supabase).replaceAll(
       ctx.organizationId,
       grantProjectId,
-      activities.map((a) => ({ label: a.label, description: a.description, amount: a.amount ?? 0, hours: a.hours })),
+      // included_in_billing démarre toujours à true : la lecture automatique ne devine jamais qu'un
+      // poste est un coût interne non facturé (ex. salaire) -- c'est à valider/décocher ci-dessous.
+      activities.map((a) => ({ label: a.label, description: a.description, amount: a.amount ?? 0, hours: a.hours, included_in_billing: true })),
       "ai"
     );
     await logDossierEvent(supabase, ctx, {
@@ -97,14 +99,15 @@ export async function saveBillingLineItemsAction(grantProjectId: string, _prev: 
   const supabase = await createClient();
   try {
     const count = Number(formData.get("item_count") ?? 0);
-    const items: { label: string; description: string | null; amount: number; hours: number | null }[] = [];
+    const items: { label: string; description: string | null; amount: number; hours: number | null; included_in_billing: boolean }[] = [];
     for (let i = 0; i < count; i++) {
       const label = String(formData.get(`item_label_${i}`) ?? "").trim();
       if (!label) continue;
       const description = textOrNull(formData.get(`item_description_${i}`), 2000);
       const amount = numberOrZero(formData.get(`item_amount_${i}`));
       const hours = numberOrNull(formData.get(`item_hours_${i}`));
-      items.push({ label, description, amount, hours });
+      const included = formData.get(`item_included_${i}`) !== "false"; // par défaut true si absent
+      items.push({ label, description, amount, hours, included_in_billing: included });
     }
     await billingLineItemsService(supabase).replaceAll(ctx.organizationId, grantProjectId, items, "manual");
     refresh(grantProjectId);

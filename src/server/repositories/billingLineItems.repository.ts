@@ -13,6 +13,10 @@ export type BillingLineItemRow = {
   amount: number;
   hours: number | null;
   source: "ai" | "manual";
+  // Coché (0050) = ce poste donne lieu à une facture du client, et son montant entre dans le total
+  // réparti sur les versements. Décoché = coût interne (ex. salaire déjà payé par l'entreprise),
+  // remboursé directement par la subvention -- jamais facturé, donc jamais compté dans le total.
+  included_in_billing: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -22,6 +26,8 @@ export type BillingLineItemInput = {
   description: string | null;
   amount: number;
   hours: number | null;
+  // Optionnel : true par défaut (comportement historique -- tout poste accepté était facturé).
+  included_in_billing?: boolean;
 };
 
 export function billingLineItemsRepository(supabase: SupabaseClient) {
@@ -50,6 +56,7 @@ export function billingLineItemsRepository(supabase: SupabaseClient) {
         description: item.description,
         amount: item.amount,
         hours: item.hours,
+        included_in_billing: item.included_in_billing ?? true,
         source,
       }));
       const { data, error } = await supabase.from("billing_line_items").insert(rows).select();
