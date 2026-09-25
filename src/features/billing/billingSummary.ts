@@ -7,6 +7,14 @@
 // reprend volontairement la même construction (« devra avoir [participe passé] ») que la première,
 // jamais « devra facturer » (formulation que Jade n'aime pas).
 //
+// Voix active ou passive selon QUI est nommé (Jade, sur le dossier direct de Réseau Psy -- pas
+// de fournisseur/sous-traitant) : billerLabel == null veut dire que la phrase parle du CLIENT
+// lui-même, qui est celui qui DÉPENSE (reçoit des factures de ses fournisseurs pour pouvoir les
+// soumettre à la réclamation) -- jamais celui qui facture quelqu'un d'autre. Donc voix passive :
+// « [client] devra avoir ÉTÉ facturé [...] ». billerLabel renseigné (fournisseur/sous-traitant,
+// SuppliersTable.tsx/SupplierDossierCard.tsx) reste à la voix active : cette partie-là émet
+// vraiment les factures : « [fournisseur] devra avoir facturé [...] ».
+//
 // Fonction pure (aucune dépendance Supabase) : appelable aussi bien depuis une page serveur
 // (grants/[id]/page.tsx) qu'un composant client (SuppliersTable.tsx, DossierCard.tsx,
 // SupplierDossierCard.tsx).
@@ -52,7 +60,11 @@ export function buildBillingNarrative(input: BillingNarrativeInput): string | nu
   if (input.billerAmount != null) {
     const who = input.billerLabel ?? input.clientName;
     const due = input.deadline ? ` d'ici le ${formatDate(input.deadline)}` : "";
-    parts.push(`${who} devra avoir facturé ${money(input.billerAmount)}${due}.`);
+    // Pas de fournisseur/sous-traitant nommé : c'est le dossier direct du client -- il DÉPENSE
+    // (reçoit des factures), il ne facture personne -- voix passive. Voir le commentaire en
+    // tête de fichier.
+    const verb = input.billerLabel == null ? "avoir été facturé" : "avoir facturé";
+    parts.push(`${who} devra ${verb} ${money(input.billerAmount)}${due}.`);
   }
 
   return parts.length > 0 ? parts.join(" ") : null;
