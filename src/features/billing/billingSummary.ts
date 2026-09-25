@@ -3,7 +3,9 @@
 // (src/features/grants/subsidyMath.ts, utilisé par SubsidyPanel côté interne) mais sous forme de
 // phrase plutôt que de tableau de chiffres, pour l'afficher aussi bien à l'interne que dans le
 // portail client. Demandé par Jade : « L'entreprise X devra avoir dépensé la totalité du projet
-// [...] mais [client parent] devra facturer [...] d'ici [date de fin] ».
+// [...] mais [client parent] devra avoir facturé [...] d'ici [date de fin] » -- la deuxième phrase
+// reprend volontairement la même construction (« devra avoir [participe passé] ») que la première,
+// jamais « devra facturer » (formulation que Jade n'aime pas).
 //
 // Fonction pure (aucune dépendance Supabase) : appelable aussi bien depuis une page serveur
 // (grants/[id]/page.tsx) qu'un composant client (SuppliersTable.tsx, DossierCard.tsx,
@@ -50,7 +52,7 @@ export function buildBillingNarrative(input: BillingNarrativeInput): string | nu
   if (input.billerAmount != null) {
     const who = input.billerLabel ?? input.clientName;
     const due = input.deadline ? ` d'ici le ${formatDate(input.deadline)}` : "";
-    parts.push(`${who} devra facturer ${money(input.billerAmount)}${due}.`);
+    parts.push(`${who} devra avoir facturé ${money(input.billerAmount)}${due}.`);
   }
 
   return parts.length > 0 ? parts.join(" ") : null;

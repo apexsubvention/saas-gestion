@@ -83,7 +83,7 @@ export default async function PortalHomePage() {
           </div>
           <div className="space-y-3">
             {(supplierRows as SupplierBillingRow[]).map((s) => (
-              <SupplierDossierCard key={s.id} row={s} />
+              <SupplierDossierCard key={s.id} row={s} clientName={ctx.clientName} />
             ))}
           </div>
         </div>

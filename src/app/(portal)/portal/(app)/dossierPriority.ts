@@ -20,6 +20,12 @@ export function computeDossierPriority(dossier: PortalDossier): DossierPriority 
 }
 
 export function compareDossiersByPriority(a: PortalDossier, b: PortalDossier): number {
+  // Un dossier complété passe toujours en dernier, peu importe les autres critères --
+  // demandé par Jade : ce qui est terminé n'a plus besoin d'attirer l'attention du client.
+  const aCompleted = a.status === "completed";
+  const bCompleted = b.status === "completed";
+  if (aCompleted !== bCompleted) return aCompleted ? 1 : -1;
+
   const pa = computeDossierPriority(a);
   const pb = computeDossierPriority(b);
   if (pa.hasPendingClaim !== pb.hasPendingClaim) return pa.hasPendingClaim ? -1 : 1;

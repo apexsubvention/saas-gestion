@@ -41,7 +41,7 @@ function formatRate(rate: number | null): string {
   return `${(Number(rate) * 100).toLocaleString("fr-CA", { maximumFractionDigits: 1 })} %`;
 }
 
-export function SupplierDossierCard({ row }: { row: SupplierBillingRow }) {
+export function SupplierDossierCard({ row, clientName }: { row: SupplierBillingRow; clientName: string }) {
   const [expanded, setExpanded] = useState(false);
   const [details, setDetails] = useState<SupplierDossierDetails | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -163,7 +163,10 @@ export function SupplierDossierCard({ row }: { row: SupplierBillingRow }) {
                 const narrative = buildBillingNarrative({
                   clientName: details.view.client_name,
                   subsidy,
-                  billerLabel: "Vous",
+                  // Le nom réel du fournisseur (compte portail courant) plutôt que « Vous » : la
+                  // phrase reprend la construction « devra avoir facturé » (3e personne), pas
+                  // grammaticalement correcte avec un « vous ».
+                  billerLabel: clientName,
                   billerAmount: row.budget_amount,
                   deadline: details.view.official_end_date,
                 });
