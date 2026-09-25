@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { FolderKanban, FileText } from "lucide-react";
+import { FolderKanban, FileText, Radar } from "lucide-react";
 
 // Même style que le menu latéral de la plateforme admin (src/components/layout/Sidebar.tsx)
 // -- Jade a demandé un portail « qui se rapproche plus de ma plateforme admin » : même
@@ -8,6 +8,7 @@ import { FolderKanban, FileText } from "lucide-react";
 const NAV = [
   { href: "/portal", label: "Mes dossiers", icon: FolderKanban },
   { href: "/portal/documents", label: "Documents", icon: FileText },
+  { href: "/portal/veille", label: "Veille de subventions", icon: Radar },
 ] as const;
 
 export function PortalSidebar() {

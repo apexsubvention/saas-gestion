@@ -7,6 +7,8 @@ import { randomBytes } from "crypto";
 import { documentsService } from "@/server/services/documents.service";
 import { clientsService } from "@/server/services/clients.service";
 import { requireOrgContext } from "@/lib/permissions";
+import { clientOpportunityInterestsService } from "@/server/services/clientOpportunityInterests.service";
+import type { OpportunityInterestStatus } from "@/server/repositories/clientOpportunityInterests.repository";
 
 // Duplique volontairement le formatage d'erreur de src/server/import/importApexClients.ts
 // plutôt que de le partager : une erreur Supabase brute (PostgrestError/AuthError) n'est
@@ -279,4 +281,19 @@ export async function deletePortalAccountAction(clientId: string, portalUserRowI
 
   revalidatePath(`/clients/${clientId}`);
   return { error: null };
+}
+
+// ---- Opportunités signalées par le client (portail -> personnel) ----------------
+// Voir 0052_client_opportunity_interests.sql -- le client crée la ligne depuis son portail ;
+// le personnel ne fait que changer le statut (RLS : update réservée à is_org_staff).
+
+export async function updateOpportunityInterestStatusAction(
+  clientId: string,
+  interestId: string,
+  status: OpportunityInterestStatus
+): Promise<void> {
+  await requireOrgContext();
+  const supabase = await createClient();
+  await clientOpportunityInterestsService(supabase).updateStatus(interestId, status);
+  revalidatePath(`/clients/${clientId}`);
 }

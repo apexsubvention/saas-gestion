@@ -5,7 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 type Ctx = { organizationId: string; organizationUserId: string };
 
-export type NotificationType = "task_assigned" | "ai_review" | "general" | "deadline" | "claim_due";
+export type NotificationType = "task_assigned" | "ai_review" | "general" | "deadline" | "claim_due" | "opportunity_interest";
 
 export type NotificationRow = {
   id: string;

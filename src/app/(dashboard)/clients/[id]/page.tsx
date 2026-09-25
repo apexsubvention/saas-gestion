@@ -14,17 +14,20 @@ import { PortalPasswordBox } from "./PortalPasswordBox";
 import { DeletePortalAccountButton } from "./DeletePortalAccountButton";
 import { ClientTabs } from "./ClientTabs";
 import { GRANT_PROJECT_STATUS_LABELS, grantProjectStatusBadgeClass } from "@/features/grants/constants";
+import { clientOpportunityInterestsService } from "@/server/services/clientOpportunityInterests.service";
+import { OpportunityInterests } from "./OpportunityInterests";
 
 export default async function ClientDetailPage({ params }: { params: { id: string } }) {
   const supabase = await createClient();
   const client = await clientsService(supabase).get(params.id);
   if (!client) notFound();
 
-  const [projects, documents, children, allClients] = await Promise.all([
+  const [projects, documents, children, allClients, opportunityInterests] = await Promise.all([
     grantProjectsService(supabase).listByClient(params.id),
     documentsService(supabase).listByClient(params.id),
     clientsService(supabase).listChildren(params.id),
     clientsService(supabase).list(),
+    clientOpportunityInterestsService(supabase).listByClient(params.id),
   ]);
   const parentCandidates = allClients.filter((c) => c.id !== client.id);
   const currentParent = client.parent_client_id ? allClients.find((c) => c.id === client.parent_client_id) : null;
@@ -144,6 +147,16 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
           Programmes enregistrés dans Apex dont la nature correspond aux besoins actuels de ce client.
         </p>
         <CompatiblePrograms supabase={supabase} needs={client.current_needs} />
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold text-neutral-900">Opportunités signalées par le client</h2>
+        <p className="text-xs text-neutral-500">
+          Envoyées depuis l&apos;onglet Veille du portail client (« Cette opportunité m&apos;intéresse »).
+        </p>
+        <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+          <OpportunityInterests clientId={client.id} interests={opportunityInterests} />
+        </div>
       </section>
     </>
   );
