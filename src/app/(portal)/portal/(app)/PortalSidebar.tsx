@@ -6,9 +6,9 @@ import { FolderKanban, FileText, Radar } from "lucide-react";
 // habillage (fond foncé, icônes, bloc de marque), un jeu de sections réduit et adapté au
 // client plutôt qu'au personnel.
 const NAV = [
+  { href: "/portal/veille", label: "Veille de subventions", icon: Radar },
   { href: "/portal", label: "Mes dossiers", icon: FolderKanban },
   { href: "/portal/documents", label: "Documents", icon: FileText },
-  { href: "/portal/veille", label: "Veille de subventions", icon: Radar },
 ] as const;
 
 export function PortalSidebar() {

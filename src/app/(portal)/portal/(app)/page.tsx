@@ -24,6 +24,9 @@ import { SupplierDossierCard, type SupplierBillingRow } from "./SupplierDossierC
 // autres sous-traitants -- pas seulement le montant à facturer comme avant.
 const UPLOADABLE_STATUSES = ["requested", "issue"];
 const ACTIVE_CLAIM_STATUSES_EXCLUDED = ["paid", "rejected"];
+// Un dossier est considéré « obtenu » dès qu'il est approuvé -- qu'il soit encore en attente de
+// réclamation ou déjà complété (voir GRANT_PROJECT_STATUS_LABELS, features/grants/constants.ts).
+const OBTAINED_PROJECT_STATUSES = ["approved", "awaiting_claim", "completed"];
 
 export default async function PortalHomePage() {
   const ctx = await requirePortalContext();
@@ -38,6 +41,7 @@ export default async function PortalHomePage() {
     (sum, d) => sum + d.claims.filter((c) => !ACTIVE_CLAIM_STATUSES_EXCLUDED.includes(c.status)).length,
     0
   );
+  const obtainedCount = dossiers.filter((d) => OBTAINED_PROJECT_STATUSES.includes(d.status)).length;
   const toProvideCount = dossiers.reduce((sum, d) => {
     const projectLevel = d.documentRequests.filter((r) => UPLOADABLE_STATUSES.includes(r.status)).length;
     const perClaim = d.claims.reduce(
@@ -58,8 +62,9 @@ export default async function PortalHomePage() {
       </div>
 
       {dossiers.length > 0 && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <SummaryTile label="Dossiers actifs" value={dossiers.length} />
+          <SummaryTile label="Subventions obtenues" value={obtainedCount} />
           <SummaryTile label="Réclamations en cours" value={upcomingClaims} />
           <SummaryTile label="Éléments à fournir" value={toProvideCount} highlight={toProvideCount > 0} />
         </div>
