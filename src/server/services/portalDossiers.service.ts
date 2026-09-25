@@ -77,6 +77,11 @@ export type PortalBillingInstallment = {
   amount: number;
   invoiceDescription: string | null;
   status: "draft" | "submitted";
+  // Facture téléversée par le client pour ce versement (0054) -- null tant que le client ne
+  // l'a pas envoyée depuis le portail (InstallmentInvoiceUpload). Écrit par
+  // uploadInstallmentInvoiceAction, jamais ici (lecture seule dans ce service).
+  clientInvoiceFilename: string | null;
+  clientInvoiceUploadedAt: string | null;
 };
 
 export type PortalDossier = {
@@ -137,7 +142,7 @@ export function portalDossiersService(supabase: SupabaseClient) {
 
       const dossiers = await Promise.all(
         projects.map(async (p): Promise<PortalDossier> => {
-          const [claimRows, questionnaireData, requestRows, noteRows, lineItemRows, agreements, installmentRows] = await Promise.all([
+          const [claimRows, questionnaireData, requestRows, noteRows, lineItemRows, agreements, installmentRows, projectDocuments] = await Promise.all([
             claims.listByProject(p.id),
             questionnaire.get(p.id),
             documentRequests.listByProject(p.id),
@@ -145,7 +150,12 @@ export function portalDossiersService(supabase: SupabaseClient) {
             billingLineItems.listByProject(p.id),
             grantAgreements.listByProject(p.id),
             billingInstallments.listByProject(p.id),
+            documents.listByProject(p.id),
           ]);
+          // Nom du fichier de facture pour chaque versement (0054) -- un seul appel pour tout le
+          // dossier plutôt qu'un par versement ; documents_select_portal_full (0045) couvre déjà
+          // cette lecture pour le portail.
+          const documentFilenameById = new Map(projectDocuments.map((d) => [d.id, d.filename]));
           const agreement = agreements[0] ?? null;
 
           const visibleRequests = requestRows.filter(
@@ -218,6 +228,8 @@ export function portalDossiersService(supabase: SupabaseClient) {
               amount: Number(r.amount),
               invoiceDescription: r.invoice_description,
               status: r.status,
+              clientInvoiceFilename: r.client_invoice_document_id ? (documentFilenameById.get(r.client_invoice_document_id) ?? "Facture envoyée") : null,
+              clientInvoiceUploadedAt: r.client_invoice_uploaded_at,
             })),
           };
         })

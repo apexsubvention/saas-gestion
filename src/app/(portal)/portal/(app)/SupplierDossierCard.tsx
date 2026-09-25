@@ -13,6 +13,7 @@ import { useState, useTransition } from "react";
 import { DOCUMENT_CATEGORY_LABELS, grantProjectStatusBadgeClass, GRANT_PROJECT_STATUS_LABELS } from "@/features/grants/constants";
 import { getSupplierDossierDetailsAction, type SupplierDossierDetails } from "./supplierActions";
 import { PortalOpenDocumentButton } from "./PortalOpenDocumentButton";
+import { InstallmentInvoiceUpload } from "./InstallmentInvoiceUpload";
 import { computeSubsidy } from "@/features/grants/subsidyMath";
 import { buildBillingNarrative } from "@/features/billing/billingSummary";
 
@@ -198,6 +199,11 @@ export function SupplierDossierCard({ row, clientName }: { row: SupplierBillingR
                           </span>
                         </div>
                         {inst.invoice_description && <p className="mt-1 whitespace-pre-wrap text-xs text-neutral-500">{inst.invoice_description}</p>}
+                        <InstallmentInvoiceUpload
+                          installmentId={inst.id}
+                          uploadedFilename={inst.client_invoice_document_id ? (details.documents.find((d) => d.id === inst.client_invoice_document_id)?.filename ?? "Facture envoyée") : null}
+                          uploadedAt={inst.client_invoice_uploaded_at}
+                        />
                       </div>
                     ))}
                   </div>

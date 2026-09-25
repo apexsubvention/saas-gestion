@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatCaughtError } from "@/lib/errors";
 import { logDossierEvent } from "@/server/services/audit";
+import { billingInstallmentsService } from "@/server/services/billingInstallments.service";
 
 const BUCKET = "apex-documents";
 
@@ -144,4 +145,109 @@ export async function getPortalDocumentUrlAction(documentId: string): Promise<{ 
   } catch (e) {
     return { url: null, error: formatCaughtError(e) };
   }
+}
+
+// Téléversement de la facture d'un versement de facturation (0054), directement par le compte
+// portail -- le client, un compte parent dans la hiérarchie (can_access_grant_project,
+// hiérarchie-aware, cf. 0028), ou un compte fournisseur (can_access_grant_project_as_supplier, cf.
+// 0047/0049) peuvent tous les trois indiquer que leur facture est faite et la téléverser : les deux
+// policies SELECT existantes sur billing_installments couvrent déjà ces trois cas, combinées en OR.
+//
+// "La facture est faite" est un concept DISTINCT de billing_installments.status
+// ('draft'/'submitted', un choix interne à Apex sur l'état de PRÉPARATION du versement, cf. 0042) --
+// cette action ne touche jamais `status`, seulement les 3 colonnes client_invoice_* (0054).
+//
+// billing_installments_update (0042) est réservée au staff -- même principe que
+// uploadRequestedDocumentAction : on vérifie l'accès avec le client RLS normal (SELECT, déjà
+// portail-compatible), puis on écrit (storage + documents + billing_installments) avec le client
+// admin, strictement sur la ligne déjà vérifiée.
+export async function uploadInstallmentInvoiceAction(
+  installmentId: string,
+  _prev: PortalUploadFormState,
+  formData: FormData
+): Promise<PortalUploadFormState> {
+  const ctx = await requirePortalContext();
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { error: "Choisis un fichier." };
+  }
+
+  const supabase = await createClient();
+  const { data: installment, error: findError } = await supabase
+    .from("billing_installments")
+    .select("id, organization_id, grant_project_id, installment_number, grant_projects(client_id)")
+    .eq("id", installmentId)
+    .maybeSingle();
+  if (findError || !installment) {
+    return { error: "Versement introuvable ou accès refusé." };
+  }
+  // La jointure grant_projects(client_id) revient en objet (relation *-à-1) -- jamais en
+  // tableau -- mais le typage générique de `createClient()` sur une table sans lien déclaré
+  // dans database.types.ts (billing_installments n'y figure pas, cf. repositories non typés)
+  // ne le sait pas : on relit la valeur en `unknown` plutôt que de forcer un `any` large.
+  const clientId = (installment as unknown as { grant_projects: { client_id: string } | null }).grant_projects?.client_id;
+  if (!clientId) {
+    return { error: "Dossier introuvable." };
+  }
+
+  const admin = createAdminClient();
+  try {
+    const path = `${installment.organization_id}/${clientId}/${Date.now()}-${file.name}`;
+    const { error: uploadError } = await admin.storage.from(BUCKET).upload(path, file, {
+      contentType: file.type || undefined,
+      upsert: false,
+    });
+    if (uploadError) throw uploadError;
+
+    const { data: orgUserRow } = await admin
+      .from("organization_users")
+      .select("id")
+      .eq("user_id", ctx.userId)
+      .eq("organization_id", ctx.organizationId)
+      .maybeSingle();
+
+    const { data: doc, error: docError } = await admin
+      .from("documents")
+      .insert({
+        organization_id: installment.organization_id,
+        filename: file.name,
+        storage_path: path,
+        mime_type: file.type || null,
+        size: file.size || null,
+        category: "invoice",
+        client_id: clientId,
+        grant_project_id: installment.grant_project_id,
+        uploaded_by: orgUserRow?.id ?? null,
+        source: "client_portal",
+      })
+      .select()
+      .single();
+    if (docError) throw docError;
+
+    // Écrit via le service/repository (client Supabase non typé, cf. billingInstallments.repository.ts)
+    // plutôt qu'un appel `.from("billing_installments")` direct sur le client admin typé
+    // (`Database`) : les 3 colonnes client_invoice_* sont nouvelles (0054) et n'existent pas dans
+    // database.types.ts (généré, non régénérable dans cet environnement) -- même principe que les
+    // autres accès à de nouvelles colonnes/tables dans ce projet.
+    await billingInstallmentsService(admin).update(installmentId, {
+      client_invoice_document_id: (doc as { id: string }).id,
+      client_invoice_uploaded_at: new Date().toISOString(),
+      client_invoice_uploaded_by: orgUserRow?.id ?? null,
+    });
+
+    await logDossierEvent(admin, { organizationId: installment.organization_id, organizationUserId: orgUserRow?.id ?? "" }, {
+      grant_project_id: installment.grant_project_id,
+      client_id: clientId,
+      kind: "installment_invoice_received_portal",
+      title: `Facture reçue du client pour le versement n°${installment.installment_number}`,
+      source: "portal",
+      ref_type: "billing_installment",
+      ref_id: installmentId,
+    });
+  } catch (e) {
+    return { error: formatCaughtError(e) };
+  }
+
+  revalidatePath("/portal");
+  return { error: null };
 }

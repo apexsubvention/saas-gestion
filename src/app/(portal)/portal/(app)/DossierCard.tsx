@@ -16,6 +16,7 @@ import {
   grantProjectStatusBadgeClass,
 } from "@/features/grants/constants";
 import { DocumentRequestUpload } from "./DocumentRequestUpload";
+import { InstallmentInvoiceUpload } from "./InstallmentInvoiceUpload";
 import { PortalNotes } from "./PortalNotes";
 import { computeSubsidy } from "@/features/grants/subsidyMath";
 import { buildBillingNarrative } from "@/features/billing/billingSummary";
@@ -167,6 +168,7 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
                       </span>
                     </div>
                     {inst.invoiceDescription && <p className="mt-1 whitespace-pre-wrap text-xs text-neutral-500">{inst.invoiceDescription}</p>}
+                    <InstallmentInvoiceUpload installmentId={inst.id} uploadedFilename={inst.clientInvoiceFilename} uploadedAt={inst.clientInvoiceUploadedAt} />
                   </div>
                 ))}
               </div>

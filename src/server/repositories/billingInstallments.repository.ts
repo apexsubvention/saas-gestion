@@ -15,6 +15,12 @@ export type BillingInstallmentRow = {
   generated_by: "ai" | "manual";
   created_at: string;
   updated_at: string;
+  // "Facture faite" déclarée par le client depuis le portail (0054) -- distinct de `status`
+  // ci-dessus (choix interne d'Apex). client_invoice_document_id référence la ligne
+  // `documents` du fichier téléversé (category 'invoice', source 'client_portal').
+  client_invoice_document_id: string | null;
+  client_invoice_uploaded_at: string | null;
+  client_invoice_uploaded_by: string | null;
 };
 
 export type BillingInstallmentInsert = {
@@ -28,7 +34,12 @@ export type BillingInstallmentInsert = {
   generated_by?: "ai" | "manual";
 };
 
-export type BillingInstallmentUpdate = Partial<Pick<BillingInstallmentRow, "invoice_description" | "amount" | "status">>;
+export type BillingInstallmentUpdate = Partial<
+  Pick<
+    BillingInstallmentRow,
+    "invoice_description" | "amount" | "status" | "client_invoice_document_id" | "client_invoice_uploaded_at" | "client_invoice_uploaded_by"
+  >
+>;
 
 export function billingInstallmentsRepository(supabase: SupabaseClient) {
   return {

@@ -5,6 +5,7 @@ import { grantProjectsService } from "@/server/services/grantProjects.service";
 import { grantAgreementsService } from "@/server/services/grantAgreements.service";
 import { billingLineItemsService } from "@/server/services/billingLineItems.service";
 import { billingInstallmentsService } from "@/server/services/billingInstallments.service";
+import { documentsService } from "@/server/services/documents.service";
 import { suggestInstallmentCount } from "@/features/billing/schedule";
 import { UploadConventionForm } from "./UploadConventionForm";
 import { LineItemsEditor } from "./LineItemsEditor";
@@ -23,11 +24,16 @@ export default async function BillingAidPage({ params }: { params: { id: string 
   const project: any = await grantProjectsService(supabase).get(params.id);
   if (!project) notFound();
 
-  const [agreements, lineItems, installments] = await Promise.all([
+  const [agreements, lineItems, installments, projectDocuments] = await Promise.all([
     grantAgreementsService(supabase).listByProject(params.id),
     billingLineItemsService(supabase).listByProject(params.id),
     billingInstallmentsService(supabase).listByProject(params.id),
+    documentsService(supabase).listByProject(params.id),
   ]);
+  // Facture reçue du client (0054) : jointe ici plutôt que par une requête par versement --
+  // un seul aller-retour pour toutes les cartes de la page, même liste que la section
+  // Documents du dossier (grants/[id]/page.tsx) affiche déjà séparément.
+  const documentById = new Map(projectDocuments.map((d) => [d.id, d]));
   const agreement = agreements[0] ?? null;
   const projectStart = agreement?.project_start ?? project.official_start_date ?? null;
   const projectEnd = agreement?.project_end ?? project.official_end_date ?? null;
@@ -114,7 +120,12 @@ export default async function BillingAidPage({ params }: { params: { id: string 
 
       <section className="space-y-4">
         {installments.map((inst) => (
-          <BillingInstallmentCard key={inst.id} grantProjectId={params.id} installment={inst} />
+          <BillingInstallmentCard
+            key={inst.id}
+            grantProjectId={params.id}
+            installment={inst}
+            clientInvoiceDocument={inst.client_invoice_document_id ? (documentById.get(inst.client_invoice_document_id) ?? null) : null}
+          />
         ))}
         {installments.length === 0 && <p className="text-sm text-neutral-400">Aucun versement généré pour l&apos;instant.</p>}
       </section>

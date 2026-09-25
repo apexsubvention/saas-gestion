@@ -7,7 +7,9 @@
 // qu'Apex a rédigé ou réparti automatiquement.
 import { useState, useTransition } from "react";
 import type { BillingInstallmentRow } from "@/server/repositories/billingInstallments.repository";
-import { updateBillingInstallmentAction, deleteBillingInstallmentAction, setBillingInstallmentStatusAction } from "./actions";
+import type { DocumentRow } from "@/server/repositories/documents.repository";
+import { updateBillingInstallmentAction, deleteBillingInstallmentAction, setBillingInstallmentStatusAction, clearInstallmentClientInvoiceAction } from "./actions";
+import { OpenDocumentButton } from "../OpenDocumentButton";
 
 const input = "w-full rounded-md border border-neutral-300 px-3 py-2 text-sm";
 const textarea = `${input} min-h-[6rem]`;
@@ -34,13 +36,36 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-export function BillingInstallmentCard({ grantProjectId, installment }: { grantProjectId: string; installment: BillingInstallmentRow }) {
+function formatDateTime(iso: string | null): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString("fr-CA", { dateStyle: "medium", timeStyle: "short" });
+}
+
+export function BillingInstallmentCard({
+  grantProjectId,
+  installment,
+  clientInvoiceDocument,
+}: {
+  grantProjectId: string;
+  installment: BillingInstallmentRow;
+  // Facture téléversée par le client depuis le portail (0054) -- null si aucune (colonne
+  // client_invoice_document_id vide) ou si le document référencé n'a pas été retrouvé (ne devrait
+  // pas arriver en usage normal, mais évite un crash si jamais).
+  clientInvoiceDocument: DocumentRow | null;
+}) {
   const [description, setDescription] = useState(installment.invoice_description ?? "");
   const [amount, setAmount] = useState(String(installment.amount ?? 0));
   const [open, setOpen] = useState(installment.status === "draft");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+
+  function clearClientInvoice() {
+    if (!confirm("Retirer la facture reçue du client sur ce versement ? Le fichier reste dans les documents du dossier, mais le client pourra en téléverser une nouvelle.")) return;
+    startTransition(async () => {
+      await clearInstallmentClientInvoiceAction(grantProjectId, installment.id);
+    });
+  }
 
   function save() {
     setError(null);
@@ -81,6 +106,9 @@ export function BillingInstallmentCard({ grantProjectId, installment }: { grantP
           <span className="ml-2 text-xs font-medium text-neutral-700">{money(Number(amount) || 0)}</span>
         </div>
         <div className="flex items-center gap-2">
+          {clientInvoiceDocument && (
+            <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700">Facture reçue du client</span>
+          )}
           <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${installment.status === "submitted" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>
             {installment.status === "submitted" ? "Facturé" : "Brouillon"}
           </span>
@@ -101,6 +129,27 @@ export function BillingInstallmentCard({ grantProjectId, installment }: { grantP
               </button>
             </div>
           </div>
+
+          <section className="space-y-2 rounded-md border border-indigo-100 bg-indigo-50/50 p-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-indigo-800">Facture du client</h3>
+            {clientInvoiceDocument ? (
+              <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                <div>
+                  <p className="text-neutral-900">
+                    {clientInvoiceDocument.filename} <OpenDocumentButton storagePath={clientInvoiceDocument.storage_path} filename={clientInvoiceDocument.filename} />
+                  </p>
+                  <p className="text-xs text-neutral-500">
+                    Reçue{installment.client_invoice_uploaded_at ? ` le ${formatDateTime(installment.client_invoice_uploaded_at)}` : ""} via le portail client.
+                  </p>
+                </div>
+                <button type="button" onClick={clearClientInvoice} disabled={pending} className="rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium text-neutral-600 hover:bg-white disabled:opacity-50">
+                  Retirer
+                </button>
+              </div>
+            ) : (
+              <p className="text-xs text-neutral-500">Le client n&apos;a pas encore indiqué que cette facture était faite ni téléversé de fichier depuis le portail.</p>
+            )}
+          </section>
 
           <section className="space-y-2">
             <h3 className="text-sm font-semibold text-neutral-900">Texte suggéré pour la facture</h3>

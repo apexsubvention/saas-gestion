@@ -222,6 +222,26 @@ export async function setBillingInstallmentStatusAction(grantProjectId: string, 
   }
 }
 
+// Retire la facture reçue du client sur un versement (0054) -- ex. le client s'est trompé de
+// fichier et doit retéléverser. Ne supprime jamais le document lui-même (il reste dans la
+// bibliothèque du dossier, au cas où) -- seulement le lien/l'horodatage sur ce versement, pour
+// que la carte redevienne « facture non reçue » et que le client puisse recommencer.
+export async function clearInstallmentClientInvoiceAction(grantProjectId: string, installmentId: string): Promise<BillingActionResult> {
+  await requireOrgContext();
+  const supabase = await createClient();
+  try {
+    await billingInstallmentsService(supabase).update(installmentId, {
+      client_invoice_document_id: null,
+      client_invoice_uploaded_at: null,
+      client_invoice_uploaded_by: null,
+    });
+    refresh(grantProjectId);
+    return { error: null, ok: true };
+  } catch (e) {
+    return { error: formatCaughtError(e) };
+  }
+}
+
 export async function deleteBillingInstallmentAction(grantProjectId: string, installmentId: string, installmentNumber: number): Promise<BillingActionResult> {
   const ctx = await requireOrgContext();
   const supabase = await createClient();
