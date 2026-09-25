@@ -29,7 +29,7 @@ function PortalLoginForm() {
   return (
     <form
       action={formAction}
-      className="w-full max-w-sm space-y-4 rounded-xl border border-neutral-200 bg-white p-8 shadow-sm"
+      className="w-full max-w-sm space-y-4 rounded-xl border border-neutral-200 bg-white/95 p-8 shadow-xl backdrop-blur-sm"
     >
       <h1 className="text-xl font-semibold text-neutral-900">Portail client Apex</h1>
       <p className="text-sm text-neutral-500">Connecte-toi avec les identifiants qui t&apos;ont été transmis.</p>
@@ -93,7 +93,10 @@ function PortalLoginForm() {
 
 export default function PortalLoginPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-neutral-50">
+    <div
+      className="flex min-h-screen items-center justify-center bg-neutral-950 bg-cover bg-center"
+      style={{ backgroundImage: "url(/images/login-background.jpg)" }}
+    >
       <Suspense fallback={null}>
         <PortalLoginForm />
       </Suspense>
