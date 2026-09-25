@@ -15,6 +15,11 @@ export type GrantProjectRow = {
   grant_rate: number | null;
   health_score: number | null;
   created_at: string;
+  // Jade : masquer un dossier d'un client ENFANT du portail de son client PARENT (ex. le
+  // dossier ne concerne pas le parent) -- sans le masquer du portail du client lui-même, ni
+  // du personnel. Filtré côté application dans portalDossiersService.listDossiers(), pas par
+  // RLS -- voir 0056 pour le raisonnement complet.
+  hidden_from_parent_portal: boolean;
 };
 
 export function grantProjectsRepository(supabase: SupabaseClient) {
@@ -22,7 +27,7 @@ export function grantProjectsRepository(supabase: SupabaseClient) {
     async list() {
       const { data, error } = await supabase
         .from("grant_projects")
-        .select("*, clients(name), grant_programs(name)")
+        .select("*, clients(name, parent_client_id), grant_programs(name)")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
@@ -41,7 +46,7 @@ export function grantProjectsRepository(supabase: SupabaseClient) {
     async findById(id: string) {
       const { data, error } = await supabase
         .from("grant_projects")
-        .select("*, clients(name), grant_programs(name)")
+        .select("*, clients(name, parent_client_id), grant_programs(name)")
         .eq("id", id)
         .maybeSingle();
       if (error) throw error;
@@ -84,6 +89,17 @@ export function grantProjectsRepository(supabase: SupabaseClient) {
       const { data, error } = await supabase
         .from("grant_projects")
         .update({ status, updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as GrantProjectRow;
+    },
+
+    async updateHiddenFromParentPortal(id: string, hidden: boolean): Promise<GrantProjectRow> {
+      const { data, error } = await supabase
+        .from("grant_projects")
+        .update({ hidden_from_parent_portal: hidden, updated_at: new Date().toISOString() })
         .eq("id", id)
         .select()
         .single();

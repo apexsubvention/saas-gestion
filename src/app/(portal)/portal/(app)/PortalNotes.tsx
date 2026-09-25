@@ -46,11 +46,16 @@ export function PortalNotes({
   clientId,
   notes,
   currentOrgUserId,
+  hint,
 }: {
   grantProjectId: string;
   clientId: string;
   notes: DossierNoteView[];
   currentOrgUserId: string | null;
+  // Jade : sur un dossier « à rédiger », ce même fil sert aussi à commenter les dépenses et à
+  // donner les grandes lignes du projet -- pas de nouveaux champs, juste un rappel affiché ici
+  // (voir DossierCard.tsx pour quand ce texte est fourni).
+  hint?: string;
 }) {
   const action = addPortalNoteAction.bind(null, grantProjectId, clientId);
   const initialState: AddPortalNoteFormState = { error: null };
@@ -59,6 +64,7 @@ export function PortalNotes({
   return (
     <div className="space-y-2">
       <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Notes échangées avec ton équipe</h3>
+      {hint && <p className="text-xs text-neutral-500">{hint}</p>}
       <div className="space-y-2 rounded-md border border-neutral-100 p-3">
         {notes.length > 0 ? (
           <ol className="space-y-3">
@@ -89,7 +95,7 @@ export function PortalNotes({
           name="body"
           required
           rows={2}
-          placeholder="Écrire un message à ton équipe chez Apex…"
+          placeholder={hint ? "Grandes lignes de ton projet, questions ou commentaires sur les dépenses…" : "Écrire un message à ton équipe chez Apex…"}
           className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
         />
         <div className="flex justify-end">

@@ -73,6 +73,86 @@ function formatAmount(amount: number | null): string {
   return `${Number(amount).toLocaleString("fr-CA", { minimumFractionDigits: 2 })} $`;
 }
 
+// Résumé du programme (Jade) : contexte, dépenses admissibles/non admissibles, ce qu'il faut
+// pour déposer et montants min/max -- un sous-ensemble volontairement restreint du dernier
+// program_snapshots figé (voir PortalProgramSummary, portalDossiers.service.ts). Chaque champ
+// ne s'affiche que s'il est renseigné -- jamais de "—" qui donnerait l'impression d'un vide
+// confirmé alors qu'Apex n'a simplement pas cette information.
+function ProgramSummarySection({ summary }: { summary: NonNullable<PortalDossier["programSummary"]> }) {
+  const hasAmounts = summary.minEligibleSpend != null || summary.maxAidAmount != null;
+  return (
+    <div className="space-y-3 rounded-lg border border-indigo-100 bg-indigo-50/40 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Résumé du programme</h3>
+        <span className="text-[11px] text-indigo-400">Figé le {formatDate(summary.takenAt)}</span>
+      </div>
+
+      {summary.description && (
+        <div>
+          <p className="text-xs font-medium text-neutral-500">Contexte</p>
+          <p className="mt-0.5 whitespace-pre-wrap text-sm text-neutral-800">{summary.description}</p>
+        </div>
+      )}
+
+      {hasAmounts && (
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          {summary.minEligibleSpend != null && (
+            <div>
+              <p className="text-xs text-neutral-500">Dépenses minimales</p>
+              <p className="text-neutral-800">{formatAmount(summary.minEligibleSpend)}</p>
+            </div>
+          )}
+          {summary.maxAidAmount != null && (
+            <div>
+              <p className="text-xs text-neutral-500">Montant maximal</p>
+              <p className="text-neutral-800">{formatAmount(summary.maxAidAmount)}</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {summary.aidNotes && (
+        <div>
+          <p className="text-xs font-medium text-neutral-500">Formule d&apos;aide</p>
+          <p className="mt-0.5 whitespace-pre-wrap text-sm text-neutral-800">{summary.aidNotes}</p>
+        </div>
+      )}
+
+      {summary.eligibleExpenses && (
+        <div>
+          <p className="text-xs font-medium text-neutral-500">Dépenses admissibles</p>
+          <p className="mt-0.5 whitespace-pre-wrap text-sm text-neutral-800">{summary.eligibleExpenses}</p>
+        </div>
+      )}
+
+      {summary.ineligibleExpenses && (
+        <div>
+          <p className="text-xs font-medium text-neutral-500">Dépenses non admissibles</p>
+          <p className="mt-0.5 whitespace-pre-wrap text-sm text-neutral-800">{summary.ineligibleExpenses}</p>
+        </div>
+      )}
+
+      {summary.applicationProcess && (
+        <div>
+          <p className="text-xs font-medium text-neutral-500">Ce qu&apos;il faut pour déposer</p>
+          <p className="mt-0.5 whitespace-pre-wrap text-sm text-neutral-800">{summary.applicationProcess}</p>
+        </div>
+      )}
+
+      {summary.requiredDocuments.length > 0 && (
+        <div>
+          <p className="text-xs font-medium text-neutral-500">Documents à préparer</p>
+          <ul className="mt-0.5 list-inside list-disc text-sm text-neutral-800">
+            {summary.requiredDocuments.map((doc, i) => (
+              <li key={i}>{doc}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDossier; currentOrgUserId: string | null }) {
   const [expanded, setExpanded] = useState(false);
   // Résumé en langage clair (Jade) : mêmes chiffres que le tableau interne (SubsidyPanel), en
@@ -144,6 +224,8 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
               <p className="text-neutral-800">{formatAmount(dossier.approvedGrantAmount)}</p>
             </div>
           </div>
+
+          {dossier.programSummary && <ProgramSummarySection summary={dossier.programSummary} />}
 
           {billingNarrative && <p className="rounded-md bg-indigo-50 px-3 py-2 text-sm text-indigo-900">{billingNarrative}</p>}
 
@@ -280,7 +362,13 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
             )}
           </div>
 
-          <PortalNotes grantProjectId={dossier.id} clientId={dossier.clientId} notes={dossier.notes} currentOrgUserId={currentOrgUserId} />
+          <PortalNotes
+            grantProjectId={dossier.id}
+            clientId={dossier.clientId}
+            notes={dossier.notes}
+            currentOrgUserId={currentOrgUserId}
+            hint={dossier.status === "draft" ? "Décris les grandes lignes de ton projet, ou commente les dépenses prévues -- ton équipe chez Apex le lira ici." : undefined}
+          />
         </div>
       )}
     </div>

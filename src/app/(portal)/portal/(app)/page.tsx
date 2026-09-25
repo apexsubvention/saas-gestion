@@ -33,7 +33,7 @@ export default async function PortalHomePage() {
   const supabase = await createClient();
 
   const [dossiers, supplierRows] = await Promise.all([
-    portalDossiersService(supabase).listDossiers(),
+    portalDossiersService(supabase).listDossiers(ctx.clientId),
     projectSuppliersService(supabase).listBySupplierClient(ctx.clientId),
   ]);
 

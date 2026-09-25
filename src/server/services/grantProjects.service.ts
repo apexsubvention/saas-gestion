@@ -31,5 +31,7 @@ export function grantProjectsService(supabase: SupabaseClient) {
       }
       return repo.updateStatus(id, status);
     },
+
+    updateHiddenFromParentPortal: (id: string, hidden: boolean) => repo.updateHiddenFromParentPortal(id, hidden),
   };
 }

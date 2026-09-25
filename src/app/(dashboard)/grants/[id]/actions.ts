@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { grantProjectsService } from "@/server/services/grantProjects.service";
+import { programSnapshotService } from "@/server/services/programSnapshot.service";
 import { documentsService } from "@/server/services/documents.service";
 import { claimsService } from "@/server/services/claims.service";
 import { scheduleDismissalsService } from "@/server/services/scheduleDismissals.service";
@@ -84,12 +85,29 @@ export async function updateGrantProjectStatusAction(
   const status = String(formData.get("status") ?? "");
 
   const supabase = await createClient();
+  let project: { program_id: string } | null = null;
   try {
-    await grantProjectsService(supabase).updateStatus(grantProjectId, status);
+    project = await grantProjectsService(supabase).updateStatus(grantProjectId, status);
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Erreur d'enregistrement" };
   }
   await logDossierEvent(supabase, ctx, { grant_project_id: grantProjectId, kind: "status_changed", title: `Statut : ${GRANT_PROJECT_STATUS_LABELS[status] ?? status}`, source: "manual" });
+
+  // Jade : dès qu'un dossier passe « À rédiger », le portail affiche un résumé du programme
+  // (contexte, dépenses admissibles, montants min/max, ce qu'il faut pour déposer) -- construit
+  // à partir de ce qui existe déjà (pas de nouvelle lecture IA à chaque changement de statut,
+  // décision prise avec Jade). On réutilise le dernier figé s'il y en a un ; sinon on en fige un
+  // maintenant (best-effort, comme takeOnCreation -- ne bloque jamais le changement de statut).
+  if (status === "draft" && project) {
+    const existing = await programSnapshotService(supabase).list(grantProjectId);
+    if (existing.length === 0) {
+      await programSnapshotService(supabase).takeOnCreation(
+        { organizationId: ctx.organizationId, organizationUserId: ctx.organizationUserId },
+        grantProjectId,
+        project.program_id
+      );
+    }
+  }
 
   revalidatePath(`/grants/${grantProjectId}`);
   revalidatePath("/grants");
@@ -484,4 +502,27 @@ export async function saveAgreementAction(
   } catch (e) {
     return { error: formatCaughtError(e), message: null };
   }
+}
+
+// ---- Visibilité côté portail du client parent ---------------------------------
+// Jade : un dossier d'un client ENFANT qui ne concerne pas le client PARENT -- masqué du
+// portail du parent seulement (le client enfant lui-même et le personnel continuent de le
+// voir normalement). N'importe quel membre du personnel peut basculer ce réglage (comme
+// "Visible pour le client" sur les notes/documents demandés) -- pas réservé aux admins.
+export async function toggleHiddenFromParentPortalAction(grantProjectId: string, hidden: boolean): Promise<{ error: string | null }> {
+  const ctx = await requireOrgContext();
+  const supabase = await createClient();
+  try {
+    await grantProjectsService(supabase).updateHiddenFromParentPortal(grantProjectId, hidden);
+  } catch (e) {
+    return { error: formatCaughtError(e) };
+  }
+  await logDossierEvent(supabase, ctx, {
+    grant_project_id: grantProjectId,
+    kind: "portal_visibility_changed",
+    title: hidden ? "Masqué du portail du client parent" : "Redevenu visible du portail du client parent",
+    source: "manual",
+  });
+  revalidatePath(`/grants/${grantProjectId}`);
+  return { error: null };
 }

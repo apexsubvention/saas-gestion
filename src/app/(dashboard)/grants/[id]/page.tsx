@@ -38,6 +38,7 @@ import { DocumentRequestsList, type DocumentRequestListItem } from "./DocumentRe
 import { DOCUMENT_CATEGORY_LABELS } from "@/features/grants/constants";
 import { dossierNotesService } from "@/server/services/dossierNotes.service";
 import { DossierNotes } from "./DossierNotes";
+import { HideFromParentPortalToggle } from "./HideFromParentPortalToggle";
 
 // Le téléversement d'une facture déclenche sa lecture automatique (jusqu'à ~1 min).
 export const maxDuration = 60;
@@ -158,6 +159,11 @@ export default async function GrantProjectPage({ params, searchParams }: { param
           {project.clients?.name} · {project.grant_programs?.name}
         </p>
         <h1 className="mt-1 text-lg font-semibold text-neutral-900">{project.name}</h1>
+        {project.clients?.parent_client_id && (
+          <div className="mt-2">
+            <HideFromParentPortalToggle grantProjectId={project.id} initialHidden={Boolean(project.hidden_from_parent_portal)} />
+          </div>
+        )}
         <div className="mt-2 flex flex-wrap gap-2">
           <Link href={`/grants/${project.id}/redaction`} className="inline-block rounded-md border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-100">
             Aide à la rédaction →

@@ -10,6 +10,7 @@ import { documentRequestsRepository, type DocumentRequestRow } from "@/server/re
 import { documentsRepository } from "@/server/repositories/documents.repository";
 import { questionnaireService } from "@/server/services/questionnaire.service";
 import { dossierNotesService, type DossierNoteView } from "@/server/services/dossierNotes.service";
+import { programSnapshotService } from "@/server/services/programSnapshot.service";
 import { billingLineItemsService } from "@/server/services/billingLineItems.service";
 import { billingInstallmentsService } from "@/server/services/billingInstallments.service";
 import { grantAgreementsService } from "@/server/services/grantAgreements.service";
@@ -84,6 +85,24 @@ export type PortalBillingInstallment = {
   clientInvoiceUploadedAt: string | null;
 };
 
+// Résumé du programme montré au client quand son dossier est « à rédiger » (Jade) -- un
+// sous-ensemble volontairement restreint du dernier program_snapshots figé pour ce dossier
+// (jamais le programme "en direct" : voir programSnapshot.service.ts -- le portail lit via la
+// policy program_snapshots_select_portal de 0056). Champs exclus volontairement : source_text
+// (texte brut de la page officielle, pas destiné au client), resource_links et
+// government_priorities (pas demandés par Jade, usage interne pour l'instant).
+export type PortalProgramSummary = {
+  description: string | null;
+  eligibleExpenses: string | null;
+  ineligibleExpenses: string | null;
+  applicationProcess: string | null;
+  requiredDocuments: string[];
+  minEligibleSpend: number | null;
+  maxAidAmount: number | null;
+  aidNotes: string | null;
+  takenAt: string;
+};
+
 export type PortalDossier = {
   id: string;
   name: string;
@@ -109,6 +128,9 @@ export type PortalDossier = {
   notes: DossierNoteView[];
   billingLineItems: PortalBillingLineItem[];
   billingInstallments: PortalBillingInstallment[];
+  // Null hors statut "draft" (à rédiger), ou si aucun snapshot n'a encore été figé pour ce
+  // dossier (ex. migration pas encore appliquée côté programme, ou dossier créé avant 0038).
+  programSummary: PortalProgramSummary | null;
 };
 
 export function portalDossiersService(supabase: SupabaseClient) {
@@ -119,30 +141,40 @@ export function portalDossiersService(supabase: SupabaseClient) {
   const documents = documentsRepository(supabase);
   const questionnaire = questionnaireService(supabase);
   const notes = dossierNotesService(supabase);
+  const snapshots = programSnapshotService(supabase);
   const billingLineItems = billingLineItemsService(supabase);
   const billingInstallments = billingInstallmentsService(supabase);
   const grantAgreements = grantAgreementsService(supabase);
 
   return {
-    async listDossiers(): Promise<PortalDossier[]> {
+    // viewerClientId : le client du compte portail CONNECTÉ (requirePortalContext -> ctx.clientId)
+    // -- distinct du client_id de chaque dossier. Sert uniquement à appliquer
+    // hidden_from_parent_portal : un dossier ainsi marqué reste visible si ce compte EST le
+    // client du dossier (viewerClientId === p.client_id), et n'est retiré que s'il y accède via
+    // la hiérarchie parent/enfant (0028). Voir 0056 pour le raisonnement complet.
+    async listDossiers(viewerClientId: string): Promise<PortalDossier[]> {
       const allProjects = (await grantProjects.list()) as Array<{
         id: string;
         name: string;
         client_id: string;
+        program_id: string;
         status: string;
         official_start_date: string | null;
         official_end_date: string | null;
         approved_grant_amount: number | null;
         total_project_cost: number | null;
         grant_rate: number | null;
+        hidden_from_parent_portal: boolean;
         clients: { name: string } | null;
         grant_programs: { name: string } | null;
       }>;
-      const projects = allProjects.filter((p) => !HIDDEN_PROJECT_STATUSES.includes(p.status));
+      const projects = allProjects
+        .filter((p) => !HIDDEN_PROJECT_STATUSES.includes(p.status))
+        .filter((p) => !p.hidden_from_parent_portal || p.client_id === viewerClientId);
 
       const dossiers = await Promise.all(
         projects.map(async (p): Promise<PortalDossier> => {
-          const [claimRows, questionnaireData, requestRows, noteRows, lineItemRows, agreements, installmentRows, projectDocuments] = await Promise.all([
+          const [claimRows, questionnaireData, requestRows, noteRows, lineItemRows, agreements, installmentRows, projectDocuments, snapshotRows] = await Promise.all([
             claims.listByProject(p.id),
             questionnaire.get(p.id),
             documentRequests.listByProject(p.id),
@@ -151,7 +183,26 @@ export function portalDossiersService(supabase: SupabaseClient) {
             grantAgreements.listByProject(p.id),
             billingInstallments.listByProject(p.id),
             documents.listByProject(p.id),
+            // Uniquement utile pour un dossier « à rédiger » (Jade) -- interrogé pour tous les
+            // statuts par simplicité (programSnapshotService.list() est déjà tolérant aux
+            // erreurs/table absente), mais seul un dossier "draft" l'expose plus bas.
+            p.status === "draft" ? snapshots.list(p.id) : Promise.resolve([]),
           ]);
+          const latestSnapshot = snapshotRows[0] ?? null;
+          const programSummary: PortalProgramSummary | null =
+            p.status === "draft" && latestSnapshot
+              ? {
+                  description: latestSnapshot.snapshot.description,
+                  eligibleExpenses: latestSnapshot.snapshot.eligible_expenses,
+                  ineligibleExpenses: latestSnapshot.snapshot.ineligible_expenses,
+                  applicationProcess: latestSnapshot.snapshot.application_process,
+                  requiredDocuments: latestSnapshot.snapshot.required_documents,
+                  minEligibleSpend: latestSnapshot.snapshot.min_eligible_spend,
+                  maxAidAmount: latestSnapshot.snapshot.max_aid_amount,
+                  aidNotes: latestSnapshot.snapshot.aid_notes,
+                  takenAt: latestSnapshot.taken_at,
+                }
+              : null;
           // Nom du fichier de facture pour chaque versement (0054) -- un seul appel pour tout le
           // dossier plutôt qu'un par versement ; documents_select_portal_full (0045) couvre déjà
           // cette lecture pour le portail.
@@ -231,6 +282,7 @@ export function portalDossiersService(supabase: SupabaseClient) {
               clientInvoiceFilename: r.client_invoice_document_id ? (documentFilenameById.get(r.client_invoice_document_id) ?? "Facture envoyée") : null,
               clientInvoiceUploadedAt: r.client_invoice_uploaded_at,
             })),
+            programSummary,
           };
         })
       );
