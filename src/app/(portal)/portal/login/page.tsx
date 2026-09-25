@@ -52,6 +52,7 @@ function PortalLoginForm() {
           name="email"
           type="email"
           required
+          autoComplete="username"
           className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500"
         />
       </div>
@@ -65,6 +66,7 @@ function PortalLoginForm() {
           name="password"
           type="password"
           required
+          autoComplete="current-password"
           className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500"
         />
       </div>
