@@ -6,7 +6,7 @@ import { FUNDING_TYPE_LABELS } from "@/features/watch/constants";
 import { fundingSearchScore } from "@/features/watch/search";
 import { assessRelevance, buildNeedProfile } from "@/features/watch/relevance";
 import { extractProjectSignals, scoreOpportunityForProject, type OpportunityForMatch, type ProjectMatchResult } from "@/features/watch/projectMatch";
-import { clientOpportunityInterestsRepository } from "@/server/repositories/clientOpportunityInterests.repository";
+import { clientOpportunityInterestsService } from "@/server/services/clientOpportunityInterests.service";
 import { SendInterestForm } from "./SendInterestForm";
 
 // Version portail de /watch (src/app/(dashboard)/watch/page.tsx), en lecture pour le client :
@@ -42,7 +42,7 @@ export default async function PortalVeillePage({ searchParams }: { searchParams?
       .not("status", "in", '("ignored","archived")')
       .order("business_relevance_score", { ascending: false }),
     supabase.from("funding_opportunity_territories").select("*"),
-    clientOpportunityInterestsRepository(supabase).listByClient(ctx.clientId),
+    clientOpportunityInterestsService(supabase).listByClient(ctx.clientId),
   ]);
   if (opportunitiesResult.error) throw opportunitiesResult.error;
   if (territoriesResult.error) throw territoriesResult.error;
