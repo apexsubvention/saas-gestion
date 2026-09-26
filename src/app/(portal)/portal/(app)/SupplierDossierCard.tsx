@@ -16,6 +16,7 @@ import { PortalOpenDocumentButton } from "./PortalOpenDocumentButton";
 import { InstallmentInvoiceUpload } from "./InstallmentInvoiceUpload";
 import { computeSubsidy } from "@/features/grants/subsidyMath";
 import { buildBillingNarrative } from "@/features/billing/billingSummary";
+import { computePaymentDeadline, paymentDeadlineAlertText } from "@/features/billing/paymentDeadline";
 
 export type SupplierBillingRow = {
   id: string;
@@ -112,6 +113,20 @@ export function SupplierDossierCard({ row, clientName }: { row: SupplierBillingR
 
           {details?.view && (
             <>
+              {(() => {
+                const paymentDeadline = computePaymentDeadline({
+                  projectEnd: details.view.official_end_date,
+                  paymentDeadlineDate: details.view.payment_deadline_date,
+                  paymentDeadlineDaysAfterEnd: details.view.payment_deadline_days_after_end,
+                });
+                const text = paymentDeadlineAlertText(paymentDeadline, details.view.payment_deadline_days_after_end);
+                return text ? (
+                  <div className="rounded-lg border-2 border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900">
+                    <p className="font-semibold">⏰ Délai de paiement et de facturation</p>
+                    <p className="mt-1">{text}</p>
+                  </div>
+                ) : null;
+              })()}
               <div>
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Dossier</h3>
                 <div className="mt-2 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">

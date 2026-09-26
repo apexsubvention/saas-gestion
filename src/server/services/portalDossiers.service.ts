@@ -139,6 +139,11 @@ export type PortalDossier = {
   totalProjectCost: number | null;
   grantRate: number | null;
   billingDeadline: string | null;
+  // (0060) Faits bruts du délai de paiement/facturation lu dans la convention -- la date
+  // effective et le texte d'alerte se calculent en TypeScript pur, voir
+  // src/features/billing/paymentDeadline.ts (computePaymentDeadline / paymentDeadlineAlertText).
+  paymentDeadlineDate: string | null;
+  paymentDeadlineDaysAfterEnd: number | null;
   claims: PortalClaimView[];
   redaction: PortalRedactionItem[];
   // Documents demandés au niveau du dossier (claim_id vide -- ex. en vue d'un dépôt),
@@ -301,12 +306,18 @@ export function portalDossiersService(supabase: SupabaseClient) {
             programName: p.grant_programs?.name ?? null,
             status: p.status,
             statusLabel: GRANT_PROJECT_STATUS_LABELS[p.status] ?? p.status,
-            officialStartDate: p.official_start_date,
-            officialEndDate: p.official_end_date,
-            approvedGrantAmount: p.approved_grant_amount,
+            // Jade : une fois une convention lue/saisie (grant_agreements), Début/Fin/Montant
+            // approuvé doivent TOUJOURS s'afficher dans le portail -- même si les champs "officiels"
+            // du projet (souvent remplis à la main séparément) n'ont jamais été renseignés. Même
+            // repli que grantRate/billingDeadline juste en dessous.
+            officialStartDate: p.official_start_date ?? agreement?.project_start ?? null,
+            officialEndDate: p.official_end_date ?? agreement?.project_end ?? null,
+            approvedGrantAmount: p.approved_grant_amount ?? agreement?.grant_amount ?? null,
             totalProjectCost: p.total_project_cost,
             grantRate: p.grant_rate ?? agreement?.grant_rate ?? null,
             billingDeadline: agreement?.project_end ?? p.official_end_date,
+            paymentDeadlineDate: agreement?.payment_deadline_date ?? null,
+            paymentDeadlineDaysAfterEnd: agreement?.payment_deadline_days_after_end ?? null,
             claims: claimsWithRequirements,
             redaction,
             documentRequests: projectLevelRequests,

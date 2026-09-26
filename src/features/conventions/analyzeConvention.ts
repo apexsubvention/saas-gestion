@@ -31,6 +31,11 @@ export type ConventionExtraction = {
   eligible_expense_period_start: string | null;
   eligible_expense_period_end: string | null;
   claim_frequency: string | null;
+  // (0060) Délai de paiement/facturation, si la convention en précise un différent de la
+  // simple fin de projet -- soit une date fixe, soit un nombre de jours de grâce après la
+  // fin du projet (jamais les deux calculés l'un à partir de l'autre par l'IA elle-même).
+  payment_deadline_date: string | null;
+  payment_deadline_days_after_project_end: number | null;
   terms_source_ref: string | null; // où figurent montant / taux / dates
   terms_confidence: Confidence;
   suppliers: ConventionSupplier[];
@@ -41,6 +46,11 @@ Extrais UNIQUEMENT ce qui est écrit dans le document. N'invente rien, ne calcul
 - grant_amount = montant maximal de l'aide accordée (contribution). grant_rate_percent = taux d'aide en pourcentage (50 pour 50 %).
 - Dates au format AAAA-MM-JJ : début/fin du projet et début/fin de la période d'admissibilité des dépenses.
 - claim_frequency : fréquence des réclamations/demandes de remboursement si indiquée (ex. mensuelle, trimestrielle).
+- Délai de paiement/facturation : cherche une règle sur la date limite pour payer/facturer les dépenses.
+  - Si une DATE PRÉCISE est écrite (ex. « au plus tard le 31 mars 2027 »), mets-la dans payment_deadline_date (AAAA-MM-JJ).
+  - Si un NOMBRE DE JOURS après la fin du projet est écrit (ex. « le paiement peut être effectué jusqu'à 90 jours après la fin du projet »), mets ce nombre dans payment_deadline_days_after_project_end.
+  - Ne calcule JAMAIS toi-même une date à partir d'un délai en jours (ex. n'additionne pas 90 jours à la fin du projet) : donne le nombre de jours brut, le calcul se fait ailleurs.
+  - Si la convention ne mentionne rien de spécial à ce sujet, laisse les deux champs à null (la règle par défaut, appliquée ailleurs, est que tout doit être payé et facturé d'ici la fin du projet elle-même).
 - suppliers : sous-traitants / fournisseurs / partenaires NOMMÉS dans le budget ou les annexes, avec le budget admissible (eligible_budget) et l'aide accordée (aid_amount) SI ces montants sont écrits pour eux. Ne liste pas des catégories générales (« salaires », « déplacements ») comme des fournisseurs.
 - source_ref : page ou section où se trouve l'information (ex. « page 3 », « annexe B, tableau 2 »). terms_source_ref pour montant/taux/dates.
 - confidence : high = écrit clairement ; medium = déduit d'un tableau ou d'un libellé ambigu ; low = incertain.
@@ -66,6 +76,8 @@ const TOOL = {
       eligible_expense_period_start: nullableString,
       eligible_expense_period_end: nullableString,
       claim_frequency: nullableString,
+      payment_deadline_date: nullableString,
+      payment_deadline_days_after_project_end: nullableNumber,
       terms_source_ref: nullableString,
       terms_confidence: confidenceSchema,
       suppliers: {
@@ -94,6 +106,8 @@ const inputSchema = z.object({
   eligible_expense_period_start: isoDate,
   eligible_expense_period_end: isoDate,
   claim_frequency: lenientStr(200),
+  payment_deadline_date: isoDate,
+  payment_deadline_days_after_project_end: z.number().int().min(0).max(3650).nullable().catch(null),
   terms_source_ref: lenientStr(200),
   terms_confidence: conf,
   suppliers: lenientList(
@@ -114,7 +128,17 @@ export function parseConventionInput(input: unknown): ConventionExtraction {
 }
 
 export function hasAgreementTerms(x: ConventionExtraction): boolean {
-  return [x.grant_amount, x.grant_rate_percent, x.project_start, x.project_end, x.eligible_expense_period_start, x.eligible_expense_period_end, x.claim_frequency].some((v) => v != null);
+  return [
+    x.grant_amount,
+    x.grant_rate_percent,
+    x.project_start,
+    x.project_end,
+    x.eligible_expense_period_start,
+    x.eligible_expense_period_end,
+    x.claim_frequency,
+    x.payment_deadline_date,
+    x.payment_deadline_days_after_project_end,
+  ].some((v) => v != null);
 }
 
 export async function analyzeConventionFile(file: { bytes: ArrayBuffer; mime: string }): Promise<ConventionExtraction> {

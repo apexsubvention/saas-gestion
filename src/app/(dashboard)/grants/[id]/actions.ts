@@ -511,6 +511,8 @@ export async function saveAgreementAction(
     grant_rate_percent: numberOrNull(formData.get("grant_rate_percent")),
     claim_frequency: String(formData.get("claim_frequency") ?? ""),
     special_conditions: String(formData.get("special_conditions") ?? ""),
+    payment_deadline_date: dateOrNull(formData.get("payment_deadline_date")),
+    payment_deadline_days_after_end: numberOrNull(formData.get("payment_deadline_days_after_end")),
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Formulaire invalide", message: null };

@@ -52,6 +52,21 @@ export function AgreementForm({ grantProjectId, agreement }: { grantProjectId: s
           <input name="ddr_due_delay_days" inputMode="numeric" defaultValue="15" className={input} />
         </Field>
       </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Date limite de paiement/facturation (si précisée dans la convention)" hint="Laisse vide si la convention ne donne pas de date précise.">
+          <input name="payment_deadline_date" type="date" defaultValue={agreement?.payment_deadline_date ?? ""} className={input} />
+        </Field>
+        <Field
+          label="OU délai de grâce après la fin du projet (jours)"
+          hint="Ex. 90 si la convention permet de payer jusqu'à 90 jours après la fin du projet. Laisse vide si non applicable."
+        >
+          <input name="payment_deadline_days_after_end" inputMode="numeric" defaultValue={agreement?.payment_deadline_days_after_end ?? ""} className={input} />
+        </Field>
+      </div>
+      <p className="text-xs text-neutral-500">
+        Si aucune des deux options ci-dessus n&apos;est remplie, Apex affiche par défaut la fin du projet comme date limite de paiement et de
+        facturation (une alerte séparée en tient compte, dans le Dossier et le portail).
+      </p>
       <Field label="Conditions particulières"><textarea name="special_conditions" rows={3} defaultValue={agreement?.special_conditions ?? ""} className={input} /></Field>
       <p className="text-xs text-neutral-500">
         En enregistrant, les dates de réclamation sont estimées à partir de ces dates et ajoutées à l&apos;échéancier (un DDR par mois pour PARI-CNRC), et le

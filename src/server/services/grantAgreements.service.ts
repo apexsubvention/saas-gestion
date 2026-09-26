@@ -65,6 +65,8 @@ export function grantAgreementsService(supabase: SupabaseClient) {
         grant_rate: input.grant_rate_percent == null ? null : input.grant_rate_percent / 100,
         claim_frequency: input.claim_frequency || null,
         special_conditions: input.special_conditions || null,
+        payment_deadline_date: input.payment_deadline_date || null,
+        payment_deadline_days_after_end: input.payment_deadline_days_after_end,
       };
 
       const existing = (await repo.listByProject(grantProjectId))[0];

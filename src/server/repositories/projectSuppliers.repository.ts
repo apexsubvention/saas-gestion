@@ -41,6 +41,10 @@ export type SupplierDossierView = {
   total_project_cost: number | null;
   approved_grant_amount: number | null;
   grant_rate: number | null;
+  // (0060) Faits bruts du délai de paiement/facturation -- voir
+  // src/features/billing/paymentDeadline.ts pour le calcul de la date effective.
+  payment_deadline_date: string | null;
+  payment_deadline_days_after_end: number | null;
   own_supplier_id: string | null;
   own_budget_amount: number | null;
   own_billing_frequency: string | null;

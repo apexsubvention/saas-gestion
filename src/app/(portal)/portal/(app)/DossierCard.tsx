@@ -21,6 +21,7 @@ import { PortalNotes } from "./PortalNotes";
 import { PortalSupplierInvoices } from "./PortalSupplierInvoices";
 import { computeSubsidy } from "@/features/grants/subsidyMath";
 import { buildBillingNarrative } from "@/features/billing/billingSummary";
+import { computePaymentDeadline, paymentDeadlineAlertText } from "@/features/billing/paymentDeadline";
 
 // Un document demandé se réaffiche avec son formulaire de téléversement tant qu'il
 // n'est pas validé par le personnel -- "issue" (problème signalé) permet donc bien de
@@ -177,6 +178,14 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
     billerAmount,
     deadline: dossier.billingDeadline,
   });
+  // Alerte SÉPARÉE (jamais fondue dans billingNarrative ci-dessus) sur le délai de paiement et
+  // de facturation lu dans la convention -- même calcul et même texte que côté admin/fournisseur.
+  const paymentDeadline = computePaymentDeadline({
+    projectEnd: dossier.billingDeadline,
+    paymentDeadlineDate: dossier.paymentDeadlineDate,
+    paymentDeadlineDaysAfterEnd: dossier.paymentDeadlineDaysAfterEnd,
+  });
+  const paymentDeadlineText = paymentDeadlineAlertText(paymentDeadline, dossier.paymentDeadlineDaysAfterEnd);
   const openRequirementsCount = dossier.claims.reduce((sum, c) => sum + c.openRequirements.length, 0);
   const actionableRequestsCount =
     dossier.documentRequests.filter((r) => UPLOADABLE_STATUSES.includes(r.status)).length +
@@ -215,6 +224,12 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
 
       {expanded && (
         <div className="space-y-5 border-t border-neutral-100 px-4 py-4">
+          {paymentDeadlineText && (
+            <div className="rounded-lg border-2 border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900">
+              <p className="font-semibold">⏰ Délai de paiement et de facturation</p>
+              <p className="mt-1">{paymentDeadlineText}</p>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
             <div>
               <p className="text-xs text-neutral-400">Début</p>

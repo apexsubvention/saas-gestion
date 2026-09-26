@@ -12,6 +12,10 @@ export type GrantAgreementRow = {
   grant_rate: number | null;
   claim_frequency: string | null;
   special_conditions: string | null;
+  // (0060) Délai de paiement/facturation lu dans la convention -- faits bruts jamais
+  // calculés ici ; voir src/features/billing/paymentDeadline.ts pour la date effective.
+  payment_deadline_date: string | null;
+  payment_deadline_days_after_end: number | null;
   created_at: string;
 };
 
@@ -24,6 +28,8 @@ export type GrantAgreementWrite = {
   grant_rate?: number | null;
   claim_frequency?: string | null;
   special_conditions?: string | null;
+  payment_deadline_date?: string | null;
+  payment_deadline_days_after_end?: number | null;
 };
 
 export function grantAgreementsRepository(supabase: SupabaseClient) {
@@ -49,6 +55,8 @@ export function grantAgreementsRepository(supabase: SupabaseClient) {
       grant_rate?: number | null;
       claim_frequency?: string | null;
       special_conditions?: string | null;
+      payment_deadline_date?: string | null;
+      payment_deadline_days_after_end?: number | null;
     }): Promise<GrantAgreementRow> {
       const { data, error } = await supabase.from("grant_agreements").insert(input).select().single();
       if (error) throw error;

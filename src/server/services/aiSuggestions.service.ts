@@ -54,6 +54,8 @@ export function aiSuggestionsService(supabase: SupabaseClient) {
             eligible_expense_period_start: x.eligible_expense_period_start,
             eligible_expense_period_end: x.eligible_expense_period_end,
             claim_frequency: x.claim_frequency,
+            payment_deadline_date: x.payment_deadline_date,
+            payment_deadline_days_after_project_end: x.payment_deadline_days_after_project_end,
           },
         });
       }
@@ -138,6 +140,8 @@ export function aiSuggestionsService(supabase: SupabaseClient) {
             grant_rate_percent: rate,
             claim_frequency: strOrNull(p.claim_frequency) ?? current?.claim_frequency ?? "",
             special_conditions: current?.special_conditions ?? "",
+            payment_deadline_date: strOrNull(p.payment_deadline_date) ?? current?.payment_deadline_date ?? null,
+            payment_deadline_days_after_end: numOrNull(p.payment_deadline_days_after_project_end) ?? current?.payment_deadline_days_after_end ?? null,
           });
           const bits = [result.claimsCreated ? `${result.claimsCreated} DDR mensuel(s)` : null, result.created ? `${result.created} échéance(s)` : null].filter(Boolean).join(", ");
           report.push(`Entente mise à jour${bits ? ` — ${bits} ajouté(s) à l'échéancier` : ""}${result.statusChanged ? " ; statut du dossier mis à jour" : ""}.`);

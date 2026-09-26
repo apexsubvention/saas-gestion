@@ -31,6 +31,7 @@ import { supplierLedgerService } from "@/server/services/supplierLedger.service"
 import { billingLineItemsService } from "@/server/services/billingLineItems.service";
 import { computeSubsidy, resolveSubsidyInputs } from "@/features/grants/subsidyMath";
 import { buildBillingNarrative } from "@/features/billing/billingSummary";
+import { computePaymentDeadline, paymentDeadlineAlertText } from "@/features/billing/paymentDeadline";
 import { grantAgreementsService } from "@/server/services/grantAgreements.service";
 import { NewSupplierForm } from "./NewSupplierForm";
 import { DeleteGrantProjectButton } from "../DeleteGrantProjectButton";
@@ -97,6 +98,16 @@ export default async function GrantProjectPage({ params, searchParams }: { param
   // sinon fiche du dossier -- même ordre que "Dates du projet" sur la page Facturation).
   const clientName = project.clients?.name ?? "Le client";
   const projectDeadline = agreement?.project_end ?? project.official_end_date ?? null;
+  // Jade : alerte SÉPARÉE (jamais fondue dans les phrases de résumé ci-dessous) sur le délai de
+  // paiement/facturation lu dans la convention -- date fixe, ou délai de grâce en jours après la
+  // fin du projet, sinon repli sur la fin du projet elle-même (règle par défaut, expliquée dans le
+  // texte). Même calcul affiché à l'identique côté portail (parent et fournisseur/enfant).
+  const paymentDeadline = computePaymentDeadline({
+    projectEnd: projectDeadline,
+    paymentDeadlineDate: agreement?.payment_deadline_date ?? null,
+    paymentDeadlineDaysAfterEnd: agreement?.payment_deadline_days_after_end ?? null,
+  });
+  const paymentDeadlineText = paymentDeadlineAlertText(paymentDeadline, agreement?.payment_deadline_days_after_end ?? null);
   // Jade (0059) : ce qui sera VRAIMENT facturé, ce sont les postes cochés "À facturer" dans Aide à
   // la facturation -- jamais le coût total du projet (qui inclut les coûts internes, ex. salaire,
   // jamais facturés par personne). Dès que des postes existent, on utilise leur somme plutôt que
@@ -300,6 +311,12 @@ export default async function GrantProjectPage({ params, searchParams }: { param
           <section className="space-y-3">
             <h2 className="text-sm font-semibold text-neutral-900">Fournisseurs et factures</h2>
             <SuggestionsPanel grantProjectId={project.id} suggestions={suggestions} />
+            {paymentDeadlineText && (
+              <div className="rounded-lg border-2 border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900">
+                <p className="font-semibold">⏰ Délai de paiement et de facturation</p>
+                <p className="mt-1">{paymentDeadlineText}</p>
+              </div>
+            )}
             <SubsidyPanel summary={subsidy} supplierBudgetTotal={ledger.supplierBudgetTotal} narrative={billingNarrative} />
             <p className="text-xs text-neutral-500">
               Un seul tableau, automatique et manuel : modifie, ajoute ou supprime les fournisseurs, même ceux générés automatiquement. Une facture
