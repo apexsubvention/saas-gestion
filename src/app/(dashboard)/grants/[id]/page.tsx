@@ -354,6 +354,7 @@ export default async function GrantProjectPage({ params, searchParams }: { param
               documents={documents.map((d) => ({ id: d.id, filename: d.filename, category: d.category }))}
               clients={allClients.map((c) => ({ id: c.id, name: c.name }))}
               claims={claims.map((c) => ({ id: c.id, label: c.claim_number || `Réclamation (${c.period_start ?? "—"})` }))}
+              lineItems={lineItems}
               totals={ledger.totals}
               billingContext={{ clientName, subsidy, deadline: projectDeadline }}
             />

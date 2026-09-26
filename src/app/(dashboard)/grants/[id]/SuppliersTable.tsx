@@ -18,12 +18,119 @@ import {
   saveSupplierAction,
   setInvoicePaymentProofAction,
   setSupplierOverrideAction,
+  updateBillingLineItemAction,
   updateInvoicePaymentStatusAction,
   type LedgerActionResult,
 } from "./supplierActions";
 import type { LedgerInvoice, LedgerSupplier, Tracked } from "@/server/services/supplierLedger.service";
+import type { BillingLineItemRow } from "@/server/repositories/billingLineItems.repository";
 import type { DossierEventRow } from "@/server/services/audit";
 import { buildBillingNarrative, type BillingNarrativeInput } from "@/features/billing/billingSummary";
+
+// Jade (0058) : pourquoi un poste est décoché -- même libellés que LineItemsEditor.tsx (Aide à la
+// facturation), pour que ce soit reconnaissable, que l'un ou l'autre écran serve à cocher.
+const EXCLUSION_REASON_LABELS: Record<string, string> = {
+  internal_salary: "Salaire interne (non facturé)",
+  redistribute_supplier: "À redistribuer à un autre fournisseur",
+  new_supplier: "Nécessite l'ajout d'un nouveau fournisseur",
+};
+
+// Postes budgétaires (Aide à la facturation) associés à CE fournisseur (0060, Jade) : « Détails »
+// affiche maintenant la vraie liste, modifiable directement ici -- même mécanisme, sans changer
+// d'onglet. Budget prévu (colonne du tableau) = somme de ceux cochés « À facturer » ci-dessous.
+function SupplierLineItemRow({ grantProjectId, item }: { grantProjectId: string; item: BillingLineItemRow }) {
+  const [label, setLabel] = useState(item.label);
+  const [description, setDescription] = useState(item.description ?? "");
+  const [amount, setAmount] = useState(String(item.amount ?? 0));
+  const [hours, setHours] = useState(item.hours != null ? String(item.hours) : "");
+  const [included, setIncluded] = useState(item.included_in_billing);
+  const [exclusionReason, setExclusionReason] = useState(item.exclusion_reason ?? "");
+  const { pending, error, run } = useLedgerAction();
+  const [saved, setSaved] = useState(false);
+
+  const dirty =
+    label !== item.label ||
+    description !== (item.description ?? "") ||
+    amount !== String(item.amount ?? 0) ||
+    hours !== (item.hours != null ? String(item.hours) : "") ||
+    included !== item.included_in_billing ||
+    exclusionReason !== (item.exclusion_reason ?? "");
+
+  function save() {
+    const amt = parseAmount(amount);
+    if (amt == null || Number.isNaN(amt)) return run(async () => ({ error: "Montant invalide." }));
+    const hrs = hours.trim() ? Number(hours) : null;
+    if (hrs != null && !Number.isFinite(hrs)) return run(async () => ({ error: "Heures invalides." }));
+    setSaved(false);
+    run(
+      () =>
+        updateBillingLineItemAction(grantProjectId, item.id, {
+          label,
+          description: description || null,
+          amount: amt,
+          hours: hrs,
+          included_in_billing: included,
+          exclusion_reason: included ? null : (exclusionReason as "internal_salary" | "redistribute_supplier" | "new_supplier" | "") || null,
+          supplier_id: item.supplier_id,
+        }),
+      () => setSaved(true)
+    );
+  }
+
+  return (
+    <div className={`grid grid-cols-1 gap-2 rounded-md border p-2 sm:grid-cols-12 sm:items-start ${included ? "border-neutral-200 bg-white" : "border-neutral-200 bg-neutral-50 opacity-70"}`}>
+      <input value={label} onChange={(e) => setLabel(e.target.value)} className={`${input} sm:col-span-4`} placeholder="Activité / poste" />
+      <textarea value={description} onChange={(e) => setDescription(e.target.value)} className={`${input} sm:col-span-3`} rows={1} placeholder="Détail" />
+      <input type="number" min={0} step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} className={`${input} sm:col-span-1`} placeholder="Montant $" />
+      <input type="number" min={0} step="0.5" value={hours} onChange={(e) => setHours(e.target.value)} className={`${input} sm:col-span-1`} placeholder="Heures" />
+      <label className="flex items-center gap-1 text-xs text-neutral-600 sm:col-span-1">
+        <input type="checkbox" checked={included} onChange={(e) => setIncluded(e.target.checked)} /> À facturer
+      </label>
+      {!included && (
+        <select value={exclusionReason} onChange={(e) => setExclusionReason(e.target.value)} className={`${input} sm:col-span-2`}>
+          <option value="">Pourquoi (optionnel)…</option>
+          {Object.entries(EXCLUSION_REASON_LABELS).map(([v, l]) => (
+            <option key={v} value={v}>{l}</option>
+          ))}
+        </select>
+      )}
+      <div className={`flex items-center gap-1 ${included ? "sm:col-span-2" : ""}`}>
+        {dirty && (
+          <button onClick={save} disabled={pending} className={`${smallBtn} bg-neutral-900 text-white hover:bg-neutral-800`}>
+            {pending ? "…" : "Enregistrer"}
+          </button>
+        )}
+        {!dirty && saved && <span className="text-xs text-emerald-700">Enregistré ✓</span>}
+      </div>
+      {error && <p className="text-xs text-red-600 sm:col-span-12">{error}</p>}
+    </div>
+  );
+}
+
+function SupplierLineItems({ grantProjectId, items }: { grantProjectId: string; items: BillingLineItemRow[] }) {
+  if (items.length === 0) {
+    return (
+      <p className="text-xs text-neutral-400">
+        Aucun poste associé à ce fournisseur pour l&apos;instant -- associe-le à ce fournisseur dans{" "}
+        <span className="font-medium">Aide à la facturation</span>, il apparaîtra ensuite ici.
+      </p>
+    );
+  }
+  const includedTotal = items.filter((it) => it.included_in_billing).reduce((sum, it) => sum + Number(it.amount ?? 0), 0);
+  return (
+    <div className="space-y-2">
+      <p className="text-xs text-neutral-500">
+        Postes associés à ce fournisseur ({items.length}) — Budget prévu = somme de ceux cochés « À facturer » ci-dessous :{" "}
+        <span className="font-medium text-neutral-700">{money(includedTotal)}</span>.
+      </p>
+      <div className="space-y-2">
+        {items.map((it) => (
+          <SupplierLineItemRow key={it.id} grantProjectId={grantProjectId} item={it} />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 // Contexte du dossier (mêmes chiffres que SubsidyPanel) nécessaire pour rédiger, par fournisseur,
 // le résumé « devra facturer X $ d'ici le ... » -- voir billingContext plus bas.
@@ -105,7 +212,7 @@ function TrackedCell({ grantProjectId, supplierId, field, tracked }: { grantProj
         <div className="flex flex-wrap items-center gap-1">
           {badge && <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${badge.className}`}>{badge.label}</span>}
         </div>
-        <p className="text-[11px] text-neutral-400">Calculé depuis Aide à la facturation — modifie les postes pour le changer.</p>
+        <p className="text-[11px] text-neutral-400">Calculé à partir des postes cochés « À facturer » — ouvre « Détails » ci-dessous pour les modifier.</p>
       </div>
     );
   }
@@ -374,7 +481,7 @@ function InvoiceRow({
   );
 }
 
-function SupplierGroup({ grantProjectId, supplier, documents, clients, claims, isFirst, isLast, billingContext }: { grantProjectId: string; supplier: LedgerSupplier; documents: DocOption[]; clients: ClientOption[]; claims: ClaimOption[]; isFirst: boolean; isLast: boolean; billingContext?: SupplierBillingContext }) {
+function SupplierGroup({ grantProjectId, supplier, documents, clients, claims, lineItems, isFirst, isLast, billingContext }: { grantProjectId: string; supplier: LedgerSupplier; documents: DocOption[]; clients: ClientOption[]; claims: ClaimOption[]; lineItems: BillingLineItemRow[]; isFirst: boolean; isLast: boolean; billingContext?: SupplierBillingContext }) {
   const [name, setName] = useState(supplier.name);
   const [contact, setContact] = useState(supplier.contact ?? "");
   const [frequency, setFrequency] = useState(supplier.billing_frequency ?? "");
@@ -470,6 +577,10 @@ function SupplierGroup({ grantProjectId, supplier, documents, clients, claims, i
               Informations de facturation. Quand ce fournisseur est un client Apex (ex. Sitegrow), elles sont visibles dans son portail.
             </p>
             {narrative && <p className="mb-3 rounded-md bg-indigo-50 px-3 py-2 text-sm text-indigo-900">{narrative}</p>}
+            <div className="mb-3">
+              <h4 className="mb-2 text-xs font-semibold text-neutral-700">Postes de facturation (Aide à la facturation)</h4>
+              <SupplierLineItems grantProjectId={grantProjectId} items={lineItems} />
+            </div>
             <div className="grid gap-3 sm:grid-cols-3">
               <label className="space-y-1 text-xs text-neutral-600">Contact<input value={contact} onChange={(e) => setContact(e.target.value)} className={input} /></label>
               <label className="space-y-1 text-xs text-neutral-600">Fréquence de facturation<input value={frequency} onChange={(e) => setFrequency(e.target.value)} className={input} /></label>
@@ -533,6 +644,7 @@ export function SuppliersTable({
   documents,
   clients,
   claims,
+  lineItems,
   totals,
   billingContext,
 }: {
@@ -542,6 +654,9 @@ export function SuppliersTable({
   documents: DocOption[];
   clients: ClientOption[];
   claims: ClaimOption[];
+  // Postes budgétaires (Aide à la facturation) de TOUT le dossier -- filtrés par fournisseur pour
+  // le « Détails » de chacun, voir SupplierLineItems.
+  lineItems: BillingLineItemRow[];
   totals: { budget: number; accepted: number; claimed: number; remaining: number };
   billingContext?: SupplierBillingContext;
 }) {
@@ -563,7 +678,18 @@ export function SuppliersTable({
           </thead>
           <tbody>
             {suppliers.map((s, i) => (
-              <SupplierGroup key={s.id} grantProjectId={grantProjectId} supplier={s} documents={documents} clients={clients} claims={claims} isFirst={i === 0} isLast={i === suppliers.length - 1} billingContext={billingContext} />
+              <SupplierGroup
+                key={s.id}
+                grantProjectId={grantProjectId}
+                supplier={s}
+                documents={documents}
+                clients={clients}
+                claims={claims}
+                lineItems={lineItems.filter((it) => it.supplier_id === s.id)}
+                isFirst={i === 0}
+                isLast={i === suppliers.length - 1}
+                billingContext={billingContext}
+              />
             ))}
             {unassigned.length > 0 && (
               <>
@@ -594,10 +720,10 @@ export function SuppliersTable({
         « Budget prévu », « Subvention acceptée » et « Réclamé à ce jour » se calculent automatiquement (AUTO/CALCULÉE). « Subvention acceptée »
         et « Réclamé à ce jour » restent modifiables à la main (clique sur le montant, puis « Revenir au calcul automatique » pour annuler — la
         valeur automatique n&apos;est jamais perdue). « Budget prévu » vient des postes budgétaires cochés « À facturer » et associés à ce
-        fournisseur dans Aide à la facturation : dès qu&apos;au moins un poste est associé, ce montant reflète toujours exactement ces postes
-        (non modifiable ici — change les postes dans Aide à la facturation pour l&apos;ajuster) ; sans poste associé, il reste saisissable à la
-        main comme avant. « Réclamé » vient des réclamations liées aux factures du fournisseur. Ouvre « Détails » sur un fournisseur pour voir
-        l&apos;historique complet de ses modifications (🕐).
+        fournisseur : ouvre « Détails » sur un fournisseur pour voir et modifier directement ses postes (mêmes cases et montants que dans Aide à
+        la facturation) — dès qu&apos;au moins un poste est associé, Budget prévu reflète toujours exactement ceux cochés « À facturer » ; sans
+        poste associé, il reste saisissable à la main comme avant. « Réclamé » vient des réclamations liées aux factures du fournisseur. « Détails »
+        montre aussi l&apos;historique complet des modifications (🕐).
       </p>
     </div>
   );

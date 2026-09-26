@@ -80,5 +80,14 @@ export function billingLineItemsRepository(supabase: SupabaseClient) {
       if (error) throw error;
       return data?.length ?? 0;
     },
+
+    // Modifie UN SEUL poste en place (0060, Jade) : contrairement à replaceAll (tout supprimer/
+    // réinsérer, utilisé par la liste complète d'Aide à la facturation), garde son id/position --
+    // utilisé par l'édition inline dans le tableau Fournisseurs (Détails d'un fournisseur).
+    async update(id: string, patch: Partial<BillingLineItemInput>): Promise<BillingLineItemRow> {
+      const { data, error } = await supabase.from("billing_line_items").update(patch).eq("id", id).select().single();
+      if (error) throw error;
+      return data as unknown as BillingLineItemRow;
+    },
   };
 }

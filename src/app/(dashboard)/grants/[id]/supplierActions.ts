@@ -11,6 +11,7 @@ import { documentsService } from "@/server/services/documents.service";
 import { expensesRepository } from "@/server/repositories/expenses.repository";
 import { logAudit, logDossierEvent, listDossierEventsByRef, type DossierEventRow } from "@/server/services/audit";
 import { claimsService } from "@/server/services/claims.service";
+import { billingLineItemsService } from "@/server/services/billingLineItems.service";
 
 const fmtMoney = (n: number) => new Intl.NumberFormat("fr-CA", { style: "currency", currency: "CAD", minimumFractionDigits: 2 }).format(n);
 const OVERRIDE_FIELD_LABELS = { accepted: "Subvention acceptée", claimed: "Réclamé à ce jour", budget: "Budget prévu" } as const;
@@ -251,6 +252,43 @@ export async function setSupplierOverrideAction(
     });
     revalidatePath(`/grants/${grantProjectId}`);
     return { error: null };
+  } catch (e) {
+    return { error: formatCaughtError(e) };
+  }
+}
+
+// Poste budgétaire (Aide à la facturation) modifié directement depuis « Détails » d'un
+// fournisseur (0060, Jade) : même poste, même validation -- juste un autre point d'entrée que
+// la liste complète. included/exclusion_reason/supplier_id gardent leur sens habituel.
+const lineItemPatchSchema = z.object({
+  label: z.string().trim().min(1, "Le libellé est requis.").max(300),
+  description: optionalText(2000),
+  amount: money.refine((v) => v != null, "Montant invalide.").transform((v) => v as number),
+  hours: z.number().min(0, "Heures invalides").max(100_000, "Heures invalides").nullable(),
+  included_in_billing: z.boolean(),
+  exclusion_reason: z.enum(["internal_salary", "redistribute_supplier", "new_supplier"]).nullable(),
+  supplier_id: z.string().uuid().nullable(),
+});
+export type LineItemPatchInput = z.input<typeof lineItemPatchSchema>;
+
+export async function updateBillingLineItemAction(grantProjectId: string, itemId: string, input: LineItemPatchInput): Promise<LedgerActionResult> {
+  const ctx = await requireOrgContext();
+  const parsed = lineItemPatchSchema.safeParse(input);
+  if (!parsed.success) return { error: firstIssue(parsed.error) };
+  const supabase = await createClient();
+  try {
+    await billingLineItemsService(supabase).updateOne(grantProjectId, itemId, parsed.data);
+    await logDossierEvent(supabase, ctx, {
+      grant_project_id: grantProjectId,
+      kind: "billing_line_item_updated",
+      title: `Poste modifié : ${parsed.data.label}`,
+      source: "manual",
+      ref_type: "billing_line_item",
+      ref_id: itemId,
+    });
+    revalidatePath(`/grants/${grantProjectId}`);
+    revalidatePath(`/grants/${grantProjectId}/facturation`);
+    return { error: null, id: itemId };
   } catch (e) {
     return { error: formatCaughtError(e) };
   }
