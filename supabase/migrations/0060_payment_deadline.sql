@@ -25,7 +25,13 @@ comment on column grant_agreements.payment_deadline_days_after_end is
 -- convention lue/saisie doit toujours l'emporter sur des champs "officiels" du projet
 -- jamais renseignés à la main. Ajoute aussi les 2 nouveaux champs bruts de délai de
 -- paiement, pour l'alerte affichée côté portail fournisseur.
-create or replace function portal_supplier_dossier_view(p_grant_project_id uuid)
+--
+-- Postgres refuse un simple "create or replace" quand la liste des colonnes de retour change
+-- (RETURNS TABLE) : il faut d'abord supprimer l'ancienne fonction (SQLSTATE 42P13, "cannot
+-- change return type of existing function").
+drop function if exists portal_supplier_dossier_view(uuid);
+
+create function portal_supplier_dossier_view(p_grant_project_id uuid)
 returns table (
   grant_project_id uuid,
   grant_project_name text,
