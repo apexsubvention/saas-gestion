@@ -97,12 +97,20 @@ export default async function GrantProjectPage({ params, searchParams }: { param
   // sinon fiche du dossier -- même ordre que "Dates du projet" sur la page Facturation).
   const clientName = project.clients?.name ?? "Le client";
   const projectDeadline = agreement?.project_end ?? project.official_end_date ?? null;
+  // Jade (0059) : ce qui sera VRAIMENT facturé, ce sont les postes cochés "À facturer" dans Aide à
+  // la facturation -- jamais le coût total du projet (qui inclut les coûts internes, ex. salaire,
+  // jamais facturés par personne). Dès que des postes existent, on utilise leur somme plutôt que
+  // le coût total ; sinon (dossier tout juste créé, aucun poste encore extrait/saisi) on retombe
+  // sur l'ancien calcul (coût total requis pour atteindre la subvention).
+  const billableFromItems = lineItems.length > 0 ? lineItemsSummary.includedTotal : null;
+  const excludedFromItems = lineItems.length > 0 ? lineItems.filter((it) => !it.included_in_billing).reduce((sum, it) => sum + Number(it.amount ?? 0), 0) : null;
   const billingNarrative = buildBillingNarrative({
     clientName,
     subsidy,
     billerLabel: null,
-    billerAmount: subsidy.requiredSpend,
+    billerAmount: billableFromItems ?? subsidy.requiredSpend,
     deadline: projectDeadline,
+    excludedAmount: excludedFromItems,
   });
   const otherClients = allClients.filter((c) => c.id !== project.client_id);
 

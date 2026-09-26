@@ -1,0 +1,11 @@
+-- 0059_billing_line_items_supplier_link.sql
+--
+-- Jade : elle veut que ce qu'elle coche dans "Aide à la facturation" (les activités/postes
+-- budgétaires acceptés) se reflète dans le tableau Fournisseurs du Dossier (Budget prévu). Pour ça,
+-- chaque poste peut être associé à UN fournisseur -- une fois associé et coché "À facturer", son
+-- montant alimente automatiquement le "Budget prévu" de ce fournisseur (voir supplierLedger.service,
+-- même principe "auto vs modifié manuellement" déjà utilisé pour Subvention acceptée/Réclamé).
+--
+-- Aucune RLS à ajouter : billing_line_items_select/insert/update/delete existent déjà (0042/0050)
+-- et couvrent déjà cette nouvelle colonne, comme toute colonne ajoutée à une table existante.
+alter table billing_line_items add column supplier_id uuid references project_suppliers(id) on delete set null;

@@ -99,7 +99,7 @@ export async function saveBillingLineItemsAction(grantProjectId: string, _prev: 
   const supabase = await createClient();
   try {
     const count = Number(formData.get("item_count") ?? 0);
-    const items: { label: string; description: string | null; amount: number; hours: number | null; included_in_billing: boolean; exclusion_reason: "internal_salary" | "redistribute_supplier" | "new_supplier" | null }[] = [];
+    const items: { label: string; description: string | null; amount: number; hours: number | null; included_in_billing: boolean; exclusion_reason: "internal_salary" | "redistribute_supplier" | "new_supplier" | null; supplier_id: string | null }[] = [];
     for (let i = 0; i < count; i++) {
       const label = String(formData.get(`item_label_${i}`) ?? "").trim();
       if (!label) continue;
@@ -109,7 +109,8 @@ export async function saveBillingLineItemsAction(grantProjectId: string, _prev: 
       const included = formData.get(`item_included_${i}`) !== "false"; // par défaut true si absent
       const reasonRaw = String(formData.get(`item_exclusion_reason_${i}`) ?? "");
       const reason = reasonRaw === "internal_salary" || reasonRaw === "redistribute_supplier" || reasonRaw === "new_supplier" ? reasonRaw : null;
-      items.push({ label, description, amount, hours, included_in_billing: included, exclusion_reason: reason });
+      const supplierId = String(formData.get(`item_supplier_id_${i}`) ?? "").trim() || null;
+      items.push({ label, description, amount, hours, included_in_billing: included, exclusion_reason: reason, supplier_id: supplierId });
     }
     await billingLineItemsService(supabase).replaceAll(ctx.organizationId, grantProjectId, items, "manual");
     refresh(grantProjectId);

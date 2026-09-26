@@ -13,7 +13,7 @@ import { logAudit, logDossierEvent, listDossierEventsByRef, type DossierEventRow
 import { claimsService } from "@/server/services/claims.service";
 
 const fmtMoney = (n: number) => new Intl.NumberFormat("fr-CA", { style: "currency", currency: "CAD", minimumFractionDigits: 2 }).format(n);
-const OVERRIDE_FIELD_LABELS = { accepted: "Subvention acceptée", claimed: "Réclamé à ce jour" } as const;
+const OVERRIDE_FIELD_LABELS = { accepted: "Subvention acceptée", claimed: "Réclamé à ce jour", budget: "Budget prévu" } as const;
 
 // Actions du tableau fournisseurs / factures d'un dossier. Chaque action revérifie que les
 // identifiants reçus appartiennent bien à CE dossier (la RLS protège l'accès, pas la cohérence).
@@ -214,11 +214,11 @@ export async function setInvoicePaymentProofAction(grantProjectId: string, invoi
 export async function setSupplierOverrideAction(
   grantProjectId: string,
   supplierId: string,
-  field: "accepted" | "claimed",
+  field: "accepted" | "claimed" | "budget",
   value: number | null
 ): Promise<LedgerActionResult> {
   const ctx = await requireOrgContext();
-  if (field !== "accepted" && field !== "claimed") return { error: "Champ invalide." };
+  if (field !== "accepted" && field !== "claimed" && field !== "budget") return { error: "Champ invalide." };
   if (value != null && (!Number.isFinite(value) || value < 0 || value > 100_000_000)) return { error: "Montant invalide." };
 
   const supabase = await createClient();
@@ -226,7 +226,7 @@ export async function setSupplierOverrideAction(
     const before = (await projectSuppliersService(supabase).listByProject(grantProjectId)).find((s) => s.id === supplierId);
     if (!before) return { error: "Fournisseur introuvable dans ce dossier." };
     await supplierLedgerService(supabase).setOverride(supplierId, field, value, ctx.organizationUserId);
-    const column = field === "accepted" ? "accepted_subsidy_override" : "claimed_override";
+    const column = field === "accepted" ? "accepted_subsidy_override" : field === "claimed" ? "claimed_override" : "budget_amount";
     const beforeValue = (before as unknown as Record<string, unknown>)[column] as number | null | undefined;
     await logAudit(supabase, ctx, {
       action: value == null ? "override_reverted" : "override_set",

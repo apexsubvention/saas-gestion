@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { projectSuppliersRepository, type ProjectSupplierRow } from "@/server/repositories/projectSuppliers.repository";
 import { expensesRepository, type ExpenseRow } from "@/server/repositories/expenses.repository";
 import { documentsRepository } from "@/server/repositories/documents.repository";
+import { billingLineItemsRepository } from "@/server/repositories/billingLineItems.repository";
 import { matchSupplier } from "@/features/invoices/matchSupplier";
 import { amountBeforeTax, type InvoiceExtraction } from "@/features/invoices/analyzeInvoice";
 
@@ -35,6 +36,10 @@ export type Tracked = {
 export type LedgerSupplier = ProjectSupplierRow & {
   invoices: LedgerInvoice[];
   invoiced: number;
+  // Budget prévu (0059, Jade) : auto = somme des postes budgétaires (Aide à la facturation) cochés
+  // "À facturer" ET associés à ce fournisseur ; override = budget_amount saisi à la main (comme
+  // avant 0059 -- comportement historique conservé pour les fournisseurs sans poste associé).
+  budget: Tracked;
   accepted: Tracked; // subvention acceptée
   claimed: Tracked; // réclamé à ce jour (auto = réclamations liées à ses factures)
   remaining: number | null; // subvention acceptée - réclamé
@@ -63,11 +68,25 @@ export function supplierLedgerService(supabase: SupabaseClient) {
   const suppliersRepo = projectSuppliersRepository(supabase);
   const expensesRepo = expensesRepository(supabase);
   const documentsRepo = documentsRepository(supabase);
+  const lineItemsRepo = billingLineItemsRepository(supabase);
 
   return {
     // `projectRate` (fraction) sert au calcul de repli de la subvention acceptée : budget x taux.
     async load(grantProjectId: string, projectRate: number | null = null): Promise<Ledger> {
-      const [suppliers, expenses] = await Promise.all([suppliersRepo.listByProject(grantProjectId), expensesRepo.listByProject(grantProjectId)]);
+      const [suppliers, expenses, lineItems] = await Promise.all([
+        suppliersRepo.listByProject(grantProjectId),
+        expensesRepo.listByProject(grantProjectId),
+        lineItemsRepo.listByProject(grantProjectId),
+      ]);
+      // Budget prévu (0059, Jade) : somme des postes budgétaires (Aide à la facturation) cochés
+      // "À facturer" ET associés à ce fournisseur -- null (pas 0) si aucun poste n'est associé, pour
+      // distinguer "rien à calculer" de "calculé, ça fait 0 $".
+      const budgetAutoBySupplier = new Map<string, number>();
+      for (const it of lineItems) {
+        if (it.included_in_billing && it.supplier_id) {
+          budgetAutoBySupplier.set(it.supplier_id, Math.round(((budgetAutoBySupplier.get(it.supplier_id) ?? 0) + Number(it.amount ?? 0)) * 100) / 100);
+        }
+      }
       const [links, proofLinks] = await Promise.all([
         documentsRepo.listInvoiceLinks(expenses.map((e) => e.id)),
         documentsRepo.listPaymentProofLinks(expenses.map((e) => e.id)),
@@ -115,10 +134,21 @@ export function supplierLedgerService(supabase: SupabaseClient) {
 
       const ledgerSuppliers: LedgerSupplier[] = suppliers.map((s) => {
         const list = bySupplier.get(s.id) ?? [];
-        const budget = num(s.budget_amount);
+        const budgetAuto = budgetAutoBySupplier.has(s.id) ? budgetAutoBySupplier.get(s.id)! : null;
+        const budgetOverride = num(s.budget_amount);
+        // budget_amount reste le champ "saisi à la main" -- comportement historique (avant 0059)
+        // conservé pour les fournisseurs sans poste budgétaire associé. Une fois un poste associé
+        // ET coché "À facturer", sa somme devient la valeur AUTO ; la saisie manuelle, si elle
+        // existe déjà, garde priorité (mode "manuel") jusqu'à ce qu'on clique « revenir au calcul
+        // automatique », exactement comme Subvention acceptée / Réclamé à ce jour.
+        const budget: Tracked =
+          budgetOverride != null ? { effective: budgetOverride, auto: budgetAuto, override: budgetOverride, mode: "manual" }
+          : budgetAuto != null ? { effective: budgetAuto, auto: budgetAuto, override: null, mode: "auto" }
+          : { effective: null, auto: null, override: null, mode: "none" };
+
         const accAuto = num(s.accepted_subsidy_auto);
         const accOverride = num(s.accepted_subsidy_override);
-        const fallback = budget != null && projectRate != null ? Math.round(budget * projectRate * 100) / 100 : null;
+        const fallback = budget.effective != null && projectRate != null ? Math.round(budget.effective * projectRate * 100) / 100 : null;
         const accepted: Tracked =
           accOverride != null ? { effective: accOverride, auto: accAuto ?? fallback, override: accOverride, mode: "manual" }
           : accAuto != null ? { effective: accAuto, auto: accAuto, override: null, mode: "auto" }
@@ -132,16 +162,16 @@ export function supplierLedgerService(supabase: SupabaseClient) {
           : { effective: claimAuto, auto: claimAuto, override: null, mode: "auto" };
 
         const remaining = accepted.effective != null ? Math.round((accepted.effective - (claimed.effective ?? 0)) * 100) / 100 : null;
-        return { ...s, invoices: list, invoiced: list.reduce((sum, i) => sum + (i.amount ?? 0), 0), accepted, claimed, remaining };
+        return { ...s, invoices: list, invoiced: list.reduce((sum, i) => sum + (i.amount ?? 0), 0), budget, accepted, claimed, remaining };
       });
       const sumOf = (pick: (s: LedgerSupplier) => number | null) => Math.round(ledgerSuppliers.reduce((sum, s) => sum + (pick(s) ?? 0), 0) * 100) / 100;
       return {
         suppliers: ledgerSuppliers,
         unassigned,
         spent: invoices.reduce((sum, i) => sum + (i.amount ?? 0), 0),
-        supplierBudgetTotal: suppliers.reduce((sum, s) => sum + (num(s.budget_amount) ?? 0), 0),
+        supplierBudgetTotal: sumOf((s) => s.budget.effective),
         totals: {
-          budget: sumOf((s) => num(s.budget_amount)),
+          budget: sumOf((s) => s.budget.effective),
           accepted: sumOf((s) => s.accepted.effective),
           claimed: sumOf((s) => s.claimed.effective),
           remaining: sumOf((s) => s.remaining),
@@ -153,8 +183,12 @@ export function supplierLedgerService(supabase: SupabaseClient) {
 
     // Modification manuelle d'une valeur suivie. value = null -> « revenir au calcul automatique » :
     // seul l'override est effacé, la valeur automatique n'a jamais été touchée.
-    async setOverride(supplierId: string, field: "accepted" | "claimed", value: number | null, organizationUserId: string) {
+    // "budget" (0059) écrit directement dans budget_amount -- ce champ EST l'override historique
+    // (saisi à la main depuis toujours) ; il n'a pas ses propres colonnes _by/_at (pas nécessaire :
+    // déjà journalisé dans audit_logs/dossier_events par l'appelant, comme pour accepted/claimed).
+    async setOverride(supplierId: string, field: "accepted" | "claimed" | "budget", value: number | null, organizationUserId: string) {
       const stamp = value == null ? { by: null, at: null } : { by: organizationUserId, at: new Date().toISOString() };
+      if (field === "budget") return suppliersRepo.update(supplierId, { budget_amount: value });
       return suppliersRepo.update(
         supplierId,
         field === "accepted"

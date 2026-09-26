@@ -6,6 +6,7 @@ import { grantAgreementsService } from "@/server/services/grantAgreements.servic
 import { billingLineItemsService } from "@/server/services/billingLineItems.service";
 import { billingInstallmentsService } from "@/server/services/billingInstallments.service";
 import { documentsService } from "@/server/services/documents.service";
+import { projectSuppliersService } from "@/server/services/projectSuppliers.service";
 import { suggestInstallmentCount } from "@/features/billing/schedule";
 import { UploadConventionForm } from "./UploadConventionForm";
 import { LineItemsEditor } from "./LineItemsEditor";
@@ -24,11 +25,12 @@ export default async function BillingAidPage({ params }: { params: { id: string 
   const project: any = await grantProjectsService(supabase).get(params.id);
   if (!project) notFound();
 
-  const [agreements, lineItems, installments, projectDocuments] = await Promise.all([
+  const [agreements, lineItems, installments, projectDocuments, projectSuppliers] = await Promise.all([
     grantAgreementsService(supabase).listByProject(params.id),
     billingLineItemsService(supabase).listByProject(params.id),
     billingInstallmentsService(supabase).listByProject(params.id),
     documentsService(supabase).listByProject(params.id),
+    projectSuppliersService(supabase).listByProject(params.id),
   ]);
   // Facture reçue du client (0054) : jointe ici plutôt que par une requête par versement --
   // un seul aller-retour pour toutes les cartes de la page, même liste que la section
@@ -73,7 +75,12 @@ export default async function BillingAidPage({ params }: { params: { id: string 
         {/* key forcé sur le contenu de la liste : les lignes sont remplacées en bloc (delete-then-insert,
             donc de nouveaux id) à chaque lecture de convention ou enregistrement manuel -- sans ce key,
             l'état local du composant client ne se remettrait pas à jour après un nouvel upload. */}
-        <LineItemsEditor key={lineItems.map((it) => it.id).join(",") || "empty"} grantProjectId={params.id} initialItems={lineItems} />
+        <LineItemsEditor
+          key={lineItems.map((it) => it.id).join(",") || "empty"}
+          grantProjectId={params.id}
+          initialItems={lineItems}
+          suppliers={projectSuppliers.map((s) => ({ id: s.id, name: s.name }))}
+        />
         <p className="text-xs font-medium text-neutral-700">
           Total à facturer : {money(totalAmount)}
           {totalAccepted !== totalAmount && (

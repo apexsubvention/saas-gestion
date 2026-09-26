@@ -28,6 +28,12 @@ export type BillingNarrativeInput = {
   billerLabel: string | null; // qui doit facturer (ex. nom du fournisseur/sous-traitant) ; null = le client lui-même
   billerAmount: number | null; // montant que CE facturier doit facturer -- jamais déduit ici, fourni par l'appelant
   deadline: string | null; // date ISO (fin de projet), pour "d'ici le ..."
+  // (0059, Jade) : portion du coût total qui ne sera JAMAIS facturée par personne (ex. salaire
+  // interne, décoché dans Aide à la facturation) -- déjà comprise dans requiredSpend/billerAmount
+  // ci-dessus quand ceux-ci viennent du coût total du projet. Sert uniquement à AJOUTER une
+  // précision dans la phrase (« X $ de coûts internes ne seront jamais facturés ») ; ne change
+  // jamais billerAmount lui-même. null/0 = rien à préciser.
+  excludedAmount?: number | null;
 };
 
 function money(n: number): string {
@@ -64,7 +70,13 @@ export function buildBillingNarrative(input: BillingNarrativeInput): string | nu
     // (reçoit des factures), il ne facture personne -- voix passive. Voir le commentaire en
     // tête de fichier.
     const verb = input.billerLabel == null ? "avoir été facturé" : "avoir facturé";
-    parts.push(`${who} devra ${verb} ${money(input.billerAmount)}${due}.`);
+    let sentence = `${who} devra ${verb} ${money(input.billerAmount)}${due}.`;
+    // Jade : évite de laisser croire que TOUT le coût total sera facturé -- précise la portion qui
+    // ne le sera jamais (ex. salaire interne), déjà comprise dans le calcul de la subvention ci-dessus.
+    if (input.excludedAmount != null && input.excludedAmount > 0) {
+      sentence += ` (${money(input.excludedAmount)} de coûts internes -- ex. salaire -- ne seront jamais facturés, mais comptent dans le calcul de la subvention ci-dessus.)`;
+    }
+    parts.push(sentence);
   }
 
   return parts.length > 0 ? parts.join(" ") : null;

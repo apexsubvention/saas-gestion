@@ -20,6 +20,10 @@ export type BillingLineItemRow = {
   // Pourquoi décoché (0058, Jade) : simple aide-mémoire, jamais lu par un calcul -- aucun montant
   // n'est déplacé automatiquement. null si coché, ou décoché sans raison choisie.
   exclusion_reason: "internal_salary" | "redistribute_supplier" | "new_supplier" | null;
+  // Fournisseur associé (0059, Jade) : quand ce poste est coché "À facturer" ET associé à un
+  // fournisseur, son montant alimente automatiquement le "Budget prévu" de ce fournisseur dans le
+  // tableau Fournisseurs -- voir supplierLedger.service. null si pas encore associé.
+  supplier_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -32,6 +36,7 @@ export type BillingLineItemInput = {
   // Optionnel : true par défaut (comportement historique -- tout poste accepté était facturé).
   included_in_billing?: boolean;
   exclusion_reason?: "internal_salary" | "redistribute_supplier" | "new_supplier" | null;
+  supplier_id?: string | null;
 };
 
 export function billingLineItemsRepository(supabase: SupabaseClient) {
@@ -62,6 +67,7 @@ export function billingLineItemsRepository(supabase: SupabaseClient) {
         hours: item.hours,
         included_in_billing: item.included_in_billing ?? true,
         exclusion_reason: item.exclusion_reason ?? null,
+        supplier_id: item.supplier_id ?? null,
         source,
       }));
       const { data, error } = await supabase.from("billing_line_items").insert(rows).select();

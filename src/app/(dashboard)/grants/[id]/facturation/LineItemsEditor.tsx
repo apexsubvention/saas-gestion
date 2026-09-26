@@ -8,12 +8,12 @@ import { useState, useTransition } from "react";
 import type { BillingLineItemRow } from "@/server/repositories/billingLineItems.repository";
 import { saveBillingLineItemsAction } from "./actions";
 
-type Row = { key: string; label: string; description: string; amount: string; hours: string; included: boolean; exclusionReason: string };
+type Row = { key: string; label: string; description: string; amount: string; hours: string; included: boolean; exclusionReason: string; supplierId: string };
 
 let nextKey = 0;
 function newRow(): Row {
   nextKey += 1;
-  return { key: `new-${nextKey}`, label: "", description: "", amount: "", hours: "", included: true, exclusionReason: "" };
+  return { key: `new-${nextKey}`, label: "", description: "", amount: "", hours: "", included: true, exclusionReason: "", supplierId: "" };
 }
 
 const input = "w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm";
@@ -27,7 +27,18 @@ const EXCLUSION_REASON_LABELS: Record<string, string> = {
   new_supplier: "Nécessite l'ajout d'un nouveau fournisseur",
 };
 
-export function LineItemsEditor({ grantProjectId, initialItems }: { grantProjectId: string; initialItems: BillingLineItemRow[] }) {
+export function LineItemsEditor({
+  grantProjectId,
+  initialItems,
+  suppliers,
+}: {
+  grantProjectId: string;
+  initialItems: BillingLineItemRow[];
+  // Jade (0059) : associer un poste à un fournisseur -- coché "À facturer" + associé, son montant
+  // alimente automatiquement le "Budget prévu" de ce fournisseur dans le tableau Fournisseurs du
+  // Dossier (voir supplierLedger.service). Liste des fournisseurs déjà créés sur CE dossier.
+  suppliers: { id: string; name: string }[];
+}) {
   const [rows, setRows] = useState<Row[]>(() =>
     initialItems.length > 0
       ? initialItems.map((it) => ({
@@ -38,6 +49,7 @@ export function LineItemsEditor({ grantProjectId, initialItems }: { grantProject
           hours: it.hours != null ? String(it.hours) : "",
           included: it.included_in_billing,
           exclusionReason: it.exclusion_reason ?? "",
+          supplierId: it.supplier_id ?? "",
         }))
       : [newRow()]
   );
@@ -68,6 +80,7 @@ export function LineItemsEditor({ grantProjectId, initialItems }: { grantProject
       fd.set(`item_hours_${i}`, r.hours);
       fd.set(`item_included_${i}`, r.included ? "true" : "false");
       fd.set(`item_exclusion_reason_${i}`, r.exclusionReason);
+      fd.set(`item_supplier_id_${i}`, r.supplierId);
     });
     startTransition(async () => {
       const res = await saveBillingLineItemsAction(grantProjectId, { error: null }, fd);
@@ -106,6 +119,17 @@ export function LineItemsEditor({ grantProjectId, initialItems }: { grantProject
                 ))}
               </select>
             )}
+            <select
+              value={r.supplierId}
+              onChange={(e) => update(r.key, { supplierId: e.target.value })}
+              className={`${input} sm:col-span-3`}
+              title="Une fois associé, et si ce poste est coché « À facturer », son montant s'ajoute automatiquement au « Budget prévu » de ce fournisseur dans le tableau Fournisseurs du Dossier."
+            >
+              <option value="">Fournisseur (optionnel)</option>
+              {suppliers.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
             <button type="button" onClick={() => removeRow(r.key)} className="rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50 sm:col-span-1">
               Retirer
             </button>
@@ -113,7 +137,7 @@ export function LineItemsEditor({ grantProjectId, initialItems }: { grantProject
         ))}
       </div>
       <p className="text-xs text-neutral-500">
-        Décoche un poste qui n&apos;est pas facturé au client (ex. un salaire interne remboursé directement par la subvention) -- seuls les postes cochés « À facturer » comptent dans le total réparti sur les versements.
+        Décoche un poste qui n&apos;est pas facturé au client (ex. un salaire interne remboursé directement par la subvention) -- seuls les postes cochés « À facturer » comptent dans le total réparti sur les versements. Associe un poste coché à un fournisseur pour que son montant apparaisse dans le « Budget prévu » de ce fournisseur, dans le tableau Fournisseurs du Dossier.
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={addRow} className="rounded-md border border-neutral-300 px-2 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50">

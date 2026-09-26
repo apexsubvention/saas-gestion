@@ -72,7 +72,7 @@ const MODE_BADGE: Record<Tracked["mode"], { label: string; className: string } |
 
 // Une valeur suivie : effective + mention AUTO / CALCULÉE / MODIFIÉE MANUELLEMENT, modification à la
 // main et « Revenir au calcul automatique » (la valeur automatique n'est jamais détruite).
-function TrackedCell({ grantProjectId, supplierId, field, tracked }: { grantProjectId: string; supplierId: string; field: "accepted" | "claimed"; tracked: Tracked }) {
+function TrackedCell({ grantProjectId, supplierId, field, tracked }: { grantProjectId: string; supplierId: string; field: "accepted" | "claimed" | "budget"; tracked: Tracked }) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(tracked.effective != null ? String(tracked.effective) : "");
   const [pending, startTransition] = useTransition();
@@ -360,7 +360,6 @@ function InvoiceRow({
 
 function SupplierGroup({ grantProjectId, supplier, documents, clients, claims, isFirst, isLast, billingContext }: { grantProjectId: string; supplier: LedgerSupplier; documents: DocOption[]; clients: ClientOption[]; claims: ClaimOption[]; isFirst: boolean; isLast: boolean; billingContext?: SupplierBillingContext }) {
   const [name, setName] = useState(supplier.name);
-  const [budget, setBudget] = useState(supplier.budget_amount != null ? String(supplier.budget_amount) : "");
   const [contact, setContact] = useState(supplier.contact ?? "");
   const [frequency, setFrequency] = useState(supplier.billing_frequency ?? "");
   const [day, setDay] = useState(supplier.expected_invoice_day != null ? String(supplier.expected_invoice_day) : "");
@@ -372,7 +371,6 @@ function SupplierGroup({ grantProjectId, supplier, documents, clients, claims, i
 
   const dirty =
     name !== supplier.name ||
-    budget !== (supplier.budget_amount != null ? String(supplier.budget_amount) : "") ||
     contact !== (supplier.contact ?? "") ||
     frequency !== (supplier.billing_frequency ?? "") ||
     day !== (supplier.expected_invoice_day != null ? String(supplier.expected_invoice_day) : "") ||
@@ -382,27 +380,31 @@ function SupplierGroup({ grantProjectId, supplier, documents, clients, claims, i
   // Résumé en langage clair (Jade) : reprend le contexte du dossier (dépense totale requise,
   // portion subventionnée -- mêmes chiffres que SubsidyPanel) et le budget prévu DE CE fournisseur
   // comme montant à facturer -- jamais le total du projet, pour ne pas laisser croire qu'un
-  // fournisseur parmi d'autres doit à lui seul facturer tout le dossier.
+  // fournisseur parmi d'autres doit à lui seul facturer tout le dossier. Budget prévu (0059) peut
+  // désormais venir des postes budgétaires cochés/associés dans Aide à la facturation -- même
+  // valeur "effective" que celle affichée dans la colonne Budget prévu ci-dessous.
   const narrative = billingContext
     ? buildBillingNarrative({
         clientName: billingContext.clientName,
         subsidy: billingContext.subsidy,
         billerLabel: supplier.name,
-        billerAmount: supplier.budget_amount != null ? Number(supplier.budget_amount) : null,
+        billerAmount: supplier.budget.effective,
         deadline: billingContext.deadline,
       })
     : null;
 
+  // Jade (0059) : Budget prévu n'est plus enregistré avec les autres champs de la fiche -- il a son
+  // propre bouton (comme Subvention acceptée / Réclamé), pour pouvoir revenir au calcul automatique
+  // (somme des postes associés) sans y toucher ici. budget_amount de la ligne n'est donc jamais
+  // modifié par ce formulaire : on renvoie sa valeur actuelle telle quelle.
   function save() {
-    const b = parseAmount(budget);
     const d = day.trim() ? Number(day) : null;
-    if (Number.isNaN(b)) return run(async () => ({ error: "Budget invalide." }));
     if (d != null && !Number.isInteger(d)) return run(async () => ({ error: "Jour attendu invalide (1 à 31)." }));
     run(() =>
       saveSupplierAction(grantProjectId, {
         id: supplier.id,
         name,
-        budget_amount: b,
+        budget_amount: supplier.budget_amount,
         contact: contact || null,
         billing_frequency: frequency || null,
         expected_invoice_day: d,
@@ -416,7 +418,7 @@ function SupplierGroup({ grantProjectId, supplier, documents, clients, claims, i
     <>
       <tr className="border-b border-neutral-100 bg-white align-top">
         <td className="px-3 py-2"><input value={name} onChange={(e) => setName(e.target.value)} className={`${input} font-medium`} aria-label="Nom du fournisseur" /></td>
-        <td className="px-3 py-2"><input inputMode="decimal" value={budget} onChange={(e) => setBudget(e.target.value)} placeholder="Budget $" className={input} aria-label="Budget" /></td>
+        <td className="px-3 py-2"><TrackedCell grantProjectId={grantProjectId} supplierId={supplier.id} field="budget" tracked={supplier.budget} /></td>
         <td className="px-3 py-2"><TrackedCell grantProjectId={grantProjectId} supplierId={supplier.id} field="accepted" tracked={supplier.accepted} /></td>
         <td className="px-3 py-2"><TrackedCell grantProjectId={grantProjectId} supplierId={supplier.id} field="claimed" tracked={supplier.claimed} /></td>
         <td className={`px-3 py-2 text-sm font-semibold ${supplier.remaining != null && supplier.remaining < 0 ? "text-red-700" : "text-neutral-900"}`}>{money(supplier.remaining)}</td>
@@ -573,10 +575,11 @@ export function SuppliersTable({
         </table>
       </div>
       <p className="text-xs text-neutral-400">
-        « Subvention acceptée » et « Réclamé à ce jour » se calculent automatiquement (AUTO/CALCULÉE) mais restent modifiables : clique sur le
-        montant pour l&apos;ajuster à la main (MODIFIÉE MANUELLEMENT), puis « Revenir au calcul automatique » pour annuler — la valeur automatique
-        n&apos;est jamais perdue. « Réclamé » vient des réclamations liées aux factures du fournisseur. Ouvre « Détails » sur un fournisseur pour
-        voir l&apos;historique complet de ses modifications (🕐).
+        « Budget prévu », « Subvention acceptée » et « Réclamé à ce jour » se calculent automatiquement (AUTO/CALCULÉE) mais restent modifiables :
+        clique sur le montant pour l&apos;ajuster à la main (MODIFIÉE MANUELLEMENT), puis « Revenir au calcul automatique » pour annuler — la
+        valeur automatique n&apos;est jamais perdue. « Budget prévu » vient des postes budgétaires cochés « À facturer » et associés à ce
+        fournisseur dans Aide à la facturation ; « Réclamé » vient des réclamations liées aux factures du fournisseur. Ouvre « Détails » sur un
+        fournisseur pour voir l&apos;historique complet de ses modifications (🕐).
       </p>
     </div>
   );

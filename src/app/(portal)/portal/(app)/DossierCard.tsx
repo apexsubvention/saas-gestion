@@ -160,18 +160,21 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
   // phrase -- voir src/features/billing/billingSummary.ts. spent=0 : on ne connaît pas les
   // dépenses déjà facturées ici (pas nécessaire, seule la cible totale compte pour ce résumé).
   const subsidy = computeSubsidy({ rate: dossier.grantRate, maxSubsidy: dossier.approvedGrantAmount, totalProjectCost: dossier.totalProjectCost, spent: 0 });
-  // Si le taux/coût total du projet n'est pas renseigné sur la fiche (ou l'entente), on retombe sur
-  // le total déjà validé des activités/postes acceptés (aide à la facturation) -- sinon la phrase ne
-  // s'affiche jamais sur un dossier où seule la convention a été lue, sans que le taux ait été
-  // reporté sur la fiche. Jamais de valeur inventée : simplement une autre source déjà existante.
+  // (0059, Jade) : ce qui sera VRAIMENT facturé, ce sont les postes cochés "À facturer" dans Aide à
+  // la facturation -- jamais le coût total du projet (qui inclut les coûts internes, ex. salaire,
+  // jamais facturés par personne). Dès que des postes existent pour ce dossier, on utilise leur
+  // somme plutôt que le coût total ; sinon (aucun poste encore extrait/saisi) on retombe sur
+  // l'ancien calcul (coût total requis pour atteindre la subvention) -- jamais de valeur inventée.
   const lineItemsTotal = dossier.billingLineItems.filter((it) => it.includedInBilling).reduce((sum, it) => sum + it.amount, 0);
-  const billerAmount = subsidy.ready && subsidy.requiredSpend != null ? subsidy.requiredSpend : lineItemsTotal > 0 ? lineItemsTotal : null;
+  const excludedTotal = dossier.billingLineItems.filter((it) => !it.includedInBilling).reduce((sum, it) => sum + it.amount, 0);
+  const billerAmount = dossier.billingLineItems.length > 0 ? lineItemsTotal : subsidy.ready ? subsidy.requiredSpend : null;
   const billingNarrative = buildBillingNarrative({
     clientName: dossier.clientName ?? "Le client",
     subsidy,
     billerLabel: null,
     billerAmount,
     deadline: dossier.billingDeadline,
+    excludedAmount: dossier.billingLineItems.length > 0 ? excludedTotal : null,
   });
   const openRequirementsCount = dossier.claims.reduce((sum, c) => sum + c.openRequirements.length, 0);
   const actionableRequestsCount =
