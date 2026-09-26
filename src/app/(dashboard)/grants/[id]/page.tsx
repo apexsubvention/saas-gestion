@@ -29,7 +29,6 @@ import { aiSuggestionsService } from "@/server/services/aiSuggestions.service";
 import { listDossierEvents } from "@/server/services/audit";
 import { supplierLedgerService } from "@/server/services/supplierLedger.service";
 import { billingLineItemsService } from "@/server/services/billingLineItems.service";
-import { LineItemsEditor } from "./facturation/LineItemsEditor";
 import { computeSubsidy, resolveSubsidyInputs } from "@/features/grants/subsidyMath";
 import { buildBillingNarrative } from "@/features/billing/billingSummary";
 import { grantAgreementsService } from "@/server/services/grantAgreements.service";
@@ -80,6 +79,13 @@ export default async function GrantProjectPage({ params, searchParams }: { param
   const rateForLedger = Number(project.grant_rate ?? agreement?.grant_rate ?? 0) || null;
   const ledger = await supplierLedgerService(supabase).load(params.id, rateForLedger);
   const lineItems = await billingLineItemsService(supabase).listByProject(params.id);
+  // Résumé seulement dans le Dossier (Jade : trop de tableaux qui se ressemblent) -- le détail
+  // éditable (cocher/décocher, raison d'exclusion) reste dans l'onglet Aide à la facturation.
+  const lineItemsSummary = {
+    includedCount: lineItems.filter((it) => it.included_in_billing).length,
+    excludedCount: lineItems.filter((it) => !it.included_in_billing).length,
+    includedTotal: lineItems.filter((it) => it.included_in_billing).reduce((sum, it) => sum + Number(it.amount ?? 0), 0),
+  };
   const dossierEvents = await listDossierEvents(supabase, params.id);
   const suggestions = await aiSuggestionsService(supabase).listProposed(params.id);
   const [snapshots, currentProgram] = await Promise.all([programSnapshotService(supabase).list(params.id), programsRepository(supabase).findById(project.program_id)]);
@@ -292,17 +298,30 @@ export default async function GrantProjectPage({ params, searchParams }: { param
               téléversée dans « Documents » (catégorie Facture) est lue automatiquement et ajoutée ici sous son fournisseur ; tu peux aussi associer
               un document toi-même. Ouvre « Détails » sur un fournisseur pour voir l&apos;historique de ses modifications.
             </p>
-            <details className="rounded-lg border border-neutral-200 bg-white p-4" open={lineItems.length > 0}>
-              <summary className="cursor-pointer text-sm font-medium text-neutral-800">Activités et postes budgétaires acceptés (à facturer)</summary>
-              <div className="mt-3 space-y-2">
-                <p className="text-xs text-neutral-500">
-                  Repris automatiquement de la convention téléversée dans « Documents » (catégorie Convention) -- coche/décoche « À facturer » pour
-                  chaque poste ; si tu décoches, précise pourquoi (salaire interne, à redistribuer à un autre fournisseur, ou nécessite l&apos;ajout
-                  d&apos;un nouveau fournisseur). Cette liste est aussi modifiable dans l&apos;onglet « Aide à la facturation ».
+            {lineItems.length > 0 ? (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-neutral-200 bg-white p-4">
+                <p className="text-sm text-neutral-700">
+                  <span className="font-medium text-neutral-900">Activités et postes budgétaires acceptés</span> (repris de la convention) :{" "}
+                  {lineItemsSummary.includedCount} à facturer ({money(lineItemsSummary.includedTotal)})
+                  {lineItemsSummary.excludedCount > 0 ? `, ${lineItemsSummary.excludedCount} exclu(s)` : ""}.
                 </p>
-                <LineItemsEditor key={lineItems.map((it) => it.id).join(",") || "empty"} grantProjectId={project.id} initialItems={lineItems} />
+                <Link
+                  href={`/grants/${project.id}/facturation`}
+                  className="inline-block whitespace-nowrap rounded-md border border-purple-200 bg-purple-50 px-3 py-1.5 text-xs font-medium text-purple-700 hover:bg-purple-100"
+                >
+                  Voir / cocher le détail →
+                </Link>
               </div>
-            </details>
+            ) : (
+              <p className="text-xs text-neutral-400">
+                Aucune activité/poste budgétaire détecté pour l&apos;instant -- téléverse la convention dans « Documents », ou ajoute-les toi-même
+                dans{" "}
+                <Link href={`/grants/${project.id}/facturation`} className="underline hover:text-neutral-600">
+                  Aide à la facturation
+                </Link>
+                .
+              </p>
+            )}
             <SuppliersTable
               grantProjectId={project.id}
               suppliers={ledger.suppliers}

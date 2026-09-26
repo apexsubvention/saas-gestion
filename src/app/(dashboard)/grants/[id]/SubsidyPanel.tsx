@@ -41,28 +41,36 @@ export function SubsidyPanel({
   return (
     <div className="space-y-3 rounded-lg border border-neutral-200 bg-white p-4">
       {narrative && <p className="rounded-md bg-indigo-50 px-3 py-2 text-sm text-indigo-900">{narrative}</p>}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      {/* Jade : ce bloc répétait presque les mêmes totaux que la ligne TOTAL du tableau Fournisseurs
+          plus bas -- on ne garde en évidence que les 3 chiffres qui n'y sont pas déjà (taux, maximum,
+          restant) ; le reste du détail du calcul est disponible en un clic, pas perdu. */}
+      <div className="grid grid-cols-3 gap-3">
         <Stat label="Taux d'aide" value={`${ratePct.toLocaleString("fr-CA")} %`} />
         <Stat label="Subvention maximale" value={money(summary.maxSubsidy)} />
-        <Stat label="Dépenses requises pour l'atteindre" value={money(summary.requiredSpend)} hint={`${money(summary.maxSubsidy)} ÷ ${ratePct} %`} />
-        <Stat label="Dépensé à ce jour (factures)" value={money(summary.spent)} />
-        <Stat label="Subvention gagnée" value={money(summary.earned)} hint={`${ratePct} % des dépenses facturées`} />
         <Stat label="Subvention restante" value={money(summary.remaining)} strong />
-        <Stat label="Dépenses restantes à engager" value={money(summary.remainingSpend)} hint="pour atteindre la subvention maximale" />
-        <Stat
-          label="Budget des fournisseurs"
-          value={money(supplierBudgetTotal)}
-          hint={budgetGap == null ? undefined : budgetGap >= 0 ? "couvre les dépenses requises" : `il manque ${money(-budgetGap)} de budget pour atteindre le maximum`}
-        />
       </div>
       {summary.excessSpend > 0 && (
         <p className="text-xs text-amber-800">
           Les dépenses dépassent de {money(summary.excessSpend)} ce qui est remboursé : la subvention est déjà à son maximum.
         </p>
       )}
-      <p className="text-xs text-neutral-400">
-        Calcul sur les montants avant taxes des factures du tableau ci-dessous. Chaque dollar facturé rapporte {ratePct.toLocaleString("fr-CA")} % de subvention, jusqu&apos;au maximum.
-      </p>
+      <details className="text-xs text-neutral-500">
+        <summary className="cursor-pointer text-neutral-600 hover:text-neutral-800">Voir le détail du calcul</summary>
+        <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
+          <Stat label="Dépenses requises pour l'atteindre" value={money(summary.requiredSpend)} hint={`${money(summary.maxSubsidy)} ÷ ${ratePct} %`} />
+          <Stat label="Dépensé à ce jour (factures)" value={money(summary.spent)} />
+          <Stat label="Subvention gagnée" value={money(summary.earned)} hint={`${ratePct} % des dépenses facturées`} />
+          <Stat label="Dépenses restantes à engager" value={money(summary.remainingSpend)} hint="pour atteindre la subvention maximale" />
+          <Stat
+            label="Budget des fournisseurs"
+            value={money(supplierBudgetTotal)}
+            hint={budgetGap == null ? undefined : budgetGap >= 0 ? "couvre les dépenses requises" : `il manque ${money(-budgetGap)} de budget pour atteindre le maximum`}
+          />
+        </div>
+        <p className="mt-2 text-neutral-400">
+          Calcul sur les montants avant taxes des factures du tableau ci-dessous. Chaque dollar facturé rapporte {ratePct.toLocaleString("fr-CA")} % de subvention, jusqu&apos;au maximum.
+        </p>
+      </details>
     </div>
   );
 }
