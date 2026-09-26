@@ -137,13 +137,16 @@ export function supplierLedgerService(supabase: SupabaseClient) {
         const budgetAuto = budgetAutoBySupplier.has(s.id) ? budgetAutoBySupplier.get(s.id)! : null;
         const budgetOverride = num(s.budget_amount);
         // budget_amount reste le champ "saisi à la main" -- comportement historique (avant 0059)
-        // conservé pour les fournisseurs sans poste budgétaire associé. Une fois un poste associé
-        // ET coché "À facturer", sa somme devient la valeur AUTO ; la saisie manuelle, si elle
-        // existe déjà, garde priorité (mode "manuel") jusqu'à ce qu'on clique « revenir au calcul
-        // automatique », exactement comme Subvention acceptée / Réclamé à ce jour.
+        // conservé pour les fournisseurs sans poste budgétaire associé. Jade (suite au test réel du
+        // dossier Caracol) : dès qu'un poste est coché "À facturer" ET associé à ce fournisseur, la
+        // somme de ces postes DOIT être Budget prévu -- toujours, même si une valeur avait été
+        // saisie à la main avant (ex. au moment de créer le fournisseur). La saisie manuelle ne sert
+        // donc de repli que tant qu'AUCUN poste n'est associé/coché pour ce fournisseur ; elle
+        // n'est jamais silencieusement perdue (budget_amount n'est pas effacé en base), seulement
+        // ignorée pour l'affichage tant que le calcul automatique existe.
         const budget: Tracked =
-          budgetOverride != null ? { effective: budgetOverride, auto: budgetAuto, override: budgetOverride, mode: "manual" }
-          : budgetAuto != null ? { effective: budgetAuto, auto: budgetAuto, override: null, mode: "auto" }
+          budgetAuto != null ? { effective: budgetAuto, auto: budgetAuto, override: budgetOverride, mode: "auto" }
+          : budgetOverride != null ? { effective: budgetOverride, auto: null, override: budgetOverride, mode: "manual" }
           : { effective: null, auto: null, override: null, mode: "none" };
 
         const accAuto = num(s.accepted_subsidy_auto);

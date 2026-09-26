@@ -78,6 +78,10 @@ function TrackedCell({ grantProjectId, supplierId, field, tracked }: { grantProj
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const badge = MODE_BADGE[tracked.mode];
+  // Jade : « Budget prévu » calculé (postes cochés « À facturer » associés à ce fournisseur) doit
+  // toujours refléter exactement ces postes -- pas de saisie manuelle qui viendrait le masquer.
+  // Non éditable ici tant que ce calcul existe ; pour le changer, il faut changer les postes.
+  const lockedToAuto = field === "budget" && tracked.mode === "auto";
 
   function run(value: number | null) {
     setError(null);
@@ -92,6 +96,18 @@ function TrackedCell({ grantProjectId, supplierId, field, tracked }: { grantProj
     const v = parseAmount(text);
     if (v == null || Number.isNaN(v)) return setError("Montant invalide.");
     run(v);
+  }
+
+  if (lockedToAuto) {
+    return (
+      <div className="space-y-1">
+        <span className="text-sm font-medium text-neutral-900">{money(tracked.effective)}</span>
+        <div className="flex flex-wrap items-center gap-1">
+          {badge && <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${badge.className}`}>{badge.label}</span>}
+        </div>
+        <p className="text-[11px] text-neutral-400">Calculé depuis Aide à la facturation — modifie les postes pour le changer.</p>
+      </div>
+    );
   }
 
   return (
@@ -575,11 +591,13 @@ export function SuppliersTable({
         </table>
       </div>
       <p className="text-xs text-neutral-400">
-        « Budget prévu », « Subvention acceptée » et « Réclamé à ce jour » se calculent automatiquement (AUTO/CALCULÉE) mais restent modifiables :
-        clique sur le montant pour l&apos;ajuster à la main (MODIFIÉE MANUELLEMENT), puis « Revenir au calcul automatique » pour annuler — la
-        valeur automatique n&apos;est jamais perdue. « Budget prévu » vient des postes budgétaires cochés « À facturer » et associés à ce
-        fournisseur dans Aide à la facturation ; « Réclamé » vient des réclamations liées aux factures du fournisseur. Ouvre « Détails » sur un
-        fournisseur pour voir l&apos;historique complet de ses modifications (🕐).
+        « Budget prévu », « Subvention acceptée » et « Réclamé à ce jour » se calculent automatiquement (AUTO/CALCULÉE). « Subvention acceptée »
+        et « Réclamé à ce jour » restent modifiables à la main (clique sur le montant, puis « Revenir au calcul automatique » pour annuler — la
+        valeur automatique n&apos;est jamais perdue). « Budget prévu » vient des postes budgétaires cochés « À facturer » et associés à ce
+        fournisseur dans Aide à la facturation : dès qu&apos;au moins un poste est associé, ce montant reflète toujours exactement ces postes
+        (non modifiable ici — change les postes dans Aide à la facturation pour l&apos;ajuster) ; sans poste associé, il reste saisissable à la
+        main comme avant. « Réclamé » vient des réclamations liées aux factures du fournisseur. Ouvre « Détails » sur un fournisseur pour voir
+        l&apos;historique complet de ses modifications (🕐).
       </p>
     </div>
   );

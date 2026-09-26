@@ -166,15 +166,16 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
   // somme plutôt que le coût total ; sinon (aucun poste encore extrait/saisi) on retombe sur
   // l'ancien calcul (coût total requis pour atteindre la subvention) -- jamais de valeur inventée.
   const lineItemsTotal = dossier.billingLineItems.filter((it) => it.includedInBilling).reduce((sum, it) => sum + it.amount, 0);
-  const excludedTotal = dossier.billingLineItems.filter((it) => !it.includedInBilling).reduce((sum, it) => sum + it.amount, 0);
   const billerAmount = dossier.billingLineItems.length > 0 ? lineItemsTotal : subsidy.ready ? subsidy.requiredSpend : null;
+  // Jade : dans le portail client, on ne mentionne PAS les coûts internes exclus -- seul ce qui est
+  // vraiment coché "À facturer" compte pour le client parent, une précision sur les coûts internes
+  // pourrait mélanger. Cette nuance reste réservée à l'interne (grants/[id]/page.tsx).
   const billingNarrative = buildBillingNarrative({
     clientName: dossier.clientName ?? "Le client",
     subsidy,
     billerLabel: null,
     billerAmount,
     deadline: dossier.billingDeadline,
-    excludedAmount: dossier.billingLineItems.length > 0 ? excludedTotal : null,
   });
   const openRequirementsCount = dossier.claims.reduce((sum, c) => sum + c.openRequirements.length, 0);
   const actionableRequestsCount =
