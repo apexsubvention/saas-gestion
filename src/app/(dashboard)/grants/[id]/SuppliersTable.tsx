@@ -5,6 +5,16 @@
 // tableaux empilés (un « auto », un « manuel ») -- fusionnés ici en un seul, où chaque valeur suivie
 // reste modifiable à la main même quand elle est calculée automatiquement (mention AUTO / CALCULÉE /
 // MODIFIÉE MANUELLEMENT, « revenir au calcul automatique » sans jamais perdre la valeur auto).
+//
+// Budget prévu (0060, Jade) : n'est plus une colonne du tableau. Juste sous chaque fournisseur,
+// une ligne toujours visible (pas cachée derrière « Détails ») affiche ses postes de facturation --
+// même composant/mêmes cases que dans Aide à la facturation, les deux listes sont connectées (même
+// table billing_line_items). La somme des postes cochés « À facturer » liés à ce fournisseur EST
+// Budget prévu (affiché dans le narratif juste au-dessus des postes) ; sans poste associé, un champ
+// de saisie manuelle classique (TrackedCell) prend le relais. « Détails » ne contient plus que les
+// informations de facturation (contact/fréquence/jour/exigences/lien client) et l'historique -- les
+// factures (ajout, statut, preuve de paiement) restent, elles, gérées directement dans le tableau
+// principal comme avant, sans changement.
 import { Fragment, useState, useTransition } from "react";
 import { OpenDocumentButton } from "./OpenDocumentButton";
 import {
@@ -35,9 +45,10 @@ const EXCLUSION_REASON_LABELS: Record<string, string> = {
   new_supplier: "Nécessite l'ajout d'un nouveau fournisseur",
 };
 
-// Postes budgétaires (Aide à la facturation) associés à CE fournisseur (0060, Jade) : « Détails »
-// affiche maintenant la vraie liste, modifiable directement ici -- même mécanisme, sans changer
-// d'onglet. Budget prévu (colonne du tableau) = somme de ceux cochés « À facturer » ci-dessous.
+// Postes budgétaires (Aide à la facturation) associés à CE fournisseur (0060, Jade) : affichés
+// juste sous chaque fournisseur (toujours visibles, plus besoin d'ouvrir « Détails »), modifiables
+// directement ici -- même mécanisme, sans changer d'onglet. Budget prévu = somme de ceux cochés
+// « À facturer » ci-dessous.
 function SupplierLineItemRow({ grantProjectId, item }: { grantProjectId: string; item: BillingLineItemRow }) {
   const [label, setLabel] = useState(item.label);
   const [description, setDescription] = useState(item.description ?? "");
@@ -107,13 +118,31 @@ function SupplierLineItemRow({ grantProjectId, item }: { grantProjectId: string;
   );
 }
 
-function SupplierLineItems({ grantProjectId, items }: { grantProjectId: string; items: BillingLineItemRow[] }) {
+// Jade : le tableau Fournisseurs n'a plus de colonne « Budget prévu » séparée -- ce sont ces
+// postes, toujours visibles ici (plus besoin d'ouvrir « Détails »), qui EN TIENNENT LIEU,
+// exactement comme dans Aide à la facturation (même mécanisme, mêmes cases). Repli manuel
+// conservé (comportement historique) tant qu'aucun poste n'est encore associé à ce fournisseur.
+function SupplierLineItems({
+  grantProjectId,
+  supplierId,
+  items,
+  budget,
+}: {
+  grantProjectId: string;
+  supplierId: string;
+  items: BillingLineItemRow[];
+  budget: Tracked;
+}) {
   if (items.length === 0) {
     return (
-      <p className="text-xs text-neutral-400">
-        Aucun poste associé à ce fournisseur pour l&apos;instant -- associe-le à ce fournisseur dans{" "}
-        <span className="font-medium">Aide à la facturation</span>, il apparaîtra ensuite ici.
-      </p>
+      <div className="space-y-2">
+        <p className="text-xs text-neutral-400">
+          Aucun poste associé à ce fournisseur pour l&apos;instant -- associe-le à ce fournisseur dans{" "}
+          <span className="font-medium">Aide à la facturation</span>, il apparaîtra ensuite ici et deviendra Budget prévu. En
+          attendant, tu peux saisir un budget prévu à la main :
+        </p>
+        <TrackedCell grantProjectId={grantProjectId} supplierId={supplierId} field="budget" tracked={budget} />
+      </div>
     );
   }
   const includedTotal = items.filter((it) => it.included_in_billing).reduce((sum, it) => sum + Number(it.amount ?? 0), 0);
@@ -319,7 +348,7 @@ function InvoicePaymentRow({ grantProjectId, invoice, documents }: { grantProjec
   return (
     <tr className="border-b border-neutral-100 bg-white">
       <td className="px-3 py-2 text-xs text-neutral-400"><span className="pl-3">↳ paiement</span></td>
-      <td className="px-3 py-2" colSpan={6}>
+      <td className="px-3 py-2" colSpan={5}>
         <div className="flex flex-wrap items-center gap-3">
           <label className="flex items-center gap-2 text-xs text-neutral-600">
             Statut
@@ -429,7 +458,7 @@ function InvoiceRow({
       <td className="px-3 py-2">
         <input value={number} onChange={(e) => setNumber(e.target.value)} placeholder="N° de facture" className={input} />
       </td>
-      <td className="px-3 py-2" colSpan={2}>
+      <td className="px-3 py-2">
         <DocumentSelect value={docId} onChange={setDocId} documents={documents} />
         {invoice?.document && docId === invoice.document.id && (
           <div className="mt-1"><OpenDocumentButton storagePath={invoice.document.storage_path} filename={invoice.document.filename} /></div>
@@ -541,7 +570,6 @@ function SupplierGroup({ grantProjectId, supplier, documents, clients, claims, l
     <>
       <tr className="border-b border-neutral-100 bg-white align-top">
         <td className="px-3 py-2"><input value={name} onChange={(e) => setName(e.target.value)} className={`${input} font-medium`} aria-label="Nom du fournisseur" /></td>
-        <td className="px-3 py-2"><TrackedCell grantProjectId={grantProjectId} supplierId={supplier.id} field="budget" tracked={supplier.budget} /></td>
         <td className="px-3 py-2"><TrackedCell grantProjectId={grantProjectId} supplierId={supplier.id} field="accepted" tracked={supplier.accepted} /></td>
         <td className="px-3 py-2"><TrackedCell grantProjectId={grantProjectId} supplierId={supplier.id} field="claimed" tracked={supplier.claimed} /></td>
         <td className={`px-3 py-2 text-sm font-semibold ${supplier.remaining != null && supplier.remaining < 0 ? "text-red-700" : "text-neutral-900"}`}>{money(supplier.remaining)}</td>
@@ -570,17 +598,19 @@ function SupplierGroup({ grantProjectId, supplier, documents, clients, claims, l
           {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
         </td>
       </tr>
+      <tr className="border-b border-neutral-100 bg-white">
+        <td colSpan={6} className="px-3 pb-3">
+          {narrative && <p className="mb-2 rounded-md bg-indigo-50 px-3 py-2 text-sm text-indigo-900">{narrative}</p>}
+          <h4 className="mb-2 text-xs font-semibold text-neutral-700">Budget prévu — postes de facturation</h4>
+          <SupplierLineItems grantProjectId={grantProjectId} supplierId={supplier.id} items={lineItems} budget={supplier.budget} />
+        </td>
+      </tr>
       {showDetails && (
         <tr className="border-b border-neutral-100 bg-neutral-50">
-          <td colSpan={7} className="px-3 py-3">
+          <td colSpan={6} className="px-3 py-3">
             <p className="mb-2 text-xs text-neutral-500">
               Informations de facturation. Quand ce fournisseur est un client Apex (ex. Sitegrow), elles sont visibles dans son portail.
             </p>
-            {narrative && <p className="mb-3 rounded-md bg-indigo-50 px-3 py-2 text-sm text-indigo-900">{narrative}</p>}
-            <div className="mb-3">
-              <h4 className="mb-2 text-xs font-semibold text-neutral-700">Postes de facturation (Aide à la facturation)</h4>
-              <SupplierLineItems grantProjectId={grantProjectId} items={lineItems} />
-            </div>
             <div className="grid gap-3 sm:grid-cols-3">
               <label className="space-y-1 text-xs text-neutral-600">Contact<input value={contact} onChange={(e) => setContact(e.target.value)} className={input} /></label>
               <label className="space-y-1 text-xs text-neutral-600">Fréquence de facturation<input value={frequency} onChange={(e) => setFrequency(e.target.value)} className={input} /></label>
@@ -612,23 +642,22 @@ function SupplierGroup({ grantProjectId, supplier, documents, clients, claims, l
 
 function AddSupplierRow({ grantProjectId }: { grantProjectId: string }) {
   const [name, setName] = useState("");
-  const [budget, setBudget] = useState("");
   const { pending, error, run } = useLedgerAction();
 
   function add() {
-    const b = parseAmount(budget);
-    if (Number.isNaN(b)) return run(async () => ({ error: "Budget invalide." }));
     run(
-      () => saveSupplierAction(grantProjectId, { id: null, name, budget_amount: b, contact: null, billing_frequency: null, expected_invoice_day: null, invoice_description_requirements: null, supplier_client_id: null }),
-      () => { setName(""); setBudget(""); }
+      () => saveSupplierAction(grantProjectId, { id: null, name, budget_amount: null, contact: null, billing_frequency: null, expected_invoice_day: null, invoice_description_requirements: null, supplier_client_id: null }),
+      () => setName("")
     );
   }
 
   return (
     <tr className="bg-neutral-50">
       <td className="px-3 py-2"><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nouveau fournisseur" className={input} /></td>
-      <td className="px-3 py-2"><input inputMode="decimal" value={budget} onChange={(e) => setBudget(e.target.value)} placeholder="Budget $" className={input} /></td>
-      <td colSpan={4} className="px-3 py-2 text-xs text-neutral-400">Ajoute un fournisseur, puis ses factures avec « + Facture ». Le suivi financier (subvention acceptée, réclamé) s&apos;ajuste ensuite dans son tableau.</td>
+      <td colSpan={4} className="px-3 py-2 text-xs text-neutral-400">
+        Ajoute un fournisseur, puis associe-lui des postes dans Aide à la facturation (Budget prévu) et ses factures avec « + Facture ». Le
+        suivi financier (subvention acceptée, réclamé) s&apos;ajuste ensuite dans son tableau.
+      </td>
       <td className="px-3 py-2">
         <button onClick={add} disabled={pending || !name.trim()} className={`${smallBtn} bg-neutral-900 text-white hover:bg-neutral-800`}>{pending ? "…" : "+ Ajouter"}</button>
         {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
@@ -668,7 +697,6 @@ export function SuppliersTable({
           <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
             <tr>
               <th className="px-3 py-2 font-medium">Nom</th>
-              <th className="px-3 py-2 font-medium">Budget prévu</th>
               <th className="px-3 py-2 font-medium">Subvention acceptée</th>
               <th className="px-3 py-2 font-medium">Réclamé à ce jour</th>
               <th className="px-3 py-2 font-medium">Solde restant</th>
@@ -693,7 +721,7 @@ export function SuppliersTable({
             ))}
             {unassigned.length > 0 && (
               <>
-                <tr className="border-b border-neutral-100 bg-amber-50"><td colSpan={7} className="px-3 py-2 text-xs font-medium text-amber-900">Factures sans fournisseur — choisis le fournisseur de chacune.</td></tr>
+                <tr className="border-b border-neutral-100 bg-amber-50"><td colSpan={6} className="px-3 py-2 text-xs font-medium text-amber-900">Factures sans fournisseur — choisis le fournisseur de chacune.</td></tr>
                 {unassigned.map((inv) => (
                   <Fragment key={inv.id}>
                     <InvoiceRow key={`${inv.id}-${inv.status}`} grantProjectId={grantProjectId} invoice={inv} supplierId={null} documents={documents} claims={claims} supplierChoices={choices} />
@@ -707,7 +735,6 @@ export function SuppliersTable({
           <tfoot className="border-t border-neutral-300 bg-neutral-50 text-sm font-semibold text-neutral-900">
             <tr>
               <td className="px-3 py-2">TOTAL</td>
-              <td className="px-3 py-2">{money(totals.budget)}</td>
               <td className="px-3 py-2">{money(totals.accepted)}</td>
               <td className="px-3 py-2">{money(totals.claimed)}</td>
               <td className="px-3 py-2">{money(totals.remaining)}</td>
@@ -717,13 +744,12 @@ export function SuppliersTable({
         </table>
       </div>
       <p className="text-xs text-neutral-400">
-        « Budget prévu », « Subvention acceptée » et « Réclamé à ce jour » se calculent automatiquement (AUTO/CALCULÉE). « Subvention acceptée »
-        et « Réclamé à ce jour » restent modifiables à la main (clique sur le montant, puis « Revenir au calcul automatique » pour annuler — la
-        valeur automatique n&apos;est jamais perdue). « Budget prévu » vient des postes budgétaires cochés « À facturer » et associés à ce
-        fournisseur : ouvre « Détails » sur un fournisseur pour voir et modifier directement ses postes (mêmes cases et montants que dans Aide à
-        la facturation) — dès qu&apos;au moins un poste est associé, Budget prévu reflète toujours exactement ceux cochés « À facturer » ; sans
-        poste associé, il reste saisissable à la main comme avant. « Réclamé » vient des réclamations liées aux factures du fournisseur. « Détails »
-        montre aussi l&apos;historique complet des modifications (🕐).
+        Budget prévu n&apos;est plus une colonne à part : les postes de chaque fournisseur (mêmes cases et montants que dans Aide à la
+        facturation) sont affichés directement sous son nom, toujours visibles — leur somme cochée « À facturer » EST Budget prévu. Sans poste
+        associé, il reste saisissable à la main comme avant. « Subvention acceptée » et « Réclamé à ce jour » se calculent automatiquement
+        (AUTO/CALCULÉE) mais restent modifiables à la main (clique sur le montant, puis « Revenir au calcul automatique » pour annuler — la
+        valeur automatique n&apos;est jamais perdue) ; « Réclamé » vient des réclamations liées aux factures du fournisseur. Ouvre « Détails »
+        sur un fournisseur pour ses informations de facturation et l&apos;historique complet de ses modifications (🕐).
       </p>
     </div>
   );
