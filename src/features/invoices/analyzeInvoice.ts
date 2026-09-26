@@ -97,11 +97,15 @@ export function parseInvoiceInput(input: unknown): InvoiceExtraction {
   return inputSchema.parse(input ?? {});
 }
 
-/** Montant à retenir pour le calcul de la subvention : avant taxes, sinon total moins taxes, sinon total. */
+// Jade : le montant retenu pour le calcul de la subvention doit TOUJOURS être avant taxes, jamais
+// le total taxes incluses -- donc si ni le sous-total ni les taxes ne sont lisibles sur la facture,
+// on retourne null (à vérifier/saisir à la main) plutôt que d'utiliser le total taxes incluses par
+// défaut, ce qui compterait silencieusement un montant trop élevé dans les dépenses admissibles.
+/** Montant à retenir pour le calcul de la subvention : avant taxes, sinon total moins taxes, sinon inconnu (jamais le total taxes incluses). */
 export function amountBeforeTax(x: Pick<InvoiceExtraction, "subtotal" | "tax" | "total">): number | null {
   if (x.subtotal != null) return x.subtotal;
   if (x.total != null && x.tax != null && x.total >= x.tax) return Math.round((x.total - x.tax) * 100) / 100;
-  return x.total;
+  return null;
 }
 
 export async function analyzeInvoiceFile(file: { bytes: ArrayBuffer; mime: string }): Promise<InvoiceExtraction> {

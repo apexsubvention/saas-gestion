@@ -8,15 +8,24 @@ import { useState, useTransition } from "react";
 import type { BillingLineItemRow } from "@/server/repositories/billingLineItems.repository";
 import { saveBillingLineItemsAction } from "./actions";
 
-type Row = { key: string; label: string; description: string; amount: string; hours: string; included: boolean };
+type Row = { key: string; label: string; description: string; amount: string; hours: string; included: boolean; exclusionReason: string };
 
 let nextKey = 0;
 function newRow(): Row {
   nextKey += 1;
-  return { key: `new-${nextKey}`, label: "", description: "", amount: "", hours: "", included: true };
+  return { key: `new-${nextKey}`, label: "", description: "", amount: "", hours: "", included: true, exclusionReason: "" };
 }
 
 const input = "w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm";
+
+// Jade (0058) : pourquoi un poste est décoché -- simple aide-mémoire, aucun montant n'est déplacé
+// automatiquement (une redistribution ou un nouveau fournisseur se fait à la main, dans le
+// tableau Fournisseurs et factures juste en dessous sur le Dossier).
+const EXCLUSION_REASON_LABELS: Record<string, string> = {
+  internal_salary: "Salaire interne (non facturé)",
+  redistribute_supplier: "À redistribuer à un autre fournisseur",
+  new_supplier: "Nécessite l'ajout d'un nouveau fournisseur",
+};
 
 export function LineItemsEditor({ grantProjectId, initialItems }: { grantProjectId: string; initialItems: BillingLineItemRow[] }) {
   const [rows, setRows] = useState<Row[]>(() =>
@@ -28,6 +37,7 @@ export function LineItemsEditor({ grantProjectId, initialItems }: { grantProject
           amount: String(it.amount ?? 0),
           hours: it.hours != null ? String(it.hours) : "",
           included: it.included_in_billing,
+          exclusionReason: it.exclusion_reason ?? "",
         }))
       : [newRow()]
   );
@@ -57,6 +67,7 @@ export function LineItemsEditor({ grantProjectId, initialItems }: { grantProject
       fd.set(`item_amount_${i}`, r.amount);
       fd.set(`item_hours_${i}`, r.hours);
       fd.set(`item_included_${i}`, r.included ? "true" : "false");
+      fd.set(`item_exclusion_reason_${i}`, r.exclusionReason);
     });
     startTransition(async () => {
       const res = await saveBillingLineItemsAction(grantProjectId, { error: null }, fd);
@@ -75,9 +86,26 @@ export function LineItemsEditor({ grantProjectId, initialItems }: { grantProject
             <input placeholder="Montant $" type="number" min={0} step="0.01" value={r.amount} onChange={(e) => update(r.key, { amount: e.target.value })} className={`${input} sm:col-span-1`} />
             <input placeholder="Heures" type="number" min={0} step="0.5" value={r.hours} onChange={(e) => update(r.key, { hours: e.target.value })} className={`${input} sm:col-span-1`} />
             <label className="flex items-center gap-1.5 text-xs text-neutral-600 sm:col-span-2" title="Décoche pour un coût interne (ex. salaire) remboursé directement par la subvention, sans facture -- son montant n'entrera pas dans le total réparti sur les versements.">
-              <input type="checkbox" checked={r.included} onChange={(e) => update(r.key, { included: e.target.checked })} />
+              <input
+                type="checkbox"
+                checked={r.included}
+                onChange={(e) => update(r.key, { included: e.target.checked, exclusionReason: e.target.checked ? "" : r.exclusionReason })}
+              />
               À facturer
             </label>
+            {!r.included && (
+              <select
+                value={r.exclusionReason}
+                onChange={(e) => update(r.key, { exclusionReason: e.target.value })}
+                className={`${input} sm:col-span-2`}
+                title="Pourquoi ce poste n'est pas facturé -- aide-mémoire seulement, aucun montant n'est déplacé automatiquement."
+              >
+                <option value="">Pourquoi ? (facultatif)</option>
+                {Object.entries(EXCLUSION_REASON_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            )}
             <button type="button" onClick={() => removeRow(r.key)} className="rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50 sm:col-span-1">
               Retirer
             </button>

@@ -20,6 +20,8 @@ import { logDossierEvent } from "@/server/services/audit";
 import { notifyUser } from "@/server/services/notifications.service";
 import { aiSuggestionsService } from "@/server/services/aiSuggestions.service";
 import { analyzeConventionFile, hasAgreementTerms } from "@/features/conventions/analyzeConvention";
+import { analyzeConventionActivities } from "@/features/billing/analyzeConventionActivities";
+import { billingLineItemsService } from "@/server/services/billingLineItems.service";
 import { supplierLedgerService } from "@/server/services/supplierLedger.service";
 import { analyzableMime, analyzeInvoiceFile, invoiceAnalysisAvailable, MAX_INVOICE_BYTES } from "@/features/invoices/analyzeInvoice";
 
@@ -39,17 +41,58 @@ async function analyzeUploadedConvention(
   const mime = analyzableMime(file.name);
   if (!mime) return "Document téléversé. Seuls les PDF et images peuvent être lus automatiquement.";
   if (file.size > MAX_INVOICE_BYTES) return "Document téléversé. Fichier trop volumineux pour la lecture automatique (4 Mo max).";
+  let message: string;
   try {
     const extraction = await analyzeConventionFile({ bytes: await file.arrayBuffer(), mime });
-    if (!extraction.is_agreement) return "Document téléversé, mais il ne ressemble pas à une convention ou à une entente : aucune proposition.";
-    const count = await aiSuggestionsService(supabase).createFromConvention(ctx, grantProjectId, clientId, documentId, extraction);
-    if (count === 0) return "Convention lue, mais aucune information exploitable n'a été trouvée.";
-    const { data: owner } = await supabase.from("grant_projects").select("owner_id, name").eq("id", grantProjectId).maybeSingle();
-    await notifyUser(supabase, ctx, { userId: (owner as { owner_id: string | null } | null)?.owner_id ?? null, type: "ai_review", message: `${count} proposition(s) à confirmer dans la convention téléversée (${(owner as { name: string } | null)?.name ?? "dossier"})`, href: `/grants/${grantProjectId}`, entity_type: "grant_project", entity_id: grantProjectId });
-    return `Convention lue : ${count} proposition(s) à confirmer dans le panneau « Apex a détecté… » ci-dessous (fournisseurs${hasAgreementTerms(extraction) ? ", montant, taux et dates" : ""}).`;
+    if (!extraction.is_agreement) {
+      message = "Document téléversé, mais il ne ressemble pas à une convention ou à une entente : aucune proposition.";
+    } else {
+      const count = await aiSuggestionsService(supabase).createFromConvention(ctx, grantProjectId, clientId, documentId, extraction);
+      if (count === 0) {
+        message = "Convention lue, mais aucune information exploitable n'a été trouvée.";
+      } else {
+        const { data: owner } = await supabase.from("grant_projects").select("owner_id, name").eq("id", grantProjectId).maybeSingle();
+        await notifyUser(supabase, ctx, { userId: (owner as { owner_id: string | null } | null)?.owner_id ?? null, type: "ai_review", message: `${count} proposition(s) à confirmer dans la convention téléversée (${(owner as { name: string } | null)?.name ?? "dossier"})`, href: `/grants/${grantProjectId}`, entity_type: "grant_project", entity_id: grantProjectId });
+        message = `Convention lue : ${count} proposition(s) à confirmer dans le panneau « Apex a détecté… » ci-dessous (fournisseurs${hasAgreementTerms(extraction) ? ", montant, taux et dates" : ""}).`;
+      }
+    }
   } catch (e) {
     return `Document téléversé, mais sa lecture automatique a échoué (${formatCaughtError(e)}).`;
   }
+
+  // Jade (0058) : le même téléversement alimente aussi, automatiquement, l'aide à la facturation
+  // (activités/postes budgétaires acceptés) -- décision prise avec Jade : seulement si la liste est
+  // encore vide, pour ne jamais écraser un travail déjà fait à la main lors d'un re-téléversement
+  // d'une convention modifiée. Best-effort : un échec ici ne fait jamais échouer le téléversement,
+  // déjà enregistré à ce stade.
+  try {
+    const existingItems = await billingLineItemsService(supabase).listByProject(grantProjectId);
+    if (existingItems.length === 0) {
+      const activities = await analyzeConventionActivities({ bytes: await file.arrayBuffer(), mime });
+      if (activities.length > 0) {
+        await billingLineItemsService(supabase).replaceAll(
+          ctx.organizationId,
+          grantProjectId,
+          // included_in_billing démarre toujours à true : la lecture automatique ne devine jamais
+          // qu'un poste est un coût interne non facturé -- c'est à valider/décocher ensuite.
+          activities.map((a) => ({ label: a.label, description: a.description, amount: a.amount ?? 0, hours: a.hours, included_in_billing: true })),
+          "ai"
+        );
+        await logDossierEvent(supabase, ctx, {
+          grant_project_id: grantProjectId,
+          client_id: clientId,
+          kind: "billing_activities_extracted",
+          title: `${activities.length} activité(s) extraite(s) de la convention pour l'aide à la facturation`,
+          source: "ai",
+        });
+        message += ` ${activities.length} activité(s)/poste(s) budgétaire(s) détecté(s) pour l'aide à la facturation -- à vérifier dans l'onglet Fournisseurs et factures.`;
+      }
+    }
+  } catch {
+    // Best-effort : aucune propagation -- la convention et ses propositions ci-dessus sont déjà enregistrées.
+  }
+
+  return message;
 }
 
 async function analyzeUploadedInvoice(
@@ -68,7 +111,11 @@ async function analyzeUploadedInvoice(
     if (!extraction.is_invoice) return "Facture téléversée, mais le document ne ressemble pas à une facture : rien n'a été ajouté au tableau.";
     const r = await supplierLedgerService(supabase).recordAnalyzedInvoice(organizationId, grantProjectId, documentId, extraction);
     if (r.status === "duplicate") return `Facture téléversée. Elle semble déjà enregistrée pour ${r.supplierName} (même numéro et même total) : rien n'a été ajouté.`;
-    return `Facture lue : ${r.supplierName} · ${moneyCad(r.amount)} avant taxes${extraction.invoice_date ? ` · ${extraction.invoice_date}` : ""}. Ajoutée au tableau fournisseurs${r.supplierCreated ? " (nouveau fournisseur créé)" : ""} — à vérifier.`;
+    // Jade : le montant retenu est toujours avant taxes -- si ni le sous-total ni les taxes ne sont
+    // lisibles sur la facture, amountBeforeTax() renvoie null plutôt que le total taxes incluses
+    // (jamais utilisé par défaut) : le message le dit clairement plutôt que d'afficher "illisible".
+    const amountLabel = r.amount != null ? `${moneyCad(r.amount)} avant taxes` : "montant avant taxes non lisible automatiquement (à saisir à la main)";
+    return `Facture lue : ${r.supplierName} · ${amountLabel}${extraction.invoice_date ? ` · ${extraction.invoice_date}` : ""}. Ajoutée au tableau fournisseurs${r.supplierCreated ? " (nouveau fournisseur créé)" : ""} — à vérifier.`;
   } catch (e) {
     return `Facture téléversée, mais sa lecture automatique a échoué (${formatCaughtError(e)}). Associe-la dans le tableau.`;
   }

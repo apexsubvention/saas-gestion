@@ -1,0 +1,11 @@
+-- 0058_billing_line_items_exclusion_reason.sql
+--
+-- Jade : quand elle décoche un poste (« À facturer ») dans la liste des activités/postes
+-- budgétaires acceptés, elle veut pouvoir noter POURQUOI -- salaire interne, à redistribuer à un
+-- autre fournisseur, ou nécessite l'ajout d'un nouveau fournisseur. Décision prise avec Jade :
+-- seulement un aide-mémoire (aucun montant n'est déplacé automatiquement vers un fournisseur --
+-- ça reste une action manuelle séparée dans le tableau Fournisseurs et factures/SuppliersTable).
+--
+-- Aucune RLS à ajouter : billing_line_items_select/insert/update/delete existent déjà (0042/0050)
+-- et couvrent déjà cette nouvelle colonne, comme toute colonne ajoutée à une table existante.
+alter table billing_line_items add column exclusion_reason text check (exclusion_reason in ('internal_salary', 'redistribute_supplier', 'new_supplier'));

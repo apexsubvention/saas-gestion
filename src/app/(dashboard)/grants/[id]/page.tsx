@@ -28,6 +28,8 @@ import { programsRepository } from "@/server/repositories/programs.repository";
 import { aiSuggestionsService } from "@/server/services/aiSuggestions.service";
 import { listDossierEvents } from "@/server/services/audit";
 import { supplierLedgerService } from "@/server/services/supplierLedger.service";
+import { billingLineItemsService } from "@/server/services/billingLineItems.service";
+import { LineItemsEditor } from "./facturation/LineItemsEditor";
 import { computeSubsidy, resolveSubsidyInputs } from "@/features/grants/subsidyMath";
 import { buildBillingNarrative } from "@/features/billing/billingSummary";
 import { grantAgreementsService } from "@/server/services/grantAgreements.service";
@@ -77,6 +79,7 @@ export default async function GrantProjectPage({ params, searchParams }: { param
   const agreement = agreements[0] ?? null;
   const rateForLedger = Number(project.grant_rate ?? agreement?.grant_rate ?? 0) || null;
   const ledger = await supplierLedgerService(supabase).load(params.id, rateForLedger);
+  const lineItems = await billingLineItemsService(supabase).listByProject(params.id);
   const dossierEvents = await listDossierEvents(supabase, params.id);
   const suggestions = await aiSuggestionsService(supabase).listProposed(params.id);
   const [snapshots, currentProgram] = await Promise.all([programSnapshotService(supabase).list(params.id), programsRepository(supabase).findById(project.program_id)]);
@@ -289,6 +292,17 @@ export default async function GrantProjectPage({ params, searchParams }: { param
               téléversée dans « Documents » (catégorie Facture) est lue automatiquement et ajoutée ici sous son fournisseur ; tu peux aussi associer
               un document toi-même. Ouvre « Détails » sur un fournisseur pour voir l&apos;historique de ses modifications.
             </p>
+            <details className="rounded-lg border border-neutral-200 bg-white p-4" open={lineItems.length > 0}>
+              <summary className="cursor-pointer text-sm font-medium text-neutral-800">Activités et postes budgétaires acceptés (à facturer)</summary>
+              <div className="mt-3 space-y-2">
+                <p className="text-xs text-neutral-500">
+                  Repris automatiquement de la convention téléversée dans « Documents » (catégorie Convention) -- coche/décoche « À facturer » pour
+                  chaque poste ; si tu décoches, précise pourquoi (salaire interne, à redistribuer à un autre fournisseur, ou nécessite l&apos;ajout
+                  d&apos;un nouveau fournisseur). Cette liste est aussi modifiable dans l&apos;onglet « Aide à la facturation ».
+                </p>
+                <LineItemsEditor key={lineItems.map((it) => it.id).join(",") || "empty"} grantProjectId={project.id} initialItems={lineItems} />
+              </div>
+            </details>
             <SuppliersTable
               grantProjectId={project.id}
               suppliers={ledger.suppliers}

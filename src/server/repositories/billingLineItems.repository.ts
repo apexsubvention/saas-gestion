@@ -17,6 +17,9 @@ export type BillingLineItemRow = {
   // réparti sur les versements. Décoché = coût interne (ex. salaire déjà payé par l'entreprise),
   // remboursé directement par la subvention -- jamais facturé, donc jamais compté dans le total.
   included_in_billing: boolean;
+  // Pourquoi décoché (0058, Jade) : simple aide-mémoire, jamais lu par un calcul -- aucun montant
+  // n'est déplacé automatiquement. null si coché, ou décoché sans raison choisie.
+  exclusion_reason: "internal_salary" | "redistribute_supplier" | "new_supplier" | null;
   created_at: string;
   updated_at: string;
 };
@@ -28,6 +31,7 @@ export type BillingLineItemInput = {
   hours: number | null;
   // Optionnel : true par défaut (comportement historique -- tout poste accepté était facturé).
   included_in_billing?: boolean;
+  exclusion_reason?: "internal_salary" | "redistribute_supplier" | "new_supplier" | null;
 };
 
 export function billingLineItemsRepository(supabase: SupabaseClient) {
@@ -57,6 +61,7 @@ export function billingLineItemsRepository(supabase: SupabaseClient) {
         amount: item.amount,
         hours: item.hours,
         included_in_billing: item.included_in_billing ?? true,
+        exclusion_reason: item.exclusion_reason ?? null,
         source,
       }));
       const { data, error } = await supabase.from("billing_line_items").insert(rows).select();
