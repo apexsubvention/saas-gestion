@@ -13,6 +13,13 @@ export type ExpenseRow = {
   eligible_amount: number | null;
   status: string;
   source: "manual" | "ai";
+  // Jade (0057) : statut de PAIEMENT de la facture -- distinct de `status` (revue de
+  // conformité de la dépense, ci-dessus). Modifiable par le personnel ET par le portail
+  // (enfant/parent) via des actions dédiées, pas par ce repository directement (voir
+  // supplierLedger.service.ts#updatePaymentStatus).
+  payment_status: "sent_unpaid" | "paid";
+  payment_status_updated_at: string | null;
+  payment_status_updated_by: string | null;
 };
 
 export function expensesRepository(supabase: SupabaseClient) {
@@ -59,6 +66,17 @@ export function expensesRepository(supabase: SupabaseClient) {
       const { data, error } = await supabase.from("expenses").delete().eq("id", id).select("id");
       if (error) throw error;
       return data?.length ?? 0;
+    },
+
+    async updatePaymentStatus(id: string, status: "sent_unpaid" | "paid", updatedBy: string | null): Promise<ExpenseRow> {
+      const { data, error } = await supabase
+        .from("expenses")
+        .update({ payment_status: status, payment_status_updated_at: new Date().toISOString(), payment_status_updated_by: updatedBy })
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as ExpenseRow;
     },
   };
 }

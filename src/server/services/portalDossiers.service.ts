@@ -11,6 +11,7 @@ import { documentsRepository } from "@/server/repositories/documents.repository"
 import { questionnaireService } from "@/server/services/questionnaire.service";
 import { dossierNotesService, type DossierNoteView } from "@/server/services/dossierNotes.service";
 import { programSnapshotService } from "@/server/services/programSnapshot.service";
+import { supplierLedgerService } from "@/server/services/supplierLedger.service";
 import { billingLineItemsService } from "@/server/services/billingLineItems.service";
 import { billingInstallmentsService } from "@/server/services/billingInstallments.service";
 import { grantAgreementsService } from "@/server/services/grantAgreements.service";
@@ -103,6 +104,24 @@ export type PortalProgramSummary = {
   takenAt: string;
 };
 
+// Facture fournisseur (Jade, 0057) : statut de paiement + preuve, modifiables par le portail
+// (enfant ET parent). Seulement les factures déjà CONFIRMÉES par le personnel (status
+// "compliant") -- jamais "to_review"/"missing_information"/"potentially_ineligible"/"rejected",
+// qui ne sont pas encore vérifiées ou posent problème : pas approprié de demander au client de
+// gérer le paiement d'une facture qu'Apex n'a pas encore validée. Les factures "sans fournisseur"
+// (triage interne, ledger.unassigned) ne sont jamais exposées ici non plus, pour la même raison.
+export type PortalSupplierInvoice = {
+  id: string;
+  supplierName: string;
+  invoiceNumber: string | null;
+  invoiceDate: string | null;
+  amount: number | null;
+  document: { id: string; filename: string } | null;
+  paymentStatus: "sent_unpaid" | "paid";
+  paymentStatusUpdatedAt: string | null;
+  paymentProof: { id: string; filename: string } | null;
+};
+
 export type PortalDossier = {
   id: string;
   name: string;
@@ -131,6 +150,7 @@ export type PortalDossier = {
   // Null hors statut "draft" (à rédiger), ou si aucun snapshot n'a encore été figé pour ce
   // dossier (ex. migration pas encore appliquée côté programme, ou dossier créé avant 0038).
   programSummary: PortalProgramSummary | null;
+  supplierInvoices: PortalSupplierInvoice[];
 };
 
 export function portalDossiersService(supabase: SupabaseClient) {
@@ -142,6 +162,7 @@ export function portalDossiersService(supabase: SupabaseClient) {
   const questionnaire = questionnaireService(supabase);
   const notes = dossierNotesService(supabase);
   const snapshots = programSnapshotService(supabase);
+  const supplierLedger = supplierLedgerService(supabase);
   const billingLineItems = billingLineItemsService(supabase);
   const billingInstallments = billingInstallmentsService(supabase);
   const grantAgreements = grantAgreementsService(supabase);
@@ -174,7 +195,7 @@ export function portalDossiersService(supabase: SupabaseClient) {
 
       const dossiers = await Promise.all(
         projects.map(async (p): Promise<PortalDossier> => {
-          const [claimRows, questionnaireData, requestRows, noteRows, lineItemRows, agreements, installmentRows, projectDocuments, snapshotRows] = await Promise.all([
+          const [claimRows, questionnaireData, requestRows, noteRows, lineItemRows, agreements, installmentRows, projectDocuments, snapshotRows, ledger] = await Promise.all([
             claims.listByProject(p.id),
             questionnaire.get(p.id),
             documentRequests.listByProject(p.id),
@@ -187,7 +208,27 @@ export function portalDossiersService(supabase: SupabaseClient) {
             // statuts par simplicité (programSnapshotService.list() est déjà tolérant aux
             // erreurs/table absente), mais seul un dossier "draft" l'expose plus bas.
             p.status === "draft" ? snapshots.list(p.id) : Promise.resolve([]),
+            // Factures fournisseurs (0057) -- expenses_select/project_suppliers_select/
+            // document_links_select (0016) et documents_select_portal_full (0045) sont déjà
+            // portail- et hiérarchie-compatibles (can_access_grant_project/can_access_client),
+            // donc supplierLedgerService.load() fonctionne tel quel avec ce client RLS.
+            supplierLedger.load(p.id),
           ]);
+          const supplierInvoices: PortalSupplierInvoice[] = ledger.suppliers.flatMap((s) =>
+            s.invoices
+              .filter((inv) => inv.status === "compliant")
+              .map((inv) => ({
+                id: inv.id,
+                supplierName: s.name,
+                invoiceNumber: inv.invoice_number,
+                invoiceDate: inv.invoice_date,
+                amount: inv.amount,
+                document: inv.document ? { id: inv.document.id, filename: inv.document.filename } : null,
+                paymentStatus: inv.paymentStatus,
+                paymentStatusUpdatedAt: inv.paymentStatusUpdatedAt,
+                paymentProof: inv.paymentProof ? { id: inv.paymentProof.id, filename: inv.paymentProof.filename } : null,
+              }))
+          );
           const latestSnapshot = snapshotRows[0] ?? null;
           const programSummary: PortalProgramSummary | null =
             p.status === "draft" && latestSnapshot
@@ -283,6 +324,7 @@ export function portalDossiersService(supabase: SupabaseClient) {
               clientInvoiceUploadedAt: r.client_invoice_uploaded_at,
             })),
             programSummary,
+            supplierInvoices,
           };
         })
       );

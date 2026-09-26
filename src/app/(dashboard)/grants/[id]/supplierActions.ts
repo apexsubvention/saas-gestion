@@ -153,6 +153,61 @@ export async function deleteInvoiceAction(grantProjectId: string, invoiceId: str
   }
 }
 
+// Statut de paiement d'une facture (0057) : « Envoyée, non payée » / « Payée ». Le personnel
+// écrit ici directement (RLS normale -- expenses_update exige admin/employee, déjà le cas du
+// personnel) ; le portail (enfant/parent) passe par une action séparée dans
+// portal/(app)/actions.ts qui vérifie l'accès puis écrit avec le client admin, RLS lui refusant
+// l'écriture directe.
+export async function updateInvoicePaymentStatusAction(grantProjectId: string, invoiceId: string, status: string): Promise<LedgerActionResult> {
+  const ctx = await requireOrgContext();
+  if (status !== "sent_unpaid" && status !== "paid") return { error: "Statut de paiement invalide." };
+  const supabase = await createClient();
+  try {
+    if (!(await ownedInvoice(supabase, grantProjectId, invoiceId))) return { error: "Facture introuvable dans ce dossier." };
+    await supplierLedgerService(supabase).updatePaymentStatus(invoiceId, status, ctx.organizationUserId);
+    await logDossierEvent(supabase, ctx, {
+      grant_project_id: grantProjectId,
+      kind: "invoice_payment_status_changed",
+      title: status === "paid" ? "Facture marquée payée" : "Facture marquée envoyée, non payée",
+      source: "manual",
+      ref_type: "expense",
+      ref_id: invoiceId,
+    });
+    revalidatePath(`/grants/${grantProjectId}`);
+    return { error: null };
+  } catch (e) {
+    return { error: formatCaughtError(e) };
+  }
+}
+
+// Choisir, parmi les documents déjà déposés sur ce dossier, lequel est la preuve de paiement
+// d'une facture (ou en retirer un -- documentId = null). Voir DocumentSelect (déjà utilisé pour
+// le document de la facture elle-même) pour l'équivalent en UI.
+export async function setInvoicePaymentProofAction(grantProjectId: string, invoiceId: string, documentId: string | null): Promise<LedgerActionResult> {
+  const ctx = await requireOrgContext();
+  const supabase = await createClient();
+  try {
+    if (!(await ownedInvoice(supabase, grantProjectId, invoiceId))) return { error: "Facture introuvable dans ce dossier." };
+    if (documentId) {
+      const ok = (await documentsService(supabase).listByProject(grantProjectId)).some((d) => d.id === documentId);
+      if (!ok) return { error: "Document introuvable dans ce dossier." };
+    }
+    await supplierLedgerService(supabase).setPaymentProof(ctx.organizationId, invoiceId, documentId);
+    await logDossierEvent(supabase, ctx, {
+      grant_project_id: grantProjectId,
+      kind: "invoice_payment_proof_set",
+      title: documentId ? "Preuve de paiement ajoutée à une facture" : "Preuve de paiement retirée d'une facture",
+      source: "manual",
+      ref_type: "expense",
+      ref_id: invoiceId,
+    });
+    revalidatePath(`/grants/${grantProjectId}`);
+    return { error: null };
+  } catch (e) {
+    return { error: formatCaughtError(e) };
+  }
+}
+
 // Modifier à la main une valeur du suivi financier (subvention acceptée / réclamé à ce jour), ou
 // revenir au calcul automatique (value = null). La valeur automatique n'est jamais détruite ; le
 // changement est journalisé (qui, quand, avant/après).

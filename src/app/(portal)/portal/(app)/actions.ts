@@ -7,6 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { formatCaughtError } from "@/lib/errors";
 import { logDossierEvent } from "@/server/services/audit";
 import { billingInstallmentsService } from "@/server/services/billingInstallments.service";
+import { supplierLedgerService } from "@/server/services/supplierLedger.service";
 
 const BUCKET = "apex-documents";
 
@@ -243,6 +244,126 @@ export async function uploadInstallmentInvoiceAction(
       source: "portal",
       ref_type: "billing_installment",
       ref_id: installmentId,
+    });
+  } catch (e) {
+    return { error: formatCaughtError(e) };
+  }
+
+  revalidatePath("/portal");
+  return { error: null };
+}
+
+// ---- Statut de paiement des factures fournisseurs (0057) --------------------------------------
+// Jade : sur une facture d'un dossier, un statut « Envoyée, non payée » / « Payée », modifiable
+// par le personnel ET par le portail (l'enfant lui-même ET son parent, via la hiérarchie déjà en
+// place -- can_access_grant_project, cf. 0028). expenses_select n'a aucune restriction
+// "personnel seulement" -- le SELECT ci-dessous suffit donc à vérifier l'accès (y compris pour
+// un parent sur le dossier d'un enfant) ; expenses_update, lui, exige has_org_role(admin/employee)
+// et refuse toujours un compte portail (rôle 'client') -- d'où l'écriture au client admin,
+// strictement sur l'id déjà vérifié. Même principe que uploadInstallmentInvoiceAction ci-dessus.
+export async function updatePortalInvoicePaymentStatusAction(expenseId: string, status: string): Promise<{ error: string | null }> {
+  const ctx = await requirePortalContext();
+  if (status !== "sent_unpaid" && status !== "paid") return { error: "Statut de paiement invalide." };
+
+  const supabase = await createClient();
+  const { data: expense, error: findError } = await supabase
+    .from("expenses")
+    .select("id, organization_id, grant_project_id")
+    .eq("id", expenseId)
+    .maybeSingle();
+  if (findError || !expense) {
+    return { error: "Facture introuvable ou accès refusé." };
+  }
+
+  const admin = createAdminClient();
+  try {
+    await supplierLedgerService(admin).updatePaymentStatus(expenseId, status, ctx.organizationUserId);
+    await logDossierEvent(admin, { organizationId: ctx.organizationId, organizationUserId: ctx.organizationUserId ?? "" }, {
+      grant_project_id: (expense as { grant_project_id: string }).grant_project_id,
+      client_id: ctx.clientId,
+      kind: "invoice_payment_status_changed_portal",
+      title: status === "paid" ? "Facture marquée payée par le client" : "Facture remise à « envoyée, non payée » par le client",
+      source: "portal",
+      ref_type: "expense",
+      ref_id: expenseId,
+    });
+  } catch (e) {
+    return { error: formatCaughtError(e) };
+  }
+
+  revalidatePath("/portal");
+  return { error: null };
+}
+
+// Téléverser la preuve de paiement d'une facture (Jade). Comme uploadInstallmentInvoiceAction :
+// vérifie l'accès avec le client normal, puis téléverse/écrit avec le client admin. Marque aussi
+// la facture « Payée » -- envoyer une preuve de paiement veut dire, sans ambiguïté, qu'elle est
+// payée, même si le client n'a pas d'abord changé le statut à la main.
+export async function uploadInvoicePaymentProofAction(
+  expenseId: string,
+  _prev: PortalUploadFormState,
+  formData: FormData
+): Promise<PortalUploadFormState> {
+  const ctx = await requirePortalContext();
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { error: "Choisis un fichier." };
+  }
+
+  const supabase = await createClient();
+  const { data: expense, error: findError } = await supabase
+    .from("expenses")
+    .select("id, organization_id, grant_project_id, grant_projects(client_id)")
+    .eq("id", expenseId)
+    .maybeSingle();
+  if (findError || !expense) {
+    return { error: "Facture introuvable ou accès refusé." };
+  }
+  const row = expense as unknown as { organization_id: string; grant_project_id: string; grant_projects: { client_id: string } | null };
+  const clientId = row.grant_projects?.client_id;
+  if (!clientId) {
+    return { error: "Dossier introuvable." };
+  }
+
+  const admin = createAdminClient();
+  try {
+    const path = `${row.organization_id}/${clientId}/${Date.now()}-${file.name}`;
+    const { error: uploadError } = await admin.storage.from(BUCKET).upload(path, file, {
+      contentType: file.type || undefined,
+      upsert: false,
+    });
+    if (uploadError) throw uploadError;
+
+    const { data: doc, error: docError } = await admin
+      .from("documents")
+      .insert({
+        organization_id: row.organization_id,
+        filename: file.name,
+        storage_path: path,
+        mime_type: file.type || null,
+        size: file.size || null,
+        category: "payment_proof",
+        client_id: clientId,
+        grant_project_id: row.grant_project_id,
+        uploaded_by: ctx.organizationUserId,
+        source: "client_portal",
+      })
+      .select()
+      .single();
+    if (docError) throw docError;
+
+    const ledger = supplierLedgerService(admin);
+    await ledger.setPaymentProof(row.organization_id, expenseId, (doc as { id: string }).id);
+    await ledger.updatePaymentStatus(expenseId, "paid", ctx.organizationUserId);
+
+    await logDossierEvent(admin, { organizationId: row.organization_id, organizationUserId: ctx.organizationUserId ?? "" }, {
+      grant_project_id: row.grant_project_id,
+      client_id: clientId,
+      kind: "invoice_payment_proof_uploaded_portal",
+      title: "Preuve de paiement reçue du client",
+      source: "portal",
+      ref_type: "expense",
+      ref_id: expenseId,
     });
   } catch (e) {
     return { error: formatCaughtError(e) };

@@ -5,7 +5,7 @@
 // tableaux empilés (un « auto », un « manuel ») -- fusionnés ici en un seul, où chaque valeur suivie
 // reste modifiable à la main même quand elle est calculée automatiquement (mention AUTO / CALCULÉE /
 // MODIFIÉE MANUELLEMENT, « revenir au calcul automatique » sans jamais perdre la valeur auto).
-import { useState, useTransition } from "react";
+import { Fragment, useState, useTransition } from "react";
 import { OpenDocumentButton } from "./OpenDocumentButton";
 import {
   confirmInvoiceAction,
@@ -16,7 +16,9 @@ import {
   moveSupplierAction,
   saveInvoiceAction,
   saveSupplierAction,
+  setInvoicePaymentProofAction,
   setSupplierOverrideAction,
+  updateInvoicePaymentStatusAction,
   type LedgerActionResult,
 } from "./supplierActions";
 import type { LedgerInvoice, LedgerSupplier, Tracked } from "@/server/services/supplierLedger.service";
@@ -169,6 +171,55 @@ function SupplierHistory({ grantProjectId, supplierId }: { grantProjectId: strin
         </ol>
       )}
     </div>
+  );
+}
+
+// Jade (0057) : statut de paiement d'une facture -- « Envoyée, non payée » par défaut, « Payée »
+// une fois le client (ou le personnel) confirme -- et sa preuve de paiement (document choisi
+// parmi ceux déjà déposés sur ce dossier, même widget que le document de la facture).
+const PAYMENT_STATUS_LABELS: Record<string, string> = { sent_unpaid: "Envoyée, non payée", paid: "Payée" };
+
+function InvoicePaymentRow({ grantProjectId, invoice, documents }: { grantProjectId: string; invoice: LedgerInvoice; documents: DocOption[] }) {
+  const [proofDocId, setProofDocId] = useState(invoice.paymentProof?.id ?? "");
+  const { pending: statusPending, error: statusError, run: runStatus } = useLedgerAction();
+  const { pending: proofPending, error: proofError, run: runProof } = useLedgerAction();
+
+  function changeStatus(status: string) {
+    runStatus(() => updateInvoicePaymentStatusAction(grantProjectId, invoice.id, status));
+  }
+
+  function saveProof(id: string) {
+    setProofDocId(id);
+    runProof(() => setInvoicePaymentProofAction(grantProjectId, invoice.id, id || null));
+  }
+
+  return (
+    <tr className="border-b border-neutral-100 bg-white">
+      <td className="px-3 py-2 text-xs text-neutral-400"><span className="pl-3">↳ paiement</span></td>
+      <td className="px-3 py-2" colSpan={6}>
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="flex items-center gap-2 text-xs text-neutral-600">
+            Statut
+            <select value={invoice.paymentStatus} onChange={(e) => changeStatus(e.target.value)} disabled={statusPending} className={input}>
+              {Object.entries(PAYMENT_STATUS_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </label>
+          {invoice.paymentStatus === "paid" && (
+            <label className="flex flex-1 items-center gap-2 text-xs text-neutral-600">
+              Preuve de paiement
+              <DocumentSelect value={proofDocId} onChange={saveProof} documents={documents} />
+            </label>
+          )}
+          {invoice.paymentProof && proofDocId === invoice.paymentProof.id && (
+            <OpenDocumentButton storagePath={invoice.paymentProof.storage_path} filename={invoice.paymentProof.filename} />
+          )}
+          {(statusPending || proofPending) && <span className="text-xs text-neutral-400">…</span>}
+        </div>
+        {(statusError || proofError) && <p className="mt-1 text-xs text-red-600">{statusError ?? proofError}</p>}
+      </td>
+    </tr>
   );
 }
 
@@ -420,7 +471,10 @@ function SupplierGroup({ grantProjectId, supplier, documents, clients, claims, i
         </tr>
       )}
       {supplier.invoices.map((inv) => (
-        <InvoiceRow key={`${inv.id}-${inv.status}`} grantProjectId={grantProjectId} invoice={inv} supplierId={supplier.id} documents={documents} claims={claims} />
+        <Fragment key={inv.id}>
+          <InvoiceRow key={`${inv.id}-${inv.status}`} grantProjectId={grantProjectId} invoice={inv} supplierId={supplier.id} documents={documents} claims={claims} />
+          <InvoicePaymentRow key={`${inv.id}-payment`} grantProjectId={grantProjectId} invoice={inv} documents={documents} />
+        </Fragment>
       ))}
       {addingInvoice && <InvoiceRow grantProjectId={grantProjectId} invoice={null} supplierId={supplier.id} documents={documents} claims={claims} onCancel={() => setAddingInvoice(false)} />}
     </>
@@ -497,7 +551,10 @@ export function SuppliersTable({
               <>
                 <tr className="border-b border-neutral-100 bg-amber-50"><td colSpan={7} className="px-3 py-2 text-xs font-medium text-amber-900">Factures sans fournisseur — choisis le fournisseur de chacune.</td></tr>
                 {unassigned.map((inv) => (
-                  <InvoiceRow key={`${inv.id}-${inv.status}`} grantProjectId={grantProjectId} invoice={inv} supplierId={null} documents={documents} claims={claims} supplierChoices={choices} />
+                  <Fragment key={inv.id}>
+                    <InvoiceRow key={`${inv.id}-${inv.status}`} grantProjectId={grantProjectId} invoice={inv} supplierId={null} documents={documents} claims={claims} supplierChoices={choices} />
+                    <InvoicePaymentRow key={`${inv.id}-payment`} grantProjectId={grantProjectId} invoice={inv} documents={documents} />
+                  </Fragment>
                 ))}
               </>
             )}

@@ -106,6 +106,35 @@ export function documentsRepository(supabase: SupabaseClient) {
       if (error) throw error;
     },
 
+    // Preuve de paiement d'une facture (document_links.entity_type = 'expense_payment_proof',
+    // 0057) -- même principe que listInvoiceLinks/setInvoiceDocument : au plus un document par
+    // facture, on remplace le lien existant.
+    async listPaymentProofLinks(expenseIds: string[]): Promise<Array<{ expense_id: string; document_id: string; filename: string; storage_path: string }>> {
+      if (expenseIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from("document_links")
+        .select("entity_id, document_id, documents(filename, storage_path)")
+        .eq("entity_type", "expense_payment_proof")
+        .in("entity_id", expenseIds);
+      if (error) throw error;
+      return (data ?? []).map((row: any) => ({
+        expense_id: row.entity_id,
+        document_id: row.document_id,
+        filename: row.documents?.filename ?? "",
+        storage_path: row.documents?.storage_path ?? "",
+      }));
+    },
+
+    async setPaymentProofDocument(organizationId: string, expenseId: string, documentId: string | null): Promise<void> {
+      const { error: delError } = await supabase.from("document_links").delete().eq("entity_type", "expense_payment_proof").eq("entity_id", expenseId);
+      if (delError) throw delError;
+      if (!documentId) return;
+      const { error } = await supabase
+        .from("document_links")
+        .insert({ organization_id: organizationId, document_id: documentId, entity_type: "expense_payment_proof", entity_id: expenseId });
+      if (error) throw error;
+    },
+
     // Documents rattachés à des demandes de document (document_links.entity_type =
     // 'document_request') -- même principe que listInvoiceLinks : une seule requête
     // groupée pour tout le dossier plutôt qu'un aller-retour par demande.

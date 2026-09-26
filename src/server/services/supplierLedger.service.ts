@@ -18,6 +18,10 @@ export type LedgerInvoice = {
   source: "manual" | "ai";
   document: { id: string; filename: string; storage_path: string } | null;
   claim: { claim_id: string; claimed_amount: number | null } | null; // réclamation où cette facture est réclamée
+  // Jade (0057) : statut de PAIEMENT -- modifiable par le personnel ET le portail (enfant/parent).
+  paymentStatus: "sent_unpaid" | "paid";
+  paymentStatusUpdatedAt: string | null;
+  paymentProof: { id: string; filename: string; storage_path: string } | null;
 };
 
 // Valeur effective = override manuel ?? valeur automatique ?? calcul de repli.
@@ -64,8 +68,12 @@ export function supplierLedgerService(supabase: SupabaseClient) {
     // `projectRate` (fraction) sert au calcul de repli de la subvention acceptée : budget x taux.
     async load(grantProjectId: string, projectRate: number | null = null): Promise<Ledger> {
       const [suppliers, expenses] = await Promise.all([suppliersRepo.listByProject(grantProjectId), expensesRepo.listByProject(grantProjectId)]);
-      const links = await documentsRepo.listInvoiceLinks(expenses.map((e) => e.id));
+      const [links, proofLinks] = await Promise.all([
+        documentsRepo.listInvoiceLinks(expenses.map((e) => e.id)),
+        documentsRepo.listPaymentProofLinks(expenses.map((e) => e.id)),
+      ]);
       const docByExpense = new Map(links.map((l) => [l.expense_id, { id: l.document_id, filename: l.filename, storage_path: l.storage_path }]));
+      const proofByExpense = new Map(proofLinks.map((l) => [l.expense_id, { id: l.document_id, filename: l.filename, storage_path: l.storage_path }]));
 
       const invoices: LedgerInvoice[] = expenses.map((e) => ({
         id: e.id,
@@ -78,6 +86,9 @@ export function supplierLedgerService(supabase: SupabaseClient) {
         source: e.source ?? "manual",
         document: docByExpense.get(e.id) ?? null,
         claim: null,
+        paymentStatus: e.payment_status ?? "sent_unpaid",
+        paymentStatusUpdatedAt: e.payment_status_updated_at ?? null,
+        paymentProof: proofByExpense.get(e.id) ?? null,
       }));
 
       const bySupplier = new Map<string, LedgerInvoice[]>();
@@ -224,6 +235,15 @@ export function supplierLedgerService(supabase: SupabaseClient) {
     // Confirmer une facture lue automatiquement (enlève la mention « à vérifier »).
     confirmInvoice: (id: string) => expensesRepo.update(id, { status: "compliant" }),
     removeInvoice: (id: string) => expensesRepo.remove(id),
+
+    // Statut de paiement (0057) : personnel ET portail (enfant/parent) -- l'appelant (action
+    // admin ou portail) vérifie l'accès à SA façon avant d'appeler ceci.
+    updatePaymentStatus: (expenseId: string, status: "sent_unpaid" | "paid", updatedBy: string | null) =>
+      expensesRepo.updatePaymentStatus(expenseId, status, updatedBy),
+
+    // Preuve de paiement (0057) : au plus un document par facture, remplace le lien existant.
+    setPaymentProof: (organizationId: string, expenseId: string, documentId: string | null) =>
+      documentsRepo.setPaymentProofDocument(organizationId, expenseId, documentId),
 
     // Facture lue automatiquement : la range sous le bon fournisseur (créé s'il est nouveau), sans
     // doublon (même fournisseur + même numéro + même total), marquée « à vérifier ».

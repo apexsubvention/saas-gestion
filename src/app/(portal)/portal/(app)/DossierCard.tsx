@@ -18,6 +18,7 @@ import {
 import { DocumentRequestUpload } from "./DocumentRequestUpload";
 import { InstallmentInvoiceUpload } from "./InstallmentInvoiceUpload";
 import { PortalNotes } from "./PortalNotes";
+import { PortalSupplierInvoices } from "./PortalSupplierInvoices";
 import { computeSubsidy } from "@/features/grants/subsidyMath";
 import { buildBillingNarrative } from "@/features/billing/billingSummary";
 
@@ -276,6 +277,8 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
               </div>
             )
           )}
+
+          <PortalSupplierInvoices invoices={dossier.supplierInvoices} />
 
           <div className="space-y-2">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Réclamations</h3>
