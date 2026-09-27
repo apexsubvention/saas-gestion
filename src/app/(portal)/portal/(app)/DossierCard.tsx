@@ -272,10 +272,15 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
   // en retard, et pas encore déposée (0065, Jade : « tu as quelque chose à faire ») -- voir
   // dossierPriority.ts#hasClaimDueSoon pour le détail et la condition d'auto-fermeture.
   const claimDueSoon = hasClaimDueSoon(dossier);
+  // Facture fournisseur envoyée mais pas encore marquée payée (0066, Jade : « quelque chose
+  // d'évident sans même cliquer sur le projet » -- même principe que "Réclamation à faire"
+  // ci-dessous). isPariProgram exclu : la section "Factures fournisseurs" elle-même est masquée
+  // pour ces dossiers (0065), donc ce badge n'aurait pas de section à pointer si on cliquait dessus.
+  const hasUnpaidSupplierInvoice = !dossier.isPariProgram && dossier.supplierInvoices.some((inv) => inv.paymentStatus === "sent_unpaid");
   // Indicateur d'urgence visible directement sur la vignette (0062, Jade), sans avoir à
-  // l'ouvrir : quelque chose à fournir, une échéance de paiement/facturation déjà connue, ou
-  // une réclamation due bientôt.
-  const isUrgent = toProvideCount > 0 || !!paymentDeadlineText || claimDueSoon;
+  // l'ouvrir : quelque chose à fournir, une échéance de paiement/facturation déjà connue, une
+  // réclamation due bientôt, ou une facture envoyée pas encore marquée payée.
+  const isUrgent = toProvideCount > 0 || !!paymentDeadlineText || claimDueSoon || hasUnpaidSupplierInvoice;
 
   return (
     <>
@@ -319,6 +324,11 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
             {claimDueSoon && (
               <span className="flex items-center gap-1 rounded-full bg-orange-50 px-2 py-0.5 font-medium text-orange-800">
                 📅 Réclamation à faire
+              </span>
+            )}
+            {hasUnpaidSupplierInvoice && (
+              <span className="flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 font-medium text-rose-700">
+                🧾 Facture à marquer payée
               </span>
             )}
             {paymentDeadlineText && (
