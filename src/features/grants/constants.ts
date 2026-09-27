@@ -202,6 +202,10 @@ export function milestoneStatusBadgeClass(status: string): string {
 export const DOCUMENT_CATEGORY_LABELS: Record<string, string> = {
   agreement: "Convention",
   invoice: "Facture",
+  // Jade (0065, PARI CNRC/IRAP) : le rapport officiel "Historique des réclamations" -- téléversé
+  // par DDR, lu automatiquement (salariés/heures/taux, montant réclamé, solde restant, historique
+  // des DDR passées) -- voir analyzeDdrReport.ts.
+  ddr_report: "Rapport DDR (Historique des réclamations)",
   payment_proof: "Preuve de paiement",
   claim_form: "Réclamation",
   application: "Demande",
@@ -214,6 +218,7 @@ export const DOCUMENT_CATEGORY_LABELS: Record<string, string> = {
 export const DOCUMENT_CATEGORY_OPTIONS: Array<{ value: string; label: string }> = [
   "agreement",
   "invoice",
+  "ddr_report",
   "payment_proof",
   "claim_form",
   "application",

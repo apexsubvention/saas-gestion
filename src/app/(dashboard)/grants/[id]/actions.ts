@@ -24,6 +24,7 @@ import { analyzeConventionActivities } from "@/features/billing/analyzeConventio
 import { billingLineItemsService } from "@/server/services/billingLineItems.service";
 import { supplierLedgerService } from "@/server/services/supplierLedger.service";
 import { analyzableMime, analyzeInvoiceFile, invoiceAnalysisAvailable, MAX_INVOICE_BYTES } from "@/features/invoices/analyzeInvoice";
+import { analyzeDdrReportFile } from "@/features/ddr/analyzeDdrReport";
 
 const moneyCad = (n: number | null) => (n == null ? "montant illisible" : new Intl.NumberFormat("fr-CA", { style: "currency", currency: "CAD" }).format(n));
 
@@ -118,6 +119,56 @@ async function analyzeUploadedInvoice(
     return `Facture lue : ${r.supplierName} · ${amountLabel}${extraction.invoice_date ? ` · ${extraction.invoice_date}` : ""}. Ajoutée au tableau fournisseurs${r.supplierCreated ? " (nouveau fournisseur créé)" : ""} — à vérifier.`;
   } catch (e) {
     return `Facture téléversée, mais sa lecture automatique a échoué (${formatCaughtError(e)}). Associe-la dans le tableau.`;
+  }
+}
+
+// Rapport "Historique DDR" (PARI CNRC/IRAP, 0065) : lu tout de suite -- salariés (heures, taux,
+// montant), montant réclamé pour la période, solde restant de l'année financière -- et ajouté au
+// tableau Fournisseurs, une ligne par salarié, sous un fournisseur marqué "salarié interne" (créé
+// si nouveau). Le solde restant du dossier est actualisé automatiquement quand il est lisible
+// (Jade : « actualiser le montant restant facilement ») -- jamais effacé s'il est illisible sur CE
+// rapport (la dernière valeur connue reste affichée). Un échec de lecture ne fait JAMAIS échouer le
+// téléversement : le document est déjà enregistré.
+async function analyzeUploadedDdrReport(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  organizationId: string,
+  grantProjectId: string,
+  documentId: string,
+  file: File
+): Promise<string> {
+  if (!invoiceAnalysisAvailable()) return "Rapport DDR téléversé. La lecture automatique n'est pas configurée (ANTHROPIC_API_KEY) : ajoute les salariés/montants à la main dans le tableau.";
+  const mime = analyzableMime(file.name);
+  if (!mime) return "Rapport DDR téléversé. Ce format ne peut pas être lu automatiquement (PDF ou image seulement).";
+  if (file.size > MAX_INVOICE_BYTES) return "Rapport DDR téléversé. Fichier trop volumineux pour la lecture automatique (4 Mo max).";
+  try {
+    const extraction = await analyzeDdrReportFile({ bytes: await file.arrayBuffer(), mime });
+    if (!extraction.is_ddr_report) return "Rapport DDR téléversé, mais le document ne ressemble pas à un rapport Historique DDR : rien n'a été ajouté au tableau.";
+
+    const r = await supplierLedgerService(supabase).recordAnalyzedDdrReport(organizationId, grantProjectId, documentId, extraction);
+
+    if (extraction.financial_year_balance_remaining != null) {
+      await grantProjectsService(supabase).updatePariBalance(grantProjectId, extraction.financial_year_balance_remaining, extraction.financial_year_label);
+    }
+
+    const parts: string[] = [];
+    if (r.status === "no_employees") {
+      parts.push("Rapport DDR lu, mais aucun salarié n'a pu y être identifié : rien n'a été ajouté au tableau.");
+    } else {
+      if (r.created.length > 0) {
+        const createdLabel = r.created.map((c) => `${c.employeeName}${c.amount != null ? ` (${moneyCad(c.amount)})` : ""}${c.supplierCreated ? " — nouveau" : ""}`).join(", ");
+        parts.push(`DDR ${extraction.ddr_number ?? "?"} lu : ${r.created.length} salarié(s) ajouté(s) — ${createdLabel} — à vérifier.`);
+      }
+      if (r.skippedDuplicates.length > 0) parts.push(`${r.skippedDuplicates.join(", ")} : déjà enregistré(s) pour ce DDR, ignoré(s).`);
+    }
+    if (extraction.claimed_amount_for_period != null) parts.push(`Montant réclamé pour la période : ${moneyCad(extraction.claimed_amount_for_period)}.`);
+    if (extraction.financial_year_balance_remaining != null) {
+      parts.push(`Solde restant actualisé${extraction.financial_year_label ? ` (${extraction.financial_year_label})` : ""} : ${moneyCad(extraction.financial_year_balance_remaining)}.`);
+    } else {
+      parts.push("Solde restant non lisible sur ce rapport : valeur précédente conservée.");
+    }
+    return parts.join(" ");
+  } catch (e) {
+    return `Rapport DDR téléversé, mais sa lecture automatique a échoué (${formatCaughtError(e)}). Ajoute les salariés/montants à la main dans le tableau.`;
   }
 }
 
@@ -220,10 +271,11 @@ export async function uploadProjectDocumentAction(
   let info: string | null = null;
   if (category === "invoice") info = await analyzeUploadedInvoice(supabase, ctx.organizationId, grantProjectId, uploaded.id, file);
   else if (category === "agreement") info = await analyzeUploadedConvention(supabase, ctx, grantProjectId, clientId, uploaded.id, file);
+  else if (category === "ddr_report") info = await analyzeUploadedDdrReport(supabase, ctx.organizationId, grantProjectId, uploaded.id, file);
   await logDossierEvent(supabase, ctx, {
     grant_project_id: grantProjectId,
     client_id: clientId,
-    kind: category === "invoice" ? "invoice_uploaded" : "document_uploaded",
+    kind: category === "invoice" ? "invoice_uploaded" : category === "ddr_report" ? "ddr_report_uploaded" : "document_uploaded",
     title: `Document téléversé : ${file.name}`,
     detail: info,
     source: info ? "ai" : "manual",
@@ -528,6 +580,10 @@ export async function createSupplierAction(
   const invoice_description_requirements = String(formData.get("invoice_description_requirements") ?? "").trim() || null;
   const supplierClientIdRaw = formData.get("supplier_client_id");
   const supplier_client_id = typeof supplierClientIdRaw === "string" && supplierClientIdRaw.length > 0 ? supplierClientIdRaw : null;
+  // Jade (0065, PARI CNRC/IRAP) : cette ligne représente un salarié interne plutôt qu'un
+  // fournisseur externe -- adapte le vocabulaire affiché (SuppliersTable.tsx), même mécanisme.
+  const is_employee = formData.get("is_employee") === "on";
+  const role = String(formData.get("role") ?? "").trim() || null;
 
   if (!name) {
     return { error: "Le nom du fournisseur est requis." };
@@ -543,6 +599,8 @@ export async function createSupplierAction(
       expected_invoice_day,
       invoice_description_requirements,
       supplier_client_id,
+      is_employee,
+      role,
     });
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Erreur d'enregistrement" };
@@ -667,6 +725,28 @@ export async function toggleRequiresPaymentProofAction(grantProjectId: string, r
     grant_project_id: grantProjectId,
     kind: "payment_proof_requirement_changed",
     title: required ? "Preuve de paiement redevenue requise" : "Preuve de paiement rendue facultative",
+    source: "manual",
+  });
+  revalidatePath(`/grants/${grantProjectId}`);
+  return { error: null };
+}
+
+// ---- Solde restant PARI (programme PARI CNRC/IRAP) -----------------------------
+// Jade (0065) : actualisé automatiquement à la lecture d'un rapport Historique DDR
+// (analyzeUploadedDdrReport ci-dessus), et modifiable ici à la main à tout moment (ex. pour
+// corriger une lecture automatique, ou le saisir avant le premier rapport téléversé).
+export async function updatePariBalanceAction(grantProjectId: string, remaining: number | null, label: string | null): Promise<{ error: string | null }> {
+  const ctx = await requireOrgContext();
+  const supabase = await createClient();
+  try {
+    await grantProjectsService(supabase).updatePariBalance(grantProjectId, remaining, label);
+  } catch (e) {
+    return { error: formatCaughtError(e) };
+  }
+  await logDossierEvent(supabase, ctx, {
+    grant_project_id: grantProjectId,
+    kind: "pari_balance_updated",
+    title: remaining != null ? `Solde restant PARI modifié à la main : ${remaining}` : "Solde restant PARI effacé",
     source: "manual",
   });
   revalidatePath(`/grants/${grantProjectId}`);

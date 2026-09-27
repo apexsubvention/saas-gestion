@@ -19,6 +19,8 @@ export function projectSuppliersService(supabase: SupabaseClient) {
         invoice_description_requirements?: string | null;
         notes?: string | null;
         supplier_client_id?: string | null;
+        is_employee?: boolean;
+        role?: string | null;
       }
     ) {
       return repo.create({ organization_id: organizationId, grant_project_id: grantProjectId, ...input });

@@ -21,6 +21,15 @@ export function isMonthlyClaimProgram(programName: string | null | undefined, cl
   return MONTHLY_PROGRAM.test(programName ?? "");
 }
 
+// Même signal que ci-dessus (nom du programme seulement, sans le texte de fréquence de l'entente)
+// -- réutilisé pour adapter le vocabulaire du tableau Fournisseurs (0065, Jade : PARI CNRC/IRAP =
+// salariés internes plutôt que fournisseurs externes) et pour proposer "Rapport Historique DDR" en
+// premier dans les catégories de document. Un seul et même regex que le calendrier de réclamations
+// mensuelles, pour ne jamais désynchroniser les deux détections.
+export function isPariCnrcProgram(programName: string | null | undefined): boolean {
+  return MONTHLY_PROGRAM.test(programName ?? "");
+}
+
 export type MonthlyClaim = {
   claim_number: string; // « DDR 2026-03 » : sert aussi de clé de dédoublonnage
   period_start: string; // AAAA-MM-JJ

@@ -26,6 +26,12 @@ export type ProjectSupplierRow = {
   source_ref: string | null;
   extracted_at: string | null;
   confidence: "high" | "medium" | "low" | null;
+  // Jade (0065, PARI CNRC/IRAP) : cette ligne représente un SALARIÉ INTERNE (coût = heures x taux
+  // horaire) plutôt qu'un fournisseur externe -- adapte le vocabulaire affiché (SuppliersTable.tsx)
+  // sans changer le mécanisme (même tableau, mêmes factures/DDR). role = poste/titre du salarié,
+  // indépendant de "contact" (resté utilisable pour un fournisseur externe ordinaire).
+  is_employee: boolean;
+  role: string | null;
 };
 
 // Résultat de la fonction RPC portal_supplier_dossier_view (0047) -- une ligne par
@@ -124,6 +130,8 @@ export function projectSuppliersRepository(supabase: SupabaseClient) {
       source_ref?: string | null;
       extracted_at?: string | null;
       confidence?: ProjectSupplierRow["confidence"];
+      is_employee?: boolean;
+      role?: string | null;
     }): Promise<ProjectSupplierRow> {
       const { data, error } = await supabase.from("project_suppliers").insert(input).select().single();
       if (error) throw error;

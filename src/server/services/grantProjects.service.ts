@@ -35,6 +35,17 @@ export function grantProjectsService(supabase: SupabaseClient) {
     updateHiddenFromParentPortal: (id: string, hidden: boolean) => repo.updateHiddenFromParentPortal(id, hidden),
     updateRequiresPaymentProof: (id: string, required: boolean) => repo.updateRequiresPaymentProof(id, required),
 
+    // Jade (0065, PARI CNRC/IRAP) : solde restant, modifiable à la main ou actualisé
+    // automatiquement à la lecture d'un rapport Historique DDR.
+    async updatePariBalance(id: string, remaining: number | null, label: string | null) {
+      if (remaining != null && (!Number.isFinite(remaining) || remaining < -100_000_000 || remaining > 100_000_000)) {
+        throw new Error("Montant invalide.");
+      }
+      const trimmedLabel = label?.trim() || null;
+      if (trimmedLabel && trimmedLabel.length > 100) throw new Error("Libellé trop long (100 caractères maximum).");
+      return repo.updatePariBalance(id, remaining, trimmedLabel);
+    },
+
     async updateName(id: string, name: string) {
       const trimmed = name.trim();
       if (!trimmed) throw new Error("Le titre du dossier est requis.");

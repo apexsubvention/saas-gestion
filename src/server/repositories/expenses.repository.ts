@@ -20,6 +20,11 @@ export type ExpenseRow = {
   payment_status: "sent_unpaid" | "paid";
   payment_status_updated_at: string | null;
   payment_status_updated_by: string | null;
+  // Jade (0065, PARI CNRC/IRAP) : coût d'un salarié interne pour une période DDR -- s'ajoutent aux
+  // montants déjà suivis (subtotal/total/eligible_amount) sans les remplacer. null pour une facture
+  // de fournisseur externe ordinaire.
+  hours: number | null;
+  hourly_rate: number | null;
 };
 
 export function expensesRepository(supabase: SupabaseClient) {
@@ -46,6 +51,8 @@ export function expensesRepository(supabase: SupabaseClient) {
       eligible_amount?: number | null;
       status?: string;
       source?: "manual" | "ai";
+      hours?: number | null;
+      hourly_rate?: number | null;
     }): Promise<ExpenseRow> {
       const { data, error } = await supabase.from("expenses").insert(input).select().single();
       if (error) throw error;
@@ -54,7 +61,7 @@ export function expensesRepository(supabase: SupabaseClient) {
 
     async update(
       id: string,
-      patch: Partial<Pick<ExpenseRow, "supplier_id" | "invoice_number" | "invoice_date" | "subtotal" | "tax" | "total" | "eligible_amount" | "status">>
+      patch: Partial<Pick<ExpenseRow, "supplier_id" | "invoice_number" | "invoice_date" | "subtotal" | "tax" | "total" | "eligible_amount" | "status" | "hours" | "hourly_rate">>
     ): Promise<ExpenseRow> {
       const { data, error } = await supabase.from("expenses").update(patch).eq("id", id).select().single();
       if (error) throw error;

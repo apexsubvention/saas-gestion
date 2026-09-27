@@ -5,6 +5,7 @@ import { documentsRepository } from "@/server/repositories/documents.repository"
 import { billingLineItemsRepository } from "@/server/repositories/billingLineItems.repository";
 import { matchSupplier } from "@/features/invoices/matchSupplier";
 import { amountBeforeTax, type InvoiceExtraction } from "@/features/invoices/analyzeInvoice";
+import { employeeAmount, type DdrExtraction } from "@/features/ddr/analyzeDdrReport";
 
 // Tableau fournisseurs d'un dossier : fournisseurs + leurs factures (document, date, montant).
 
@@ -23,6 +24,10 @@ export type LedgerInvoice = {
   paymentStatus: "sent_unpaid" | "paid";
   paymentStatusUpdatedAt: string | null;
   paymentProof: { id: string; filename: string; storage_path: string } | null;
+  // Jade (0065, PARI CNRC/IRAP) : coût d'un salarié interne pour cette période -- null pour une
+  // facture de fournisseur externe ordinaire.
+  hours: number | null;
+  hourlyRate: number | null;
 };
 
 // Valeur effective = override manuel ?? valeur automatique ?? calcul de repli.
@@ -62,6 +67,10 @@ export type SaveInvoiceInput = {
   invoice_date: string | null;
   amount: number | null; // avant taxes
   document_id: string | null;
+  // Jade (0065, PARI CNRC/IRAP) : saisie manuelle heures/taux pour un salarié -- optionnel, sans
+  // effet pour un fournisseur externe ordinaire.
+  hours?: number | null;
+  hourly_rate?: number | null;
 };
 
 export function supplierLedgerService(supabase: SupabaseClient) {
@@ -121,6 +130,8 @@ export function supplierLedgerService(supabase: SupabaseClient) {
         paymentStatus: e.payment_status ?? "sent_unpaid",
         paymentStatusUpdatedAt: e.payment_status_updated_at ?? null,
         paymentProof: proofByExpense.get(e.id) ?? null,
+        hours: num(e.hours),
+        hourlyRate: num(e.hourly_rate),
       }));
 
       const bySupplier = new Map<string, LedgerInvoice[]>();
@@ -268,9 +279,10 @@ export function supplierLedgerService(supabase: SupabaseClient) {
 
     async saveInvoice(organizationId: string, grantProjectId: string, expenseId: string | null, input: SaveInvoiceInput) {
       const amounts = { subtotal: input.amount, eligible_amount: input.amount };
+      const hoursFields = { hours: input.hours ?? null, hourly_rate: input.hourly_rate ?? null };
       let id = expenseId;
       if (id) {
-        await expensesRepo.update(id, { supplier_id: input.supplier_id, invoice_number: input.invoice_number, invoice_date: input.invoice_date, ...amounts });
+        await expensesRepo.update(id, { supplier_id: input.supplier_id, invoice_number: input.invoice_number, invoice_date: input.invoice_date, ...amounts, ...hoursFields });
       } else {
         const created = await expensesRepo.create({
           organization_id: organizationId,
@@ -279,6 +291,7 @@ export function supplierLedgerService(supabase: SupabaseClient) {
           invoice_number: input.invoice_number,
           invoice_date: input.invoice_date,
           ...amounts,
+          ...hoursFields,
           status: "compliant", // saisie à la main : déjà vue par l'utilisateur
           source: "manual",
         });
@@ -340,6 +353,84 @@ export function supplierLedgerService(supabase: SupabaseClient) {
       });
       await documentsRepo.setInvoiceDocument(organizationId, expense.id, documentId);
       return { status: "recorded", supplierName: supplier.name, supplierCreated, amount };
+    },
+
+    // Rapport "Historique DDR" (PARI CNRC/IRAP) lu automatiquement (0065) : une ligne de dépense
+    // PAR SALARIÉ listé pour cette période, rangée sous un fournisseur marqué is_employee=true
+    // (créé si nouveau -- jamais parmi les fournisseurs externes, matchSupplier() n'est comparé
+    // qu'aux salariés déjà connus). invoice_number réutilise le numéro de DDR -- même champ,
+    // même dédoublonnage (fournisseur + numéro + total) que recordAnalyzedInvoice ci-dessus, pour
+    // rester cohérent si le même rapport est téléversé deux fois. Chaque ligne créée est marquée
+    // « à vérifier », jamais appliquée telle quelle sans revue -- même philosophie que ci-dessus.
+    async recordAnalyzedDdrReport(
+      organizationId: string,
+      grantProjectId: string,
+      documentId: string,
+      x: DdrExtraction
+    ): Promise<{
+      status: "recorded" | "no_employees";
+      ddrNumber: string | null;
+      created: Array<{ employeeName: string; supplierCreated: boolean; amount: number | null }>;
+      skippedDuplicates: string[];
+    }> {
+      if (x.employees.length === 0) {
+        return { status: "no_employees", ddrNumber: x.ddr_number, created: [], skippedDuplicates: [] };
+      }
+      const allSuppliers = await suppliersRepo.listByProject(grantProjectId);
+      const employeeSuppliers = allSuppliers.filter((s) => s.is_employee);
+      const existingExpenses = await expensesRepo.listByProject(grantProjectId);
+      const created: Array<{ employeeName: string; supplierCreated: boolean; amount: number | null }> = [];
+      const skippedDuplicates: string[] = [];
+
+      for (const emp of x.employees) {
+        const name = emp.name ?? "Salarié à identifier";
+        let supplier = emp.name ? matchSupplier(emp.name, employeeSuppliers) : null;
+        let supplierCreated = false;
+        if (!supplier) {
+          supplier = await suppliersRepo.create({
+            organization_id: organizationId,
+            grant_project_id: grantProjectId,
+            name,
+            is_employee: true,
+            role: emp.role,
+            source_kind: "ai",
+            source_document_id: documentId,
+            source_ref: "ddr",
+            extracted_at: new Date().toISOString(),
+            confidence: "medium",
+          });
+          supplierCreated = true;
+          employeeSuppliers.push(supplier); // même salarié cité 2x dans le même rapport -> pas 2 fiches créées
+        }
+
+        const amount = employeeAmount(emp);
+        if (x.ddr_number) {
+          const dup = existingExpenses.find((e) => e.supplier_id === supplier!.id && e.invoice_number === x.ddr_number && num(e.total) === amount);
+          if (dup) {
+            skippedDuplicates.push(name);
+            continue;
+          }
+        }
+
+        const expense = await expensesRepo.create({
+          organization_id: organizationId,
+          grant_project_id: grantProjectId,
+          supplier_id: supplier.id,
+          invoice_number: x.ddr_number,
+          invoice_date: x.period_end ?? x.period_start,
+          subtotal: amount,
+          total: amount,
+          eligible_amount: amount,
+          hours: emp.hours,
+          hourly_rate: emp.hourly_rate,
+          status: "to_review",
+          source: "ai",
+        });
+        await documentsRepo.setInvoiceDocument(organizationId, expense.id, documentId);
+        created.push({ employeeName: name, supplierCreated, amount });
+      }
+
+      return { status: "recorded", ddrNumber: x.ddr_number, created, skippedDuplicates };
     },
   };
 }

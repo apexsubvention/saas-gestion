@@ -437,6 +437,7 @@ function InvoiceRow({
   documents,
   claims,
   supplierChoices,
+  isEmployee,
   onCancel,
 }: {
   grantProjectId: string;
@@ -445,12 +446,18 @@ function InvoiceRow({
   documents: DocOption[];
   claims: ClaimOption[];
   supplierChoices?: Array<{ id: string; name: string }>; // factures sans fournisseur : on choisit lequel
+  // Jade (0065, PARI CNRC/IRAP) : salarié interne -- vocabulaire "N° DDR"/"Heures"/"Taux horaire"
+  // plutôt que "N° de facture", champs heures/taux en plus (optionnels, servent à préremplir le
+  // montant mais celui-ci reste modifiable directement, comme partout ailleurs dans ce tableau).
+  isEmployee?: boolean;
   onCancel?: () => void;
 }) {
   const [docId, setDocId] = useState(invoice?.document?.id ?? "");
   const [number, setNumber] = useState(invoice?.invoice_number ?? "");
   const [date, setDate] = useState(invoice?.invoice_date ?? "");
   const [amount, setAmount] = useState(invoice?.amount != null ? String(invoice.amount) : "");
+  const [hours, setHours] = useState(invoice?.hours != null ? String(invoice.hours) : "");
+  const [hourlyRate, setHourlyRate] = useState(invoice?.hourlyRate != null ? String(invoice.hourlyRate) : "");
   const [supplier, setSupplier] = useState(supplierId ?? "");
   const [saved, setSaved] = useState(false);
   const [claimId, setClaimId] = useState(invoice?.claim?.claim_id ?? "");
@@ -464,20 +471,39 @@ function InvoiceRow({
     run(() => linkInvoiceClaimAction(grantProjectId, invoice!.id, claimId || null, claimId ? parsed : null));
   }
 
+  // Préremplit le montant à partir de heures x taux horaire quand les deux sont saisis et que le
+  // montant n'a pas déjà été touché à la main -- jamais imposé, l'utilisateur garde la main sur le
+  // champ Montant (même logique que les postes de facturation, SupplierLineItemRow).
+  function onHoursOrRateChange(nextHours: string, nextRate: string) {
+    setHours(nextHours);
+    setHourlyRate(nextRate);
+    const h = Number(nextHours);
+    const r = Number(nextRate);
+    if (nextHours.trim() && nextRate.trim() && Number.isFinite(h) && Number.isFinite(r) && !amount.trim()) {
+      setAmount(String(Math.round(h * r * 100) / 100));
+    }
+  }
+
   const dirty =
     !invoice ||
     docId !== (invoice.document?.id ?? "") ||
     number !== (invoice.invoice_number ?? "") ||
     date !== (invoice.invoice_date ?? "") ||
     amount !== (invoice.amount != null ? String(invoice.amount) : "") ||
+    hours !== (invoice.hours != null ? String(invoice.hours) : "") ||
+    hourlyRate !== (invoice.hourlyRate != null ? String(invoice.hourlyRate) : "") ||
     supplier !== (supplierId ?? "");
 
   function save() {
     const parsed = parseAmount(amount);
     if (Number.isNaN(parsed)) return run(async () => ({ error: "Montant invalide." }));
+    const h = hours.trim() ? Number(hours) : null;
+    if (h != null && !Number.isFinite(h)) return run(async () => ({ error: "Heures invalides." }));
+    const r = hourlyRate.trim() ? Number(hourlyRate) : null;
+    if (r != null && !Number.isFinite(r)) return run(async () => ({ error: "Taux horaire invalide." }));
     setSaved(false);
     run(
-      () => saveInvoiceAction(grantProjectId, { id: invoice?.id ?? null, supplier_id: supplier || null, invoice_number: number || null, invoice_date: date || null, amount: parsed, document_id: docId || null }),
+      () => saveInvoiceAction(grantProjectId, { id: invoice?.id ?? null, supplier_id: supplier || null, invoice_number: number || null, invoice_date: date || null, amount: parsed, document_id: docId || null, hours: h, hourly_rate: r }),
       () => { setSaved(true); onCancel?.(); }
     );
   }
@@ -487,7 +513,7 @@ function InvoiceRow({
   return (
     <tr className={`border-b border-neutral-100 ${needsReview ? "bg-amber-50/50" : "bg-neutral-50/40"}`}>
       <td className="px-3 py-2 text-xs text-neutral-400">
-        <span className="pl-3">↳ facture</span>
+        <span className="pl-3">↳ {isEmployee ? "DDR" : "facture"}</span>
         {supplierChoices && (
           <select value={supplier} onChange={(e) => setSupplier(e.target.value)} className={`${input} mt-1`}>
             <option value="">Choisir le fournisseur…</option>
@@ -496,7 +522,13 @@ function InvoiceRow({
         )}
       </td>
       <td className="px-3 py-2">
-        <input value={number} onChange={(e) => setNumber(e.target.value)} placeholder="N° de facture" className={input} />
+        <input value={number} onChange={(e) => setNumber(e.target.value)} placeholder={isEmployee ? "N° DDR (ex. DDR1)" : "N° de facture"} className={input} />
+        {isEmployee && (
+          <div className="mt-1 flex gap-1">
+            <input inputMode="decimal" value={hours} onChange={(e) => onHoursOrRateChange(e.target.value, hourlyRate)} placeholder="Heures" className={`${input} w-1/2`} />
+            <input inputMode="decimal" value={hourlyRate} onChange={(e) => onHoursOrRateChange(hours, e.target.value)} placeholder="Taux horaire $" className={`${input} w-1/2`} />
+          </div>
+        )}
       </td>
       <td className="px-3 py-2">
         <DocumentSelect value={docId} onChange={setDocId} documents={documents} />
@@ -533,7 +565,7 @@ function InvoiceRow({
           )}
           {invoice ? (
             <button
-              onClick={() => { if (confirm("Supprimer cette facture du tableau ? Le document téléversé est conservé.")) run(() => deleteInvoiceAction(grantProjectId, invoice.id)); }}
+              onClick={() => { if (confirm(`Supprimer ce${isEmployee ? " DDR" : "tte facture"} du tableau ? Le document téléversé est conservé.`)) run(() => deleteInvoiceAction(grantProjectId, invoice.id)); }}
               disabled={pending}
               className={`${smallBtn} text-red-700`}
             >
@@ -554,8 +586,10 @@ function SupplierGroup({ grantProjectId, supplier, documents, clients, claims, l
   // Taux d'aide du dossier (0061) : repli pour les postes qui n'ont pas leur propre taux -- même
   // valeur que celle utilisée par le narratif ci-dessus (subsidy.rate, computeSubsidy()).
   const projectRate = billingContext?.subsidy.rate ?? null;
+  const isEmployee = supplier.is_employee;
   const [name, setName] = useState(supplier.name);
   const [contact, setContact] = useState(supplier.contact ?? "");
+  const [role, setRole] = useState(supplier.role ?? "");
   const [frequency, setFrequency] = useState(supplier.billing_frequency ?? "");
   const [day, setDay] = useState(supplier.expected_invoice_day != null ? String(supplier.expected_invoice_day) : "");
   const [requirements, setRequirements] = useState(supplier.invoice_description_requirements ?? "");
@@ -567,6 +601,7 @@ function SupplierGroup({ grantProjectId, supplier, documents, clients, claims, l
   const dirty =
     name !== supplier.name ||
     contact !== (supplier.contact ?? "") ||
+    role !== (supplier.role ?? "") ||
     frequency !== (supplier.billing_frequency ?? "") ||
     day !== (supplier.expected_invoice_day != null ? String(supplier.expected_invoice_day) : "") ||
     requirements !== (supplier.invoice_description_requirements ?? "") ||
@@ -605,6 +640,8 @@ function SupplierGroup({ grantProjectId, supplier, documents, clients, claims, l
         expected_invoice_day: d,
         invoice_description_requirements: requirements || null,
         supplier_client_id: clientId || null,
+        is_employee: isEmployee,
+        role: role || null,
       })
     );
   }
@@ -612,25 +649,28 @@ function SupplierGroup({ grantProjectId, supplier, documents, clients, claims, l
   return (
     <>
       <tr className="border-b border-neutral-100 bg-white align-top">
-        <td className="px-3 py-2"><input value={name} onChange={(e) => setName(e.target.value)} className={`${input} font-medium`} aria-label="Nom du fournisseur" /></td>
+        <td className="px-3 py-2">
+          <input value={name} onChange={(e) => setName(e.target.value)} className={`${input} font-medium`} aria-label={isEmployee ? "Nom du salarié" : "Nom du fournisseur"} />
+          {isEmployee && <span className="mt-1 inline-block rounded-full bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700">SALARIÉ INTERNE</span>}
+        </td>
         <td className="px-3 py-2"><TrackedCell grantProjectId={grantProjectId} supplierId={supplier.id} field="accepted" tracked={supplier.accepted} /></td>
         <td className="px-3 py-2"><TrackedCell grantProjectId={grantProjectId} supplierId={supplier.id} field="claimed" tracked={supplier.claimed} /></td>
         <td className={`px-3 py-2 text-sm font-semibold ${supplier.remaining != null && supplier.remaining < 0 ? "text-red-700" : "text-neutral-900"}`}>{money(supplier.remaining)}</td>
         <td className="px-3 py-2 text-xs text-neutral-500">
-          {supplier.invoices.length} facture{supplier.invoices.length > 1 ? "s" : ""}
-          <div>{money(supplier.invoiced)} facturé</div>
+          {supplier.invoices.length} {isEmployee ? "DDR" : `facture${supplier.invoices.length > 1 ? "s" : ""}`}
+          <div>{money(supplier.invoiced)} {isEmployee ? "réclamé" : "facturé"}</div>
         </td>
         <td className="px-3 py-2">
           <div className="flex flex-wrap items-center gap-1">
             {dirty && <button onClick={save} disabled={pending} className={`${smallBtn} bg-neutral-900 text-white hover:bg-neutral-800`}>{pending ? "…" : "Enregistrer"}</button>}
             <button onClick={() => run(() => moveSupplierAction(grantProjectId, supplier.id, "up"))} disabled={pending || isFirst} className={smallBtn} title="Monter" aria-label="Monter">↑</button>
             <button onClick={() => run(() => moveSupplierAction(grantProjectId, supplier.id, "down"))} disabled={pending || isLast} className={smallBtn} title="Descendre" aria-label="Descendre">↓</button>
-            <button onClick={() => setAddingInvoice(true)} className={smallBtn}>+ Facture</button>
+            <button onClick={() => setAddingInvoice(true)} className={smallBtn}>{isEmployee ? "+ DDR" : "+ Facture"}</button>
             <button onClick={() => setShowDetails((v) => !v)} className={smallBtn}>{showDetails ? "Masquer" : "Détails"}</button>
             <button
               onClick={() => {
                 const n = supplier.invoices.length;
-                if (confirm(`Supprimer « ${supplier.name} » ?${n ? ` Ses ${n} facture(s) sont conservées, sans fournisseur.` : ""}`)) run(() => deleteSupplierAction(grantProjectId, supplier.id));
+                if (confirm(`Supprimer « ${supplier.name} » ?${n ? ` Ses ${n} ${isEmployee ? "DDR sont conservés" : "facture(s) sont conservées"}, sans fournisseur.` : ""}`)) run(() => deleteSupplierAction(grantProjectId, supplier.id));
               }}
               disabled={pending}
               className={`${smallBtn} text-red-700`}
@@ -651,21 +691,36 @@ function SupplierGroup({ grantProjectId, supplier, documents, clients, claims, l
       {showDetails && (
         <tr className="border-b border-neutral-100 bg-neutral-50">
           <td colSpan={6} className="px-3 py-3">
-            <p className="mb-2 text-xs text-neutral-500">
-              Informations de facturation. Quand ce fournisseur est un client Apex (ex. Sitegrow), elles sont visibles dans son portail.
-            </p>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <label className="space-y-1 text-xs text-neutral-600">Contact<input value={contact} onChange={(e) => setContact(e.target.value)} className={input} /></label>
-              <label className="space-y-1 text-xs text-neutral-600">Fréquence de facturation<input value={frequency} onChange={(e) => setFrequency(e.target.value)} className={input} /></label>
-              <label className="space-y-1 text-xs text-neutral-600">Jour attendu (1-31)<input inputMode="numeric" value={day} onChange={(e) => setDay(e.target.value)} className={input} /></label>
-              <label className="space-y-1 text-xs text-neutral-600 sm:col-span-2">À inscrire sur la facture<input value={requirements} onChange={(e) => setRequirements(e.target.value)} className={input} /></label>
-              <label className="space-y-1 text-xs text-neutral-600">Client Apex lié
-                <select value={clientId} onChange={(e) => setClientId(e.target.value)} className={input}>
-                  <option value="">Aucun</option>
-                  {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </label>
-            </div>
+            <label className="mb-2 flex items-center gap-1.5 text-xs font-medium text-neutral-600">
+              <input type="checkbox" checked={isEmployee} onChange={(e) => run(() => saveSupplierAction(grantProjectId, { id: supplier.id, name, budget_amount: supplier.budget_amount, contact: contact || null, billing_frequency: frequency || null, expected_invoice_day: day.trim() ? Number(day) : null, invoice_description_requirements: requirements || null, supplier_client_id: clientId || null, is_employee: e.target.checked, role: role || null }))} />
+              Salarié interne (plutôt que fournisseur externe)
+            </label>
+            {isEmployee ? (
+              <>
+                <p className="mb-2 text-xs text-neutral-500">Coûts internes (heures x taux horaire) -- suivis par DDR ci-dessus.</p>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <label className="space-y-1 text-xs text-neutral-600">Rôle<input value={role} onChange={(e) => setRole(e.target.value)} placeholder="Ex. Ingénieur logiciel" className={input} /></label>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="mb-2 text-xs text-neutral-500">
+                  Informations de facturation. Quand ce fournisseur est un client Apex (ex. Sitegrow), elles sont visibles dans son portail.
+                </p>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <label className="space-y-1 text-xs text-neutral-600">Contact<input value={contact} onChange={(e) => setContact(e.target.value)} className={input} /></label>
+                  <label className="space-y-1 text-xs text-neutral-600">Fréquence de facturation<input value={frequency} onChange={(e) => setFrequency(e.target.value)} className={input} /></label>
+                  <label className="space-y-1 text-xs text-neutral-600">Jour attendu (1-31)<input inputMode="numeric" value={day} onChange={(e) => setDay(e.target.value)} className={input} /></label>
+                  <label className="space-y-1 text-xs text-neutral-600 sm:col-span-2">À inscrire sur la facture<input value={requirements} onChange={(e) => setRequirements(e.target.value)} className={input} /></label>
+                  <label className="space-y-1 text-xs text-neutral-600">Client Apex lié
+                    <select value={clientId} onChange={(e) => setClientId(e.target.value)} className={input}>
+                      <option value="">Aucun</option>
+                      {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  </label>
+                </div>
+              </>
+            )}
             <div className="mt-3">
               <SupplierHistory grantProjectId={grantProjectId} supplierId={supplier.id} />
             </div>
@@ -674,11 +729,11 @@ function SupplierGroup({ grantProjectId, supplier, documents, clients, claims, l
       )}
       {supplier.invoices.map((inv) => (
         <Fragment key={inv.id}>
-          <InvoiceRow key={`${inv.id}-${inv.status}`} grantProjectId={grantProjectId} invoice={inv} supplierId={supplier.id} documents={documents} claims={claims} />
+          <InvoiceRow key={`${inv.id}-${inv.status}`} grantProjectId={grantProjectId} invoice={inv} supplierId={supplier.id} documents={documents} claims={claims} isEmployee={isEmployee} />
           <InvoicePaymentRow key={`${inv.id}-payment`} grantProjectId={grantProjectId} invoice={inv} documents={documents} />
         </Fragment>
       ))}
-      {addingInvoice && <InvoiceRow grantProjectId={grantProjectId} invoice={null} supplierId={supplier.id} documents={documents} claims={claims} onCancel={() => setAddingInvoice(false)} />}
+      {addingInvoice && <InvoiceRow grantProjectId={grantProjectId} invoice={null} supplierId={supplier.id} documents={documents} claims={claims} isEmployee={isEmployee} onCancel={() => setAddingInvoice(false)} />}
     </>
   );
 }

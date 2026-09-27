@@ -25,6 +25,13 @@ export type GrantProjectRow = {
   // dossiers existants). Contrôle uniquement l'affichage du bloc "Preuve de paiement" côté
   // portail client -- voir portalDossiers.service.ts / PortalSupplierInvoices.tsx.
   requires_payment_proof: boolean;
+  // Jade (0065, PARI CNRC/IRAP) : solde restant de l'année financière -- lu automatiquement à
+  // chaque rapport "Historique DDR" téléversé (label = l'année financière indiquée, ex.
+  // "2024-2025"), mais reste modifiable à la main. Aucune autre source de vérité pour cette valeur
+  // dans Apex -- voir la migration 0065 et PariBalance.tsx.
+  pari_balance_remaining: number | null;
+  pari_balance_label: string | null;
+  pari_balance_updated_at: string | null;
 };
 
 export function grantProjectsRepository(supabase: SupabaseClient) {
@@ -129,6 +136,20 @@ export function grantProjectsRepository(supabase: SupabaseClient) {
       const { data, error } = await supabase
         .from("grant_projects")
         .update({ name, updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as GrantProjectRow;
+    },
+
+    // Jade (0065) : « actualiser le montant restant facilement » -- appelé automatiquement après
+    // la lecture d'un rapport Historique DDR (quand le solde y est lisible), et disponible en
+    // modification manuelle (PariBalance.tsx) pour corriger/compléter à tout moment.
+    async updatePariBalance(id: string, remaining: number | null, label: string | null): Promise<GrantProjectRow> {
+      const { data, error } = await supabase
+        .from("grant_projects")
+        .update({ pari_balance_remaining: remaining, pari_balance_label: label, pari_balance_updated_at: new Date().toISOString(), updated_at: new Date().toISOString() })
         .eq("id", id)
         .select()
         .single();

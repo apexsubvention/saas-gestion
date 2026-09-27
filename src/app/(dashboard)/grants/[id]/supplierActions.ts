@@ -34,6 +34,10 @@ const supplierSchema = z.object({
   expected_invoice_day: z.number().int().min(1, "Jour entre 1 et 31").max(31, "Jour entre 1 et 31").nullable(),
   invoice_description_requirements: optionalText(1000),
   supplier_client_id: z.string().uuid().nullable(),
+  // Jade (0065, PARI CNRC/IRAP) : salarié interne plutôt que fournisseur externe -- optionnels,
+  // absents = comportement inchangé (fournisseur externe ordinaire).
+  is_employee: z.boolean().optional(),
+  role: optionalText(150).optional(),
 });
 export type SupplierInput = z.input<typeof supplierSchema>;
 
@@ -44,6 +48,10 @@ const invoiceSchema = z.object({
   invoice_date: isoDate,
   amount: money,
   document_id: z.string().uuid().nullable(),
+  // Jade (0065) : coût d'un salarié interne (heures x taux horaire) -- optionnels, sans effet pour
+  // un fournisseur externe ordinaire.
+  hours: z.number().min(0, "Heures invalides").max(100_000, "Heures invalides").nullable().optional(),
+  hourly_rate: money.optional(),
 });
 export type InvoiceInput = z.input<typeof invoiceSchema>;
 

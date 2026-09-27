@@ -45,6 +45,8 @@ import { RequiresPaymentProofToggle } from "./RequiresPaymentProofToggle";
 import { EditableGrantProjectName } from "./EditableGrantProjectName";
 import { DocumentCategorySelect } from "./DocumentCategorySelect";
 import { DeleteDocumentButton } from "./DeleteDocumentButton";
+import { PariBalance } from "./PariBalance";
+import { isPariCnrcProgram } from "@/server/scheduling/monthlyClaims";
 
 // Le téléversement d'une facture déclenche sa lecture automatique (jusqu'à ~1 min).
 export const maxDuration = 60;
@@ -100,6 +102,10 @@ export default async function GrantProjectPage({ params, searchParams }: { param
   ]);
   const agreement = agreements[0] ?? null;
   const rateForLedger = Number(project.grant_rate ?? agreement?.grant_rate ?? 0) || null;
+  // Jade (0065) : vocabulaire "salarié interne"/DDR adapté au tableau Fournisseurs pour ce
+  // programme -- même signal que le calendrier de réclamations mensuelles (isMonthlyClaimProgram),
+  // jamais imposé (toujours modifiable par ligne, voir SuppliersTable.tsx).
+  const isPariProgram = isPariCnrcProgram(project.grant_programs?.name ?? null);
   const ledger = await supplierLedgerService(supabase).load(params.id, rateForLedger);
   const lineItems = await billingLineItemsService(supabase).listByProject(params.id);
   // Résumé seulement dans le Dossier (Jade : trop de tableaux qui se ressemblent) -- le détail
@@ -221,7 +227,7 @@ export default async function GrantProjectPage({ params, searchParams }: { param
           <Link href={`/grants/${project.id}/facturation`} className="inline-block rounded-md border border-purple-200 bg-purple-50 px-3 py-1.5 text-sm font-medium text-purple-700 hover:bg-purple-100">
             Aide à la facturation →
           </Link>
-          {/(pari|irap)/i.test(project.grant_programs?.name ?? "") && (
+          {isPariProgram && (
             <Link href={`/grants/${project.id}/ddr`} className="inline-block rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-100">
               DDR (PARI CNRC) →
             </Link>
@@ -341,6 +347,14 @@ export default async function GrantProjectPage({ params, searchParams }: { param
           <section className="space-y-3">
             <h2 className="text-sm font-semibold text-neutral-900">Fournisseurs et factures</h2>
             <RequiresPaymentProofToggle grantProjectId={project.id} initialRequired={project.requires_payment_proof} />
+            {isPariProgram && (
+              <PariBalance
+                grantProjectId={project.id}
+                initialRemaining={project.pari_balance_remaining}
+                initialLabel={project.pari_balance_label}
+                initialUpdatedAt={project.pari_balance_updated_at}
+              />
+            )}
             <SuggestionsPanel grantProjectId={project.id} suggestions={suggestions} />
             {paymentDeadlineText && (
               <div className="rounded-lg border-2 border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900">
@@ -350,9 +364,10 @@ export default async function GrantProjectPage({ params, searchParams }: { param
             )}
             <SubsidyPanel summary={subsidy} supplierBudgetTotal={ledger.supplierBudgetTotal} narrative={billingNarrative} />
             <p className="text-xs text-neutral-500">
-              Un seul tableau, automatique et manuel : modifie, ajoute ou supprime les fournisseurs, même ceux générés automatiquement. Une facture
+              Un seul tableau, automatique et manuel : modifie, ajoute ou supprime les fournisseurs (ou salariés), même ceux générés automatiquement. Une facture
               téléversée dans « Documents » (catégorie Facture) est lue automatiquement et ajoutée ici sous son fournisseur ; tu peux aussi associer
               un document toi-même. Ouvre « Détails » sur un fournisseur pour voir l&apos;historique de ses modifications.
+              {isPariProgram && " Pour un rapport « Historique DDR », choisis la catégorie « Rapport DDR » -- Apex y lit les salariés, heures, taux et le solde restant, et les ajoute ci-dessous par DDR."}
             </p>
             {lineItems.length > 0 ? (
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-neutral-200 bg-white p-4">
@@ -390,9 +405,9 @@ export default async function GrantProjectPage({ params, searchParams }: { param
               billingContext={{ clientName, subsidy, deadline: projectDeadline }}
             />
             <details className="rounded-lg border border-neutral-200 bg-white p-4">
-              <summary className="cursor-pointer text-sm font-medium text-neutral-800">Ajouter un fournisseur avec ses détails de facturation</summary>
+              <summary className="cursor-pointer text-sm font-medium text-neutral-800">{isPariProgram ? "Ajouter un salarié ou un fournisseur" : "Ajouter un fournisseur avec ses détails de facturation"}</summary>
               <div className="mt-3">
-                <NewSupplierForm grantProjectId={project.id} clients={otherClients.map((c) => ({ id: c.id, name: c.name }))} />
+                <NewSupplierForm grantProjectId={project.id} clients={otherClients.map((c) => ({ id: c.id, name: c.name }))} suggestEmployee={isPariProgram} />
               </div>
             </details>
           </section>
