@@ -49,6 +49,24 @@ export function documentsRepository(supabase: SupabaseClient) {
       return data as any;
     },
 
+    // Jade : corriger la catégorie d'un document après coup (ex. téléversé comme "Convention"
+    // par erreur, en fait une "Facture") -- documents_update (RLS, 0016) autorise admin ET
+    // employé, contrairement à documents_delete ci-dessous qui est réservé aux admins.
+    async updateCategory(id: string, category: string): Promise<DocumentRow> {
+      const { data, error } = await supabase.from("documents").update({ category }).eq("id", id).select().single();
+      if (error) throw error;
+      return data as DocumentRow;
+    },
+
+    // Suppression définitive de la ligne "documents" -- ne touche PAS au fichier dans le bucket
+    // Storage (voir documentsService.remove, qui appelle ceci puis retire le fichier séparément).
+    // documents_delete (RLS, 0016) est réservé aux admins : un membre employé recevra ici
+    // l'erreur RLS Postgres, remontée telle quelle par formatCaughtError côté action.
+    async remove(id: string): Promise<void> {
+      const { error } = await supabase.from("documents").delete().eq("id", id);
+      if (error) throw error;
+    },
+
     async create(input: {
       organization_id: string;
       filename: string;

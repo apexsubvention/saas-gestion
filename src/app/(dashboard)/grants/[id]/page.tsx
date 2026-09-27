@@ -37,10 +37,12 @@ import { NewSupplierForm } from "./NewSupplierForm";
 import { DeleteGrantProjectButton } from "../DeleteGrantProjectButton";
 import { NewDocumentRequestForm } from "./NewDocumentRequestForm";
 import { DocumentRequestsList, type DocumentRequestListItem } from "./DocumentRequestsList";
-import { DOCUMENT_CATEGORY_LABELS } from "@/features/grants/constants";
 import { dossierNotesService } from "@/server/services/dossierNotes.service";
 import { DossierNotes } from "./DossierNotes";
 import { HideFromParentPortalToggle } from "./HideFromParentPortalToggle";
+import { EditableGrantProjectName } from "./EditableGrantProjectName";
+import { DocumentCategorySelect } from "./DocumentCategorySelect";
+import { DeleteDocumentButton } from "./DeleteDocumentButton";
 
 // Le téléversement d'une facture déclenche sa lecture automatique (jusqu'à ~1 min).
 export const maxDuration = 60;
@@ -186,7 +188,7 @@ export default async function GrantProjectPage({ params, searchParams }: { param
         <p className="text-xs uppercase tracking-wide text-neutral-400">
           {project.clients?.name} · {project.grant_programs?.name}
         </p>
-        <h1 className="mt-1 text-lg font-semibold text-neutral-900">{project.name}</h1>
+        <EditableGrantProjectName grantProjectId={project.id} initialName={project.name} />
         {project.clients?.parent_client_id && (
           <div className="mt-2">
             <HideFromParentPortalToggle grantProjectId={project.id} initialHidden={Boolean(project.hidden_from_parent_portal)} />
@@ -270,10 +272,17 @@ export default async function GrantProjectPage({ params, searchParams }: { param
                     {documents.map((d) => (
                       <tr key={d.id} className="border-b border-neutral-100 last:border-0">
                         <td className="px-4 py-2 text-neutral-900">{d.filename}</td>
-                        <td className="px-4 py-2 text-neutral-600">{DOCUMENT_CATEGORY_LABELS[d.category] ?? d.category}</td>
+                        <td className="px-4 py-2">
+                          <DocumentCategorySelect grantProjectId={project.id} documentId={d.id} initialCategory={d.category} />
+                        </td>
                         <td className="px-4 py-2 text-neutral-400">{new Date(d.created_at).toLocaleDateString("fr-CA")}</td>
                         <td className="px-4 py-2 text-right">
-                          <OpenDocumentButton storagePath={d.storage_path} filename={d.filename} />
+                          <span className="inline-flex items-center gap-3">
+                            <OpenDocumentButton storagePath={d.storage_path} filename={d.filename} />
+                            {ctx.role === "admin" && (
+                              <DeleteDocumentButton grantProjectId={project.id} documentId={d.id} storagePath={d.storage_path} filename={d.filename} />
+                            )}
+                          </span>
                         </td>
                       </tr>
                     ))}

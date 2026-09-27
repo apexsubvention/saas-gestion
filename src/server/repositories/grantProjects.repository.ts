@@ -106,5 +106,18 @@ export function grantProjectsRepository(supabase: SupabaseClient) {
       if (error) throw error;
       return data as GrantProjectRow;
     },
+
+    // Jade : le titre du dossier n'était modifiable qu'à la création -- ajouté pour corriger une
+    // erreur de saisie après coup (ex. mauvais nom de projet).
+    async updateName(id: string, name: string): Promise<GrantProjectRow> {
+      const { data, error } = await supabase
+        .from("grant_projects")
+        .update({ name, updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as GrantProjectRow;
+    },
   };
 }

@@ -14,7 +14,7 @@ import { grantAgreementsRepository } from "@/server/repositories/grantAgreements
 import { requireOrgContext } from "@/lib/permissions";
 import { grantAgreementsService } from "@/server/services/grantAgreements.service";
 import { saveAgreementSchema } from "@/features/grants/agreementSchema";
-import { GRANT_PROJECT_STATUS_LABELS } from "@/features/grants/constants";
+import { GRANT_PROJECT_STATUS_LABELS, DOCUMENT_CATEGORY_LABELS } from "@/features/grants/constants";
 import { formatCaughtError } from "@/lib/errors";
 import { logDossierEvent } from "@/server/services/audit";
 import { notifyUser } from "@/server/services/notifications.service";
@@ -161,6 +161,24 @@ export async function updateGrantProjectStatusAction(
   return { error: null };
 }
 
+// ---- Titre du dossier ---------------------------------------------------------
+// Jade : le titre n'était modifiable qu'à la création du dossier -- ajouté pour corriger une
+// erreur de saisie (mauvais nom de projet) après coup.
+export async function updateGrantProjectNameAction(grantProjectId: string, name: string): Promise<{ error: string | null }> {
+  const ctx = await requireOrgContext();
+  const supabase = await createClient();
+  const trimmed = name.trim();
+  try {
+    await grantProjectsService(supabase).updateName(grantProjectId, trimmed);
+  } catch (e) {
+    return { error: formatCaughtError(e) };
+  }
+  await logDossierEvent(supabase, ctx, { grant_project_id: grantProjectId, kind: "name_changed", title: `Titre du dossier modifié : ${trimmed}`, source: "manual" });
+  revalidatePath(`/grants/${grantProjectId}`);
+  revalidatePath("/grants");
+  return { error: null };
+}
+
 // ---- Documents -------------------------------------------------------------
 
 export type UploadProjectDocumentFormState = { error: string | null; info: string | null };
@@ -229,6 +247,43 @@ export async function getDocumentUrlAction(storagePath: string): Promise<{ url: 
   } catch (e) {
     return { url: null, error: e instanceof Error ? e.message : "Erreur lors de la génération du lien" };
   }
+}
+
+// Jade : pouvoir corriger la catégorie d'un document après coup (ex. téléversé comme
+// "Convention" par erreur, en fait une "Facture") -- documents_update (RLS) autorise admin ET
+// employé.
+export async function updateDocumentCategoryAction(grantProjectId: string, documentId: string, category: string): Promise<{ error: string | null }> {
+  const ctx = await requireOrgContext();
+  const supabase = await createClient();
+  try {
+    await documentsService(supabase).updateCategory(documentId, category);
+  } catch (e) {
+    return { error: formatCaughtError(e) };
+  }
+  await logDossierEvent(supabase, ctx, {
+    grant_project_id: grantProjectId,
+    kind: "document_category_changed",
+    title: `Catégorie de document modifiée : ${DOCUMENT_CATEGORY_LABELS[category] ?? category}`,
+    source: "manual",
+  });
+  revalidatePath(`/grants/${grantProjectId}`);
+  return { error: null };
+}
+
+// Jade : pouvoir supprimer un document téléversé par erreur. documents_delete (RLS, 0016) et la
+// politique de suppression du bucket Storage (0019) sont toutes deux réservées aux admins -- un
+// membre employé recevra ici l'erreur RLS, affichée telle quelle (formatCaughtError).
+export async function deleteDocumentAction(grantProjectId: string, documentId: string, storagePath: string): Promise<{ error: string | null }> {
+  const ctx = await requireOrgContext();
+  const supabase = await createClient();
+  try {
+    await documentsService(supabase).remove(documentId, storagePath);
+  } catch (e) {
+    return { error: formatCaughtError(e) };
+  }
+  await logDossierEvent(supabase, ctx, { grant_project_id: grantProjectId, kind: "document_deleted", title: "Document supprimé", source: "manual" });
+  revalidatePath(`/grants/${grantProjectId}`);
+  return { error: null };
 }
 
 // ---- Réclamations ------------------------------------------------------------

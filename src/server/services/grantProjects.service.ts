@@ -33,5 +33,12 @@ export function grantProjectsService(supabase: SupabaseClient) {
     },
 
     updateHiddenFromParentPortal: (id: string, hidden: boolean) => repo.updateHiddenFromParentPortal(id, hidden),
+
+    async updateName(id: string, name: string) {
+      const trimmed = name.trim();
+      if (!trimmed) throw new Error("Le titre du dossier est requis.");
+      if (trimmed.length > 200) throw new Error("Le titre du dossier est trop long (200 caractères maximum).");
+      return repo.updateName(id, trimmed);
+    },
   };
 }

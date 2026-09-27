@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { documentsRepository } from "@/server/repositories/documents.repository";
+import { DOCUMENT_CATEGORY_LABELS } from "@/features/grants/constants";
 
 const BUCKET = "apex-documents";
 
@@ -9,6 +10,23 @@ export function documentsService(supabase: SupabaseClient) {
   return {
     listByClient: (clientId: string) => repo.listByClient(clientId),
     listByProject: (grantProjectId: string) => repo.listByProject(grantProjectId),
+
+    async updateCategory(documentId: string, category: string) {
+      if (!(category in DOCUMENT_CATEGORY_LABELS)) throw new Error(`Catégorie invalide : ${category}`);
+      return repo.updateCategory(documentId, category);
+    },
+
+    // Supprime la ligne "documents" PUIS le fichier Storage -- dans cet ordre pour rester
+    // cohérent avec le choix fait dans upload() ci-dessous (storage avant la ligne, pour ne
+    // jamais laisser une ligne "documents" pointer vers un fichier absent) : ici, si la
+    // suppression Storage échoue après coup, on préfère un fichier orphelin dans le bucket à
+    // une ligne "documents" ressuscitée pointant vers un fichier déjà supprimé. Best-effort sur
+    // le retrait Storage : son échec (ex. chemin déjà absent) n'est jamais renvoyé comme une
+    // erreur de l'opération -- la ligne, elle, est bel et bien supprimée à ce stade.
+    async remove(documentId: string, storagePath: string) {
+      await repo.remove(documentId);
+      await supabase.storage.from(BUCKET).remove([storagePath]);
+    },
 
     // Upload + insertion en une transaction applicative : le fichier va dans le storage
     // AVANT la ligne "documents" (si l'insert echoue -- ex. RLS -- le fichier orphelin
