@@ -18,6 +18,10 @@ export type DocumentRequestRow = {
   due_date: string | null;
   status: string;
   visible_in_client_portal: boolean;
+  // 0067 -- Jade : « Tâches à faire pour le client », ce n'est pas chaque tâche demandée qui doit
+  // avoir un document à téléverser. true (défaut, comportement inchangé pour l'existant) = le
+  // client doit fournir un fichier ; false = une simple case à cocher suffit côté portail.
+  requires_upload: boolean;
   requested_at: string | null;
   received_at: string | null;
   validated_at: string | null;
@@ -53,6 +57,7 @@ export function documentRequestsRepository(supabase: SupabaseClient) {
       due_date?: string | null;
       status?: string;
       visible_in_client_portal?: boolean;
+      requires_upload?: boolean;
       requested_at?: string | null;
     }): Promise<DocumentRequestRow> {
       const { data, error } = await supabase.from("document_requests").insert(input).select().single();

@@ -48,6 +48,9 @@ export type PortalDocumentRequestView = {
   status: string;
   statusLabel: string;
   filename: string | null;
+  // 0067 -- Jade : « Tâches à faire pour le client » -- false = une simple case à cocher suffit
+  // (pas de fichier à fournir), voir markDocumentRequestDoneAction dans le portail.
+  requiresUpload: boolean;
 };
 
 export type PortalClaimView = ClaimRow & {
@@ -361,6 +364,7 @@ export function portalDossiersService(supabase: SupabaseClient) {
             status: r.status,
             statusLabel: DOCUMENT_REQUEST_STATUS_LABELS[r.status] ?? r.status,
             filename: filenameByRequestId.get(r.id) ?? null,
+            requiresUpload: r.requires_upload,
           });
 
           const claimsWithRequirements: PortalClaimView[] = await Promise.all(

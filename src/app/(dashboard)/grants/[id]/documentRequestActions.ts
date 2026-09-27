@@ -28,6 +28,9 @@ export async function createDocumentRequestAction(
   const due_date = String(formData.get("due_date") ?? "").trim() || null;
   const claimIdRaw = formData.get("claim_id");
   const claim_id = typeof claimIdRaw === "string" && claimIdRaw.length > 0 ? claimIdRaw : null;
+  // Une case à cocher absente du FormData quand décochée -- présence = téléversement requis
+  // (défaut coché dans le formulaire, voir NewDocumentRequestForm.tsx).
+  const requires_upload = formData.has("requires_upload");
 
   if (!title) return { error: "Le titre du document demandé est requis." };
 
@@ -44,6 +47,7 @@ export async function createDocumentRequestAction(
       title,
       instructions,
       due_date,
+      requires_upload,
     });
     await logDossierEvent(supabase, ctx, {
       grant_project_id: grantProjectId,

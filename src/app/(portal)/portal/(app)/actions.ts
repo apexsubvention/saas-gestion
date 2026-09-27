@@ -153,6 +153,62 @@ export async function uploadRequestedDocumentAction(
   return { error: null };
 }
 
+// Marquer une tâche comme faite SANS fichier (0067 -- Jade : « ce n'est pas chaque tâche
+// demandée qui va devoir avoir un document à téléverser »). Même demande (document_requests)
+// que uploadRequestedDocumentAction ci-dessus, mais requires_upload = false : on saute le
+// storage/documents/document_links et on passe directement au même statut "received" (repris tel
+// quel côté personnel -- une tâche « à valider » se traite comme un document reçu « à valider »,
+// mêmes contrôles de statut déjà en place, DOCUMENT_REQUEST_STATUS_OPTIONS inchangé).
+export async function markDocumentRequestDoneAction(requestId: string): Promise<PortalUploadFormState> {
+  const ctx = await requirePortalContext();
+
+  const supabase = await createClient();
+  const { data: request, error: findError } = await supabase
+    .from("document_requests")
+    .select("id, organization_id, client_id, grant_project_id, title, requires_upload, status")
+    .eq("id", requestId)
+    .maybeSingle();
+  if (findError || !request) {
+    return { error: "Demande introuvable ou accès refusé." };
+  }
+  if (request.requires_upload) {
+    return { error: "Cette tâche nécessite un fichier à téléverser." };
+  }
+
+  const admin = createAdminClient();
+  try {
+    const { data: orgUserRow } = await admin
+      .from("organization_users")
+      .select("id")
+      .eq("user_id", ctx.userId)
+      .eq("organization_id", ctx.organizationId)
+      .maybeSingle();
+
+    const { error: statusError } = await admin
+      .from("document_requests")
+      .update({ status: "received", received_at: new Date().toISOString() })
+      .eq("id", requestId);
+    if (statusError) throw statusError;
+
+    if (request.grant_project_id) {
+      await logDossierEvent(admin, { organizationId: request.organization_id, organizationUserId: orgUserRow?.id ?? "" }, {
+        grant_project_id: request.grant_project_id,
+        client_id: request.client_id,
+        kind: "task_done_portal",
+        title: `Tâche marquée faite par le client : ${request.title}`,
+        source: "portal",
+        ref_type: "document_request",
+        ref_id: requestId,
+      });
+    }
+  } catch (e) {
+    return { error: formatCaughtError(e) };
+  }
+
+  revalidatePath("/portal");
+  return { error: null };
+}
+
 // Lien signé pour un document de la bibliothèque (0045). documents_select_portal_full
 // permet maintenant au compte portail de lire la LIGNE "documents" (métadonnées) --
 // mais la lecture du FICHIER dans le stockage suit une policy séparée

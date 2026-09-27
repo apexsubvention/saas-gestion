@@ -952,6 +952,7 @@ export type Database = {
           received_at: string | null
           requested_at: string | null
           requested_from_contact_id: string | null
+          requires_upload: boolean
           status: string
           title: string
           updated_at: string
@@ -971,6 +972,7 @@ export type Database = {
           received_at?: string | null
           requested_at?: string | null
           requested_from_contact_id?: string | null
+          requires_upload?: boolean
           status?: string
           title: string
           updated_at?: string
@@ -990,6 +992,7 @@ export type Database = {
           received_at?: string | null
           requested_at?: string | null
           requested_from_contact_id?: string | null
+          requires_upload?: boolean
           status?: string
           title?: string
           updated_at?: string

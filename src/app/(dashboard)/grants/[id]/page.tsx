@@ -196,6 +196,7 @@ export default async function GrantProjectPage({ params, searchParams }: { param
       status: r.status,
       claimLabel: r.claim_id ? (claimLabelById.get(r.claim_id) ?? null) : null,
       file: file ? { filename: file.filename, storagePath: file.storage_path } : null,
+      requiresUpload: r.requires_upload,
     };
   });
   const scheduleEntries = buildScheduleRows({
@@ -330,10 +331,12 @@ export default async function GrantProjectPage({ params, searchParams }: { param
             </div>
           </section>
 
-          <CollapsibleSection title="Documents demandés au client" badge={`(${documentRequestItems.length})`}>
+          <CollapsibleSection title="Tâches à faire pour le client" badge={`(${documentRequestItems.length})`}>
             <p className="text-xs text-neutral-500">
-              Demande un document précis (lettre, facture, preuve de paiement...) — visible et téléversable
-              depuis le portail du client, pour un dépôt de programme ou pour une réclamation précise.
+              Demande une tâche au client (fournir un document précis, ou simplement une action à confirmer) —
+              visible depuis son portail, pour un dépôt de programme ou pour une réclamation précise. Décoche
+              « Téléversement d&apos;un document requis » si le client n&apos;a qu&apos;à cocher la tâche
+              comme faite, sans fichier à fournir.
             </p>
             <div className="rounded-lg border border-neutral-200 bg-white p-4">
               <NewDocumentRequestForm

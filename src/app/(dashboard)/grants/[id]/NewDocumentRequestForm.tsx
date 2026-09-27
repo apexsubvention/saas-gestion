@@ -37,7 +37,7 @@ export function NewDocumentRequestForm({
           name="title"
           type="text"
           required
-          placeholder="Ex. Lettre d'acceptation signée"
+          placeholder="Ex. Lettre d'acceptation signée, ou Signer et retourner la convention"
           className="w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
         />
       </div>
@@ -75,6 +75,18 @@ export function NewDocumentRequestForm({
           placeholder="Précisions facultatives"
           className="w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
         />
+      </div>
+      <div className="flex items-center gap-1.5 pb-1.5">
+        <input
+          id="requires_upload"
+          name="requires_upload"
+          type="checkbox"
+          defaultChecked
+          className="h-4 w-4 rounded border-neutral-300"
+        />
+        <label htmlFor="requires_upload" className="text-sm text-neutral-700">
+          Téléversement d&apos;un document requis
+        </label>
       </div>
       <SubmitButton />
       {state.error && <p className="w-full text-sm text-red-600">{state.error}</p>}

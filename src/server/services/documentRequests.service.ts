@@ -23,6 +23,7 @@ export function documentRequestsService(supabase: SupabaseClient) {
         title: string;
         instructions?: string | null;
         due_date?: string | null;
+        requires_upload?: boolean;
       }
     ) {
       const title = input.title.trim();
@@ -39,6 +40,8 @@ export function documentRequestsService(supabase: SupabaseClient) {
         due_date: input.due_date || null,
         status: "requested",
         visible_in_client_portal: true,
+        // 0067 -- défaut true (téléversement requis) si non précisé : comportement inchangé.
+        requires_upload: input.requires_upload ?? true,
         requested_at: new Date().toISOString(),
       });
     },

@@ -20,6 +20,7 @@ import {
   grantProjectStatusBadgeClass,
 } from "@/features/grants/constants";
 import { DocumentRequestUpload } from "./DocumentRequestUpload";
+import { PortalTaskDoneButton } from "./PortalTaskDoneButton";
 import { InstallmentInvoiceUpload } from "./InstallmentInvoiceUpload";
 import { PortalNotes } from "./PortalNotes";
 import { PortalSupplierInvoices } from "./PortalSupplierInvoices";
@@ -81,9 +82,15 @@ function DocumentRequestItem({ request }: { request: PortalDocumentRequestView }
       {request.instructions && <p className="mt-1 text-xs text-neutral-500">{request.instructions}</p>}
       {request.dueDate && <p className="mt-1 text-xs text-neutral-500">Échéance : {formatDate(request.dueDate)}</p>}
       {UPLOADABLE_STATUSES.includes(request.status) ? (
-        <DocumentRequestUpload requestId={request.id} filename={request.filename} />
+        request.requiresUpload ? (
+          <DocumentRequestUpload requestId={request.id} filename={request.filename} />
+        ) : (
+          <PortalTaskDoneButton requestId={request.id} />
+        )
+      ) : request.filename ? (
+        <p className="mt-2 text-xs text-emerald-700">Reçu : {request.filename}</p>
       ) : (
-        request.filename && <p className="mt-2 text-xs text-emerald-700">Reçu : {request.filename}</p>
+        !request.requiresUpload && <p className="mt-2 text-xs text-emerald-700">Fait — en attente de validation.</p>
       )}
     </div>
   );
@@ -409,6 +416,22 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
               <p className="mt-1">{paymentDeadlineText}</p>
             </div>
           )}
+
+          {/* Tâches à faire pour le client (0067, Jade) -- juste sous le délai de paiement, avant
+              le reste des détails du dossier : c'est la première chose actionnable qu'il doit voir
+              en ouvrant un dossier. Anciennement « Documents demandés » -- pas chaque tâche
+              n'a besoin d'un fichier, voir requiresUpload sur DocumentRequestItem plus haut. */}
+          {dossier.documentRequests.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Tâches à faire</h3>
+              <div className="space-y-2">
+                {dossier.documentRequests.map((r) => (
+                  <DocumentRequestItem key={r.id} request={r} />
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
             <div>
               <p className="text-xs text-neutral-400">Début</p>
@@ -590,17 +613,6 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
                       <span className="text-neutral-700">{m.dueDate ? formatDate(m.dueDate) : "Date à confirmer"}</span>
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {dossier.documentRequests.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Documents demandés</h3>
-              <div className="space-y-2">
-                {dossier.documentRequests.map((r) => (
-                  <DocumentRequestItem key={r.id} request={r} />
                 ))}
               </div>
             </div>

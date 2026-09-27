@@ -22,6 +22,9 @@ export type DocumentRequestListItem = {
   status: string;
   claimLabel: string | null;
   file: { filename: string; storagePath: string } | null;
+  // 0067 -- Jade : « Documents demandés au client » devient « Tâches à faire pour le client » --
+  // ce n'est pas chaque tâche qui a besoin d'un fichier téléversé (ex. « signer la convention »).
+  requiresUpload: boolean;
 };
 
 // useFormStatus() ne lit l'état d'un <form> que depuis un composant ENFANT de ce
@@ -98,6 +101,11 @@ export function DocumentRequestsList({ grantProjectId, items }: { grantProjectId
             </p>
             <p className="text-xs text-neutral-500">
               {item.documentType}
+              {!item.requiresUpload && (
+                <span className="ml-2 rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-neutral-500">
+                  Sans document — à cocher
+                </span>
+              )}
               {item.dueDate && <span className="ml-2">Échéance : {new Date(item.dueDate).toLocaleDateString("fr-CA")}</span>}
               {item.instructions && <span className="ml-2">— {item.instructions}</span>}
             </p>
