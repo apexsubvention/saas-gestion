@@ -1,5 +1,6 @@
 import type { PortalDossier } from "@/server/services/portalDossiers.service";
 import { computePriorityBucket } from "@/features/schedule/priority";
+import { computeSubsidy } from "@/features/grants/subsidyMath";
 
 // Ordre de priorité demandé par Jade pour "Mes dossiers" : un dossier avec une
 // réclamation encore en attente (pas payée, pas refusée -- même définition que
@@ -77,15 +78,24 @@ export function collectUnpaidSupplierNames(dossier: PortalDossier): string[] {
   return Array.from(new Set(dossier.supplierInvoices.filter((inv) => inv.paymentStatus === "sent_unpaid").map((inv) => inv.supplierName)));
 }
 
-// Solde restant (0063, Jade) : ce qu'il reste de la subvention approuvée une fois les
-// réclamations déjà faites soustraites -- approved_amount une fois confirmé par le gouvernement,
-// sinon claimed_amount (déposée, pas encore confirmée) ; une réclamation refusée ne compte pour
-// rien. null tant que le montant approuvé du dossier lui-même est inconnu (jamais 0 inventé).
-// PARI CNRC (Jade) : pariBalanceRemaining (lu sur le rapport Historique DDR) prend toujours le
-// dessus -- même solde qu'affiché côté admin (encadré vert), jamais recalculé ici. Partagé entre
+// Solde restant -- 0072, Jade : « cela doit donc aussi se mettre à jour dans le portail client »,
+// suite au même correctif côté admin (grants/[id]/page.tsx). Même logique EXACTE que là-bas :
+// subsidy.remaining (taux x dépenses déjà facturées, plafonné au maximum) dès que le calcul de
+// subvention est possible (taux ET montant maximal connus) -- bouge dès qu'une facture est
+// ajoutée (dossier.spent, ledger.spent), sans attendre une réclamation formelle. Repli sur
+// l'ancien calcul (approuvé - réclamé) seulement quand ce calcul n'est pas encore possible.
+// PARI CNRC : pariBalanceRemaining (lu sur le rapport Historique DDR) prend toujours le dessus --
+// même solde qu'affiché côté admin (encadré vert), jamais recalculé ici. Partagé entre
 // DossierCard.tsx (solde par dossier) et page.tsx (0071, cumul sur tous les dossiers).
 export function remainingBalanceFor(dossier: PortalDossier): number | null {
   if (dossier.isPariProgram) return dossier.pariBalanceRemaining;
+  const subsidy = computeSubsidy({
+    rate: dossier.grantRate,
+    maxSubsidy: dossier.approvedGrantAmount,
+    totalProjectCost: dossier.totalProjectCost,
+    spent: dossier.spent,
+  });
+  if (subsidy.ready) return subsidy.remaining;
   if (dossier.approvedGrantAmount == null) return null;
   const claimedSoFar = dossier.claims
     .filter((c) => c.status !== "rejected")

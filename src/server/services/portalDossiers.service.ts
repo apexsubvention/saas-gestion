@@ -167,6 +167,12 @@ export type PortalDossier = {
   // renseignée) l'emporte sur la fiche du dossier, comme resolveSubsidyInputs côté interne.
   totalProjectCost: number | null;
   grantRate: number | null;
+  // Dépenses déjà facturées (ledger.spent, même supplierLedgerService que côté admin) -- 0072,
+  // Jade : « ça doit se mettre à jour dans le portail client » aussi -- nécessaire pour que
+  // dossierPriority.ts#remainingBalanceFor calcule EXACTEMENT le même "Solde restant" que
+  // grants/[id]/page.tsx (subsidy.remaining), qui bouge dès qu'une facture est ajoutée plutôt que
+  // d'attendre une réclamation formelle.
+  spent: number;
   // PARI CNRC/IRAP (0065) -- même détection que côté admin (isPariCnrcProgram sur le nom du
   // programme). Utilisé par DossierCard.tsx pour : (1) afficher le même "Solde restant" que le
   // portail admin (pariBalanceRemaining, lu directement sur le rapport Historique DDR -- jamais
@@ -411,6 +417,7 @@ export function portalDossiersService(supabase: SupabaseClient) {
             approvedGrantAmount: p.approved_grant_amount ?? agreement?.grant_amount ?? null,
             totalProjectCost: p.total_project_cost,
             grantRate: p.grant_rate ?? agreement?.grant_rate ?? null,
+            spent: ledger.spent,
             isPariProgram,
             pariBalanceRemaining: p.pari_balance_remaining ?? null,
             billingDeadline: agreement?.project_end ?? p.official_end_date,
