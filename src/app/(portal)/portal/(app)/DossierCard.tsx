@@ -28,7 +28,7 @@ import { computeSubsidy } from "@/features/grants/subsidyMath";
 import { buildBillingNarrative, buildBillerSentence } from "@/features/billing/billingSummary";
 import { computePaymentDeadline, paymentDeadlineAlertText } from "@/features/billing/paymentDeadline";
 import { PortalOpenDocumentButton } from "./PortalOpenDocumentButton";
-import { nextClaimDueSoon, collectToProvideTitles, collectUnpaidSupplierNames } from "./dossierPriority";
+import { nextClaimDueSoon, collectToProvideTitles, collectUnpaidSupplierNames, remainingBalanceFor } from "./dossierPriority";
 
 // Un document demandé se réaffiche avec son formulaire de téléversement tant qu'il
 // n'est pas validé par le personnel -- "issue" (problème signalé) permet donc bien de
@@ -252,24 +252,9 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
     paymentDeadlineDaysAfterEnd: dossier.paymentDeadlineDaysAfterEnd,
   });
   const paymentDeadlineText = paymentDeadlineAlertText(paymentDeadline, dossier.paymentDeadlineDaysAfterEnd);
-  // Solde restant (0063, Jade) : ce qu'il reste de la subvention approuvée une fois les
-  // réclamations déjà faites soustraites -- approved_amount une fois confirmé par le
-  // gouvernement, sinon claimed_amount (déposée, pas encore confirmée) ; une réclamation refusée
-  // ne compte pour rien. null tant que le montant approuvé du dossier lui-même est inconnu.
-  // PARI CNRC (Jade) : ce calcul ne s'applique pas -- un DDR déjà accepté par le programme n'a
-  // jamais de réclamation formelle liée dans Apex (claims reste vide), donc claimedSoFar resterait
-  // à 0 et le solde afficherait le montant approuvé au complet, différent du portail admin. Le
-  // portail client doit montrer EXACTEMENT le même solde que l'admin (encadré vert) -- voir
-  // grants/[id]/page.tsx -- donc pariBalanceRemaining (même source, lue sur le rapport Historique
-  // DDR) prend toujours le dessus pour un dossier PARI, jamais recalculé ici.
-  const claimedSoFar = dossier.claims
-    .filter((c) => c.status !== "rejected")
-    .reduce((sum, c) => sum + (c.approved_amount ?? c.claimed_amount ?? 0), 0);
-  const remainingBalance = dossier.isPariProgram
-    ? dossier.pariBalanceRemaining
-    : dossier.approvedGrantAmount != null
-      ? Math.max(0, dossier.approvedGrantAmount - claimedSoFar)
-      : null;
+  // Solde restant (0063) -- voir dossierPriority.ts#remainingBalanceFor, partagé avec le cumul
+  // global de la page d'accueil du portail (0071).
+  const remainingBalance = remainingBalanceFor(dossier);
   // Titres des documents/pièces encore à fournir -- mêmes filtres que toProvideCount ci-dessous,
   // partagés avec le résumé global (0070) affiché maintenant en haut de la page d'accueil du
   // portail plutôt qu'ici, voir page.tsx et dossierPriority.ts#collectToProvideTitles.

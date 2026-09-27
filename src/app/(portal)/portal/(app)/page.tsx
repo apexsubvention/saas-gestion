@@ -4,7 +4,7 @@ import { projectSuppliersService } from "@/server/services/projectSuppliers.serv
 import { portalDossiersService } from "@/server/services/portalDossiers.service";
 import { DossiersList } from "./DossiersList";
 import { SupplierDossierCard, type SupplierBillingRow } from "./SupplierDossierCard";
-import { collectToProvideTitles, collectUnpaidSupplierNames, nextClaimDueSoon } from "./dossierPriority";
+import { collectToProvideTitles, collectUnpaidSupplierNames, nextClaimDueSoon, remainingBalanceFor } from "./dossierPriority";
 
 // Page d'accueil du portail : « Mes dossiers » -- pour chaque dossier accessible à ce
 // compte (le sien, et ceux de ses clients enfants s'il en a -- hiérarchie, cf. 0028),
@@ -32,6 +32,10 @@ const OBTAINED_PROJECT_STATUSES = ["approved", "awaiting_claim", "completed"];
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("fr-CA");
+}
+
+function formatAmount(amount: number): string {
+  return `${amount.toLocaleString("fr-CA", { minimumFractionDigits: 2 })} $`;
 }
 
 type SummaryLine = { dossierName: string; text: string };
@@ -91,6 +95,15 @@ export default async function PortalHomePage() {
     return [{ dossierName: dossierLabel(d, ctx.clientId), text: `« ${claim.title} »${overdue ? " — en retard" : ""} : échéance le ${formatDate(claim.dueDate)}` }];
   });
 
+  // Cumul de l'aide qu'il reste à recevoir (0071, Jade) -- somme de remainingBalanceFor sur tous
+  // les dossiers accessibles, encadré vert sous le Résumé (même famille de couleur que "Solde
+  // restant PARI" côté admin/PariBalance.tsx). null (dossier sans montant approuvé connu) ne
+  // compte pour rien plutôt que d'être traité comme 0 -- jamais de sous-évaluation silencieuse ;
+  // l'encadré ne s'affiche que si AU MOINS un dossier a un solde connu, sinon ce serait un 0 $
+  // trompeur alors qu'Apex ne connaît simplement encore le montant approuvé d'aucun dossier.
+  const knownBalances = dossiers.map((d) => remainingBalanceFor(d)).filter((b): b is number => b != null);
+  const totalRemaining = knownBalances.reduce((sum, b) => sum + b, 0);
+
   return (
     <div className="space-y-8">
       <div>
@@ -139,6 +152,21 @@ export default async function PortalHomePage() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {knownBalances.length > 0 && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">
+            Cumul de l&apos;aide qu&apos;il reste à recevoir
+          </p>
+          <p className="mt-1 text-xl font-semibold text-emerald-900">{formatAmount(totalRemaining)}</p>
+          {knownBalances.length < dossiers.length && (
+            <p className="mt-1 text-xs text-emerald-700">
+              Calculé sur {knownBalances.length} dossier{knownBalances.length > 1 ? "s" : ""} sur {dossiers.length} -- montant approuvé
+              pas encore connu pour le{dossiers.length - knownBalances.length > 1 ? "s" : ""} autre{dossiers.length - knownBalances.length > 1 ? "s" : ""}.
+            </p>
+          )}
         </div>
       )}
 

@@ -77,6 +77,22 @@ export function collectUnpaidSupplierNames(dossier: PortalDossier): string[] {
   return Array.from(new Set(dossier.supplierInvoices.filter((inv) => inv.paymentStatus === "sent_unpaid").map((inv) => inv.supplierName)));
 }
 
+// Solde restant (0063, Jade) : ce qu'il reste de la subvention approuvée une fois les
+// réclamations déjà faites soustraites -- approved_amount une fois confirmé par le gouvernement,
+// sinon claimed_amount (déposée, pas encore confirmée) ; une réclamation refusée ne compte pour
+// rien. null tant que le montant approuvé du dossier lui-même est inconnu (jamais 0 inventé).
+// PARI CNRC (Jade) : pariBalanceRemaining (lu sur le rapport Historique DDR) prend toujours le
+// dessus -- même solde qu'affiché côté admin (encadré vert), jamais recalculé ici. Partagé entre
+// DossierCard.tsx (solde par dossier) et page.tsx (0071, cumul sur tous les dossiers).
+export function remainingBalanceFor(dossier: PortalDossier): number | null {
+  if (dossier.isPariProgram) return dossier.pariBalanceRemaining;
+  if (dossier.approvedGrantAmount == null) return null;
+  const claimedSoFar = dossier.claims
+    .filter((c) => c.status !== "rejected")
+    .reduce((sum, c) => sum + (c.approved_amount ?? c.claimed_amount ?? 0), 0);
+  return Math.max(0, dossier.approvedGrantAmount - claimedSoFar);
+}
+
 export type DossierPriority = { hasPendingClaim: boolean; nextClaimDueDate: string | null };
 
 export function computeDossierPriority(dossier: PortalDossier): DossierPriority {
