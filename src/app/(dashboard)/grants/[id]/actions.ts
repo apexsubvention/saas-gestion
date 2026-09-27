@@ -162,6 +162,11 @@ async function analyzeUploadedDdrReport(
         parts.push(`DDR ${extraction.ddr_number ?? "?"} lu : ${r.created.length} salarié(s) ajouté(s), montant réellement remboursé (après niveau de support) — ${createdLabel} — à vérifier.`);
       }
       if (r.skippedDuplicates.length > 0) parts.push(`${r.skippedDuplicates.join(", ")} : déjà enregistré(s) pour ce DDR, ignoré(s).`);
+      // Jade (0067) : « je ne peux pas sélectionner réclamer dans quel DDR » -- une réclamation
+      // "DDR {numéro}" est maintenant créée/retrouvée et liée automatiquement (statut "Déposée —
+      // en attente" -- jamais "Payée" sans confirmation), visible dans le menu « Réclamée dans » du
+      // tableau ci-dessous et dans la section Réclamations du portail client.
+      if (r.claimLinked) parts.push(`Réclamation « DDR ${extraction.ddr_number ?? "?"} » créée/mise à jour et liée (statut « Déposée — en attente » à ajuster au besoin).`);
     }
     if (extraction.claimed_amount_for_period != null) parts.push(`Montant rectifié réclamé pour la période (utilisé ci-dessus) : ${moneyCad(extraction.claimed_amount_for_period)}.`);
     if (extraction.financial_year_balance_remaining != null) {

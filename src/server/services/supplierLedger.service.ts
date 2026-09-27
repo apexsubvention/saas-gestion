@@ -3,6 +3,7 @@ import { projectSuppliersRepository, type ProjectSupplierRow } from "@/server/re
 import { expensesRepository, type ExpenseRow } from "@/server/repositories/expenses.repository";
 import { documentsRepository } from "@/server/repositories/documents.repository";
 import { billingLineItemsRepository } from "@/server/repositories/billingLineItems.repository";
+import { claimsRepository } from "@/server/repositories/claims.repository";
 import { matchSupplier } from "@/features/invoices/matchSupplier";
 import { amountBeforeTax, type InvoiceExtraction } from "@/features/invoices/analyzeInvoice";
 import { apportionCorrectedAmounts, type DdrExtraction } from "@/features/ddr/analyzeDdrReport";
@@ -78,6 +79,7 @@ export function supplierLedgerService(supabase: SupabaseClient) {
   const expensesRepo = expensesRepository(supabase);
   const documentsRepo = documentsRepository(supabase);
   const lineItemsRepo = billingLineItemsRepository(supabase);
+  const claimsRepo = claimsRepository(supabase);
 
   return {
     // `projectRate` (fraction) sert au calcul de repli de la subvention acceptée : budget x taux.
@@ -375,9 +377,10 @@ export function supplierLedgerService(supabase: SupabaseClient) {
       ddrNumber: string | null;
       created: Array<{ employeeName: string; supplierCreated: boolean; amount: number | null }>;
       skippedDuplicates: string[];
+      claimLinked: boolean;
     }> {
       if (x.employees.length === 0) {
-        return { status: "no_employees", ddrNumber: x.ddr_number, created: [], skippedDuplicates: [] };
+        return { status: "no_employees", ddrNumber: x.ddr_number, created: [], skippedDuplicates: [], claimLinked: false };
       }
       const allSuppliers = await suppliersRepo.listByProject(grantProjectId);
       const employeeSuppliers = allSuppliers.filter((s) => s.is_employee);
@@ -389,6 +392,33 @@ export function supplierLedgerService(supabase: SupabaseClient) {
       // entre les salariés listés -- pas le total brut de chacun. Calculé une fois pour tout le
       // rapport (la répartition dépend de l'ensemble des salariés) -- voir apportionCorrectedAmounts.
       const amounts = apportionCorrectedAmounts(x.employees, x.claimed_amount_for_period);
+
+      // Jade (0067) : « je ne peux pas sélectionner réclamer dans quel DDR » -- avant, un DDR
+      // téléversé créait des dépenses salariés MAIS aucune réclamation (claims) liée, contrairement
+      // à ce qu'elle avait fait à la main pour un autre dossier (une réclamation par DDR, chaque
+      // salarié lié via claim_expenses -- c'est ce lien qui fait apparaître le menu « Réclamée
+      // dans » dans ce tableau ET la section Réclamations du portail client). Reproduit maintenant
+      // automatiquement le même résultat pour CHAQUE dossier PARI, sans étape manuelle : une
+      // réclamation par numéro de DDR (retrouvée par claim_number si déjà créée -- idempotent sur
+      // un nouveau téléversement du même rapport), statut "submitted" (le rapport Historique DDR ne
+      // documente que des demandes DÉJÀ déposées -- jamais "paid" tant que Jade ne l'a pas confirmé
+      // elle-même, même philosophie que le statut "to_review" des dépenses ci-dessous).
+      let claimId: string | null = null;
+      if (x.ddr_number) {
+        const claimNumber = `DDR ${x.ddr_number}`;
+        const existingClaim = await claimsRepo.findByProjectAndNumber(grantProjectId, claimNumber);
+        const claim =
+          existingClaim ??
+          (await claimsRepo.create({
+            organization_id: organizationId,
+            grant_project_id: grantProjectId,
+            claim_number: claimNumber,
+            period_start: x.period_start,
+            period_end: x.period_end,
+            status: "submitted",
+          }));
+        claimId = claim.id;
+      }
 
       for (const [i, emp] of x.employees.entries()) {
         const name = emp.name ?? "Salarié à identifier";
@@ -436,9 +466,24 @@ export function supplierLedgerService(supabase: SupabaseClient) {
         });
         await documentsRepo.setInvoiceDocument(organizationId, expense.id, documentId);
         created.push({ employeeName: name, supplierCreated, amount });
+
+        if (claimId && amount != null) {
+          const { error: linkError } = await supabase
+            .from("claim_expenses")
+            .insert({ organization_id: organizationId, claim_id: claimId, expense_id: expense.id, claimed_amount: amount });
+          if (linkError) throw linkError;
+        }
       }
 
-      return { status: "recorded", ddrNumber: x.ddr_number, created, skippedDuplicates };
+      if (claimId && x.claimed_amount_for_period != null) {
+        // Montant rectifié réclamé (page 2 du rapport) directement, plutôt qu'une somme recalculée
+        // à partir des parts arrondies par employé (apportionCorrectedAmounts) -- exact, jamais de
+        // dérive d'un cent par arrondi cumulé.
+        const { error: claimUpdateError } = await supabase.from("claims").update({ claimed_amount: x.claimed_amount_for_period }).eq("id", claimId);
+        if (claimUpdateError) throw claimUpdateError;
+      }
+
+      return { status: "recorded", ddrNumber: x.ddr_number, created, skippedDuplicates, claimLinked: claimId != null };
     },
   };
 }

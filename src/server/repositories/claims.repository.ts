@@ -26,6 +26,22 @@ export function claimsRepository(supabase: SupabaseClient) {
       return data as ClaimRow[];
     },
 
+    // Jade (0067, PARI CNRC) : une réclamation par DDR, retrouvée par son claim_number avant d'en
+    // créer une nouvelle -- idempotent si le même rapport « Historique DDR » est retéléversé (pas
+    // de doublon), voir supplierLedger.service.ts#recordAnalyzedDdrReport. claim_number n'a pas de
+    // contrainte unique en base (saisie libre côté formulaire manuel existant), d'où cette
+    // recherche explicite plutôt qu'un upsert.
+    async findByProjectAndNumber(grantProjectId: string, claimNumber: string): Promise<ClaimRow | null> {
+      const { data, error } = await supabase
+        .from("claims")
+        .select("*")
+        .eq("grant_project_id", grantProjectId)
+        .eq("claim_number", claimNumber)
+        .maybeSingle();
+      if (error) throw error;
+      return (data as ClaimRow | null) ?? null;
+    },
+
     async create(input: {
       organization_id: string;
       grant_project_id: string;
