@@ -9,6 +9,7 @@ import {
 import { documentRequestsRepository, type DocumentRequestRow } from "@/server/repositories/documentRequests.repository";
 import { documentsRepository } from "@/server/repositories/documents.repository";
 import { milestonesRepository } from "@/server/repositories/milestones.repository";
+import { programsRepository } from "@/server/repositories/programs.repository";
 import { questionnaireService } from "@/server/services/questionnaire.service";
 import { dossierNotesService, type DossierNoteView } from "@/server/services/dossierNotes.service";
 import { programSnapshotService } from "@/server/services/programSnapshot.service";
@@ -198,6 +199,7 @@ export function portalDossiersService(supabase: SupabaseClient) {
   const documentRequests = documentRequestsRepository(supabase);
   const documents = documentsRepository(supabase);
   const milestones = milestonesRepository(supabase);
+  const programs = programsRepository(supabase);
   const questionnaire = questionnaireService(supabase);
   const notes = dossierNotesService(supabase);
   const snapshots = programSnapshotService(supabase);
@@ -231,6 +233,17 @@ export function portalDossiersService(supabase: SupabaseClient) {
       const projects = allProjects
         .filter((p) => !HIDDEN_PROJECT_STATUSES.includes(p.status))
         .filter((p) => !p.hidden_from_parent_portal || p.client_id === viewerClientId);
+
+      // Nom du programme pour le portail (0063 -- bug trouvé, Jade : « on ne voit toujours pas le
+      // titre des programmes ») : p.grant_programs?.name ci-dessous vient d'une jointure qui suit
+      // grant_programs_select (0033) -- un compte portail ne peut lire un programme QUE s'il lui a
+      // été "envoyé" via la veille, jamais parce qu'il a un dossier réel dessus, donc le nom
+      // revient silencieusement null pour la quasi-totalité des dossiers. programsRepository
+      // .listNamesForPortal (fonction RPC dédiée, vérifie l'accès via can_access_grant_project)
+      // le résout correctement -- un seul aller-retour pour tous les dossiers de ce compte.
+      const programNameById = new Map(
+        (await programs.listNamesForPortal(Array.from(new Set(projects.map((p) => p.program_id))))).map((row) => [row.id, row.name])
+      );
 
       const dossiers = await Promise.all(
         projects.map(async (p): Promise<PortalDossier> => {
@@ -366,7 +379,7 @@ export function portalDossiersService(supabase: SupabaseClient) {
             name: p.name,
             clientId: p.client_id,
             clientName: p.clients?.name ?? null,
-            programName: p.grant_programs?.name ?? null,
+            programName: programNameById.get(p.program_id) ?? p.grant_programs?.name ?? null,
             status: p.status,
             statusLabel: GRANT_PROJECT_STATUS_LABELS[p.status] ?? p.status,
             // Jade : une fois une convention lue/saisie (grant_agreements), Début/Fin/Montant

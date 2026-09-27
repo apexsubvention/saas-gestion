@@ -38,7 +38,9 @@ function normalize(s: string): string {
   return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 }
 
-const STATUS_COLUMNS = ["draft", "pending_approval", "approved", "awaiting_claim", "completed"] as const;
+// Approuvé — en attente de réclamation en premier (0064, Jade : « c'est là qu'ils vont en avoir
+// le plus »), avant même "À rédiger" qui ouvrait la liste jusqu'ici.
+const STATUS_COLUMNS = ["awaiting_claim", "draft", "pending_approval", "approved", "completed"] as const;
 
 function StatusBoard({ dossiers, currentOrgUserId }: { dossiers: PortalDossier[]; currentOrgUserId: string | null }) {
   const columns = new Map<string, PortalDossier[]>();
@@ -123,25 +125,32 @@ export function DossiersList({
 
       {hasChildClientDossiers ? (
         <div className="space-y-4">
-          <div className="flex gap-1 border-b border-neutral-200">
-            <button
-              type="button"
-              onClick={() => setActiveTab("own")}
-              className={`border-b-2 px-3 py-2 text-sm font-medium transition ${
-                activeTab === "own" ? "border-neutral-900 text-neutral-900" : "border-transparent text-neutral-400 hover:text-neutral-600"
-              }`}
-            >
-              Tes dossiers <span className="font-normal">({own.length})</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("clients")}
-              className={`border-b-2 px-3 py-2 text-sm font-medium transition ${
-                activeTab === "clients" ? "border-neutral-900 text-neutral-900" : "border-transparent text-neutral-400 hover:text-neutral-600"
-              }`}
-            >
-              Dossiers de tes clients <span className="font-normal">({forClients.length})</span>
-            </button>
+          {/* Bascule très visible entre les deux tableaux (0064, Jade : « c'est pas assez en
+              évidence... j'aimerais qu'on voit qu'il y en a deux qui existent ») -- un vrai
+              interrupteur à deux positions (fond, ombre sur l'onglet actif) plutôt que de
+              simples onglets discrets soulignés. */}
+          <div>
+            <p className="mb-1.5 text-xs font-medium text-neutral-500">Affichage</p>
+            <div className="inline-flex rounded-lg bg-neutral-100 p-1">
+              <button
+                type="button"
+                onClick={() => setActiveTab("own")}
+                className={`rounded-md px-4 py-2 text-sm font-semibold transition ${
+                  activeTab === "own" ? "bg-white text-neutral-900 shadow-sm" : "text-neutral-500 hover:text-neutral-700"
+                }`}
+              >
+                Tes dossiers <span className="font-normal">({own.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("clients")}
+                className={`rounded-md px-4 py-2 text-sm font-semibold transition ${
+                  activeTab === "clients" ? "bg-white text-neutral-900 shadow-sm" : "text-neutral-500 hover:text-neutral-700"
+                }`}
+              >
+                Dossiers de tes clients <span className="font-normal">({forClients.length})</span>
+              </button>
+            </div>
           </div>
 
           {activeTab === "own" ? (

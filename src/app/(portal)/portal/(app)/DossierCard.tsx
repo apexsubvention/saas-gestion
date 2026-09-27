@@ -487,28 +487,36 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
             ) : (
               <p className="text-sm text-neutral-400">Aucune réclamation pour l&apos;instant.</p>
             )}
-            {/* Réclamations à venir (0063, Jade : « on voit payé, mais pas celles à venir avec les
-                dates ») -- des échéances (milestones.type='claim'), pas encore de vraie
-                réclamation créée. "estimée" = suggérée depuis la convention, pas confirmée. */}
-            {dossier.upcomingClaims.length > 0 && (
-              <div className="space-y-2 border-t border-neutral-100 pt-2">
-                <p className="text-xs font-medium text-neutral-500">Réclamations à venir</p>
+          </div>
+
+          {/* Réclamations à venir (0063, Jade : « on voit payé, mais pas celles à venir avec les
+              dates ») -- des échéances (milestones.type='claim'), pas encore de vraie réclamation
+              créée. "estimée" = suggérée depuis la convention, pas confirmée. Section à part
+              entière, même poids visuel que "Réclamations" ci-dessus (0064, Jade : « c'est pas
+              évident de voir la portion réclamation à venir ») -- plus une note discrète greffée
+              dessous. */}
+          {dossier.upcomingClaims.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Réclamations à venir</h3>
+              <div className="space-y-2">
                 {dossier.upcomingClaims.map((m) => (
-                  <div key={m.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-dashed border-neutral-200 p-2 text-xs">
-                    <span className="text-neutral-700">
-                      {m.title}
-                      {m.estimated && (
-                        <span className="ml-2 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-700">
-                          estimée
-                        </span>
-                      )}
-                    </span>
-                    <span className="text-neutral-500">{m.dueDate ? formatDate(m.dueDate) : "Date à confirmer"}</span>
+                  <div key={m.id} className="rounded-md border border-indigo-100 bg-indigo-50/40 p-3 text-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-medium text-neutral-900">
+                        {m.title}
+                        {m.estimated && (
+                          <span className="ml-2 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-700">
+                            estimée
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-neutral-700">{m.dueDate ? formatDate(m.dueDate) : "Date à confirmer"}</span>
+                    </div>
                   </div>
                 ))}
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {dossier.documentRequests.length > 0 && (
             <div className="space-y-2">

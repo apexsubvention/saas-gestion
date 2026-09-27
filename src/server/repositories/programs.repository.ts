@@ -74,5 +74,19 @@ export function programsRepository(supabase: SupabaseClient) {
       if (error) throw error;
       return data as ProgramRow;
     },
+
+    // Pour le portail client SEULEMENT (0063) : grant_programs_select (0033) ne laisse un compte
+    // portail lire une ligne grant_programs que si elle lui a été explicitement "envoyée" via la
+    // veille -- jamais parce qu'il a un dossier réel sur ce programme (bug trouvé -- voir
+    // portalDossiers.service.ts). Passe par une fonction RPC security definer qui vérifie l'accès
+    // via can_access_grant_project puis ne renvoie QUE le nom, jamais le reste de la ligne
+    // (internal_notes, claim_process, etc. -- jamais destinés au client) -- même principe que
+    // portal_supplier_dossier_view (0047, projectSuppliers.repository.ts).
+    async listNamesForPortal(programIds: string[]): Promise<Array<{ id: string; name: string }>> {
+      if (programIds.length === 0) return [];
+      const { data, error } = await supabase.rpc("portal_program_names", { p_program_ids: programIds });
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; name: string }>;
+    },
   };
 }
