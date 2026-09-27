@@ -1,11 +1,16 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-// Notifications INTERNES (personnel -> personnel). Écriture « best effort » et SANS `.select()` : seul le
-// destinataire peut lire sa notification (RLS), donc un RETURNING serait refusé pour l'expéditeur.
+// Notifications INTERNES, toujours pour un membre du PERSONNEL -- déclenchées par une action du
+// personnel (personnel -> personnel) ou, depuis 0066 (Jade : « m'avertir quand la facture est
+// payée »), par une action du CLIENT côté portail (portail -> personnel, ex. invoice_paid) ; dans
+// ce dernier cas l'appelant doit passer le client ADMIN (service role) -- notifications_insert_staff
+// (0038) exige is_org_staff(organization_id), qu'un compte portail (rôle 'client') ne remplit
+// jamais. Écriture « best effort » et SANS `.select()` : seul le destinataire peut lire sa
+// notification (RLS), donc un RETURNING serait refusé pour l'expéditeur.
 
-type Ctx = { organizationId: string; organizationUserId: string };
+type Ctx = { organizationId: string; organizationUserId: string | null };
 
-export type NotificationType = "task_assigned" | "ai_review" | "general" | "deadline" | "claim_due" | "opportunity_interest";
+export type NotificationType = "task_assigned" | "ai_review" | "general" | "deadline" | "claim_due" | "opportunity_interest" | "invoice_paid";
 
 export type NotificationRow = {
   id: string;

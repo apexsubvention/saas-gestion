@@ -18,6 +18,7 @@ const TYPE_LABELS: Record<string, string> = {
   client_followup: "Suivi client",
   meeting_task: "Réunion",
   opportunity_interest: "Intérêt client",
+  invoice_paid: "Facture payée",
 };
 
 export default async function NotificationsPage() {

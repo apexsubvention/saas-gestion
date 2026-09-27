@@ -8,8 +8,42 @@ import { formatCaughtError } from "@/lib/errors";
 import { logDossierEvent } from "@/server/services/audit";
 import { billingInstallmentsService } from "@/server/services/billingInstallments.service";
 import { supplierLedgerService } from "@/server/services/supplierLedger.service";
+import { notifyUser } from "@/server/services/notifications.service";
 
 const BUCKET = "apex-documents";
+
+// Jade (0066) : « ajouter un notif pour m'avertir quand la facture est payée » -- déclenché
+// seulement quand le CLIENT (portail) marque une facture payée, jamais quand le personnel le fait
+// lui-même en interne (supplierActions.ts -- il le sait déjà, il vient de le faire). Notifie le
+// propriétaire du dossier (owner_id), même mécanisme que "Convention lue"/"tâche assignée" --
+// visible dans la cloche de notifications du personnel, avant même d'ouvrir le dossier concerné.
+// `admin` (service role) obligatoire : notifications_insert_staff (0038) exige
+// is_org_staff(organization_id), qu'un compte portail (rôle 'client') ne remplit jamais -- voir
+// notifications.service.ts.
+async function notifyInvoicePaid(
+  admin: ReturnType<typeof createAdminClient>,
+  ctx: { organizationId: string; organizationUserId: string | null; clientName: string },
+  expense: { id: string; grant_project_id: string; supplier_id: string | null; total: number | null; subtotal: number | null }
+): Promise<void> {
+  const [{ data: project }, { data: supplier }] = await Promise.all([
+    admin.from("grant_projects").select("name, owner_id").eq("id", expense.grant_project_id).maybeSingle(),
+    expense.supplier_id
+      ? admin.from("project_suppliers").select("name").eq("id", expense.supplier_id).maybeSingle()
+      : Promise.resolve({ data: null as { name: string } | null }),
+  ]);
+  const projectRow = project as { name: string; owner_id: string | null } | null;
+  const supplierName = (supplier as { name: string } | null)?.name ?? null;
+  const amount = expense.total ?? expense.subtotal;
+  const amountText = amount != null ? ` (${Number(amount).toLocaleString("fr-CA", { style: "currency", currency: "CAD" })})` : "";
+  await notifyUser(admin, { organizationId: ctx.organizationId, organizationUserId: ctx.organizationUserId }, {
+    userId: projectRow?.owner_id ?? null,
+    type: "invoice_paid",
+    message: `Facture${supplierName ? ` de ${supplierName}` : ""} marquée payée par ${ctx.clientName}${amountText} — ${projectRow?.name ?? "dossier"}.`,
+    href: `/grants/${expense.grant_project_id}`,
+    entity_type: "expense",
+    entity_id: expense.id,
+  });
+}
 
 export type PortalUploadFormState = { error: string | null };
 
@@ -268,18 +302,19 @@ export async function updatePortalInvoicePaymentStatusAction(expenseId: string, 
   const supabase = await createClient();
   const { data: expense, error: findError } = await supabase
     .from("expenses")
-    .select("id, organization_id, grant_project_id")
+    .select("id, organization_id, grant_project_id, supplier_id, total, subtotal, payment_status")
     .eq("id", expenseId)
     .maybeSingle();
   if (findError || !expense) {
     return { error: "Facture introuvable ou accès refusé." };
   }
+  const expenseRow = expense as { id: string; grant_project_id: string; supplier_id: string | null; total: number | null; subtotal: number | null; payment_status: string };
 
   const admin = createAdminClient();
   try {
     await supplierLedgerService(admin).updatePaymentStatus(expenseId, status, ctx.organizationUserId);
     await logDossierEvent(admin, { organizationId: ctx.organizationId, organizationUserId: ctx.organizationUserId ?? "" }, {
-      grant_project_id: (expense as { grant_project_id: string }).grant_project_id,
+      grant_project_id: expenseRow.grant_project_id,
       client_id: ctx.clientId,
       kind: "invoice_payment_status_changed_portal",
       title: status === "paid" ? "Facture marquée payée par le client" : "Facture remise à « envoyée, non payée » par le client",
@@ -287,6 +322,11 @@ export async function updatePortalInvoicePaymentStatusAction(expenseId: string, 
       ref_type: "expense",
       ref_id: expenseId,
     });
+    // Notif (0066) : seulement sur la vraie transition vers "payée" -- pas si c'était déjà le cas
+    // (re-choisir la même option ne doit pas renotifier), jamais sur le retour à "non payée".
+    if (status === "paid" && expenseRow.payment_status !== "paid") {
+      await notifyInvoicePaid(admin, { organizationId: ctx.organizationId, organizationUserId: ctx.organizationUserId, clientName: ctx.clientName }, expenseRow);
+    }
   } catch (e) {
     return { error: formatCaughtError(e) };
   }
@@ -313,13 +353,22 @@ export async function uploadInvoicePaymentProofAction(
   const supabase = await createClient();
   const { data: expense, error: findError } = await supabase
     .from("expenses")
-    .select("id, organization_id, grant_project_id, grant_projects(client_id)")
+    .select("id, organization_id, grant_project_id, supplier_id, total, subtotal, payment_status, grant_projects(client_id)")
     .eq("id", expenseId)
     .maybeSingle();
   if (findError || !expense) {
     return { error: "Facture introuvable ou accès refusé." };
   }
-  const row = expense as unknown as { organization_id: string; grant_project_id: string; grant_projects: { client_id: string } | null };
+  const row = expense as unknown as {
+    id: string;
+    organization_id: string;
+    grant_project_id: string;
+    supplier_id: string | null;
+    total: number | null;
+    subtotal: number | null;
+    payment_status: string;
+    grant_projects: { client_id: string } | null;
+  };
   const clientId = row.grant_projects?.client_id;
   if (!clientId) {
     return { error: "Dossier introuvable." };
@@ -355,6 +404,11 @@ export async function uploadInvoicePaymentProofAction(
     const ledger = supplierLedgerService(admin);
     await ledger.setPaymentProof(row.organization_id, expenseId, (doc as { id: string }).id);
     await ledger.updatePaymentStatus(expenseId, "paid", ctx.organizationUserId);
+    // Notif (0066) : même garde que updatePortalInvoicePaymentStatusAction -- seulement sur la
+    // vraie transition vers "payée" (une preuve reçue pour une facture déjà "payée" ne renotifie pas).
+    if (row.payment_status !== "paid") {
+      await notifyInvoicePaid(admin, { organizationId: row.organization_id, organizationUserId: ctx.organizationUserId, clientName: ctx.clientName }, row);
+    }
 
     await logDossierEvent(admin, { organizationId: row.organization_id, organizationUserId: ctx.organizationUserId ?? "" }, {
       grant_project_id: row.grant_project_id,
