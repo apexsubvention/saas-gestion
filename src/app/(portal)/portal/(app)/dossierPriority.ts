@@ -1,4 +1,5 @@
 import type { PortalDossier } from "@/server/services/portalDossiers.service";
+import { computePriorityBucket } from "@/features/schedule/priority";
 
 // Ordre de priorité demandé par Jade pour "Mes dossiers" : un dossier avec une
 // réclamation encore en attente (pas payée, pas refusée -- même définition que
@@ -7,6 +8,34 @@ import type { PortalDossier } from "@/server/services/portalDossiers.service";
 // échéance de réclamation (due_date) passe en premier. Purement côté affichage -- aucune
 // requête supplémentaire, les réclamations sont déjà chargées avec chaque dossier.
 const PENDING_CLAIM_STATUSES_EXCLUDED = ["paid", "rejected"];
+
+// Statuts d'une réclamation AVANT son dépôt -- une fois déposée (submitted et après), plus
+// besoin d'attirer l'attention sur SA date limite de dépôt (0065, voir hasClaimDueSoon
+// ci-dessous) : le reste de son cycle de vie (analyse, paiement) ne dépend plus d'une action
+// urgente du client/personnel sur une échéance de dépôt.
+const PRE_SUBMISSION_CLAIM_STATUSES = ["planned", "preparing", "missing_documents", "ready"];
+
+// Jade (0065) : sur la vignette du portail, signaler clairement « tu as quelque chose à faire »
+// quand une réclamation (déjà créée OU seulement suggérée par l'entente, pas encore déposée)
+// arrive à échéance dans les 7 prochains jours ou est déjà en retard -- même seuil que
+// l'échéancier interne (computePriorityBucket : "overdue"/"this_week"). Se referme tout seul dès
+// que le personnel avance le statut de la réclamation (ClaimStatusSelect -> "Déposée — en
+// attente" ou plus loin) ou marque l'échéance suggérée comme terminée/annulée
+// (MilestoneStatusSelect) -- aucun nouveau mécanisme d'acquittement nécessaire, ces deux
+// contrôles existent déjà côté admin.
+export function hasClaimDueSoon(dossier: PortalDossier): boolean {
+  const claimSoon = dossier.claims.some((c) => {
+    if (!PRE_SUBMISSION_CLAIM_STATUSES.includes(c.status)) return false;
+    const bucket = computePriorityBucket(c.due_date, false);
+    return bucket === "overdue" || bucket === "this_week";
+  });
+  if (claimSoon) return true;
+
+  return dossier.upcomingClaims.some((m) => {
+    const bucket = computePriorityBucket(m.dueDate, false);
+    return bucket === "overdue" || bucket === "this_week";
+  });
+}
 
 export type DossierPriority = { hasPendingClaim: boolean; nextClaimDueDate: string | null };
 

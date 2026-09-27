@@ -29,6 +29,7 @@
 // demande de Jade -- le code (service, actions, composant) reste en place pour une réactivation
 // éventuelle, seul l'appel depuis ce fichier a été enlevé.
 import { useMemo, useState } from "react";
+import { User, Users } from "lucide-react";
 import type { PortalDossier } from "@/server/services/portalDossiers.service";
 import { GRANT_PROJECT_STATUS_LABELS, grantProjectStatusBadgeClass } from "@/features/grants/constants";
 import { DossierCard } from "./DossierCard";
@@ -40,12 +41,22 @@ function normalize(s: string): string {
 
 // Approuvé — en attente de réclamation en premier (0064, Jade : « c'est là qu'ils vont en avoir
 // le plus »), avant même "À rédiger" qui ouvrait la liste jusqu'ici.
-const STATUS_COLUMNS = ["awaiting_claim", "draft", "pending_approval", "approved", "completed"] as const;
+// 0065 (Jade) : la colonne "Approuvé" (seul, sans encore attendre de réclamation) ne sert jamais
+// en pratique -- un dossier bascule directement à "Approuvé — en attente de réclamation" --
+// retirée du tableau. On FUSIONNE plutôt que de simplement retirer le statut de la liste : un
+// dossier resté malgré tout au statut "approved" (cas limite) continue d'apparaître, regroupé
+// dans la colonne "Approuvé — en attente de réclamation", au lieu de disparaître silencieusement
+// du portail -- voir columnKeyFor ci-dessous.
+const STATUS_COLUMNS = ["awaiting_claim", "draft", "pending_approval", "completed"] as const;
+
+function columnKeyFor(status: string): string {
+  return status === "approved" ? "awaiting_claim" : status;
+}
 
 function StatusBoard({ dossiers, currentOrgUserId }: { dossiers: PortalDossier[]; currentOrgUserId: string | null }) {
   const columns = new Map<string, PortalDossier[]>();
   for (const status of STATUS_COLUMNS) columns.set(status, []);
-  for (const d of dossiers) columns.get(d.status)?.push(d);
+  for (const d of dossiers) columns.get(columnKeyFor(d.status))?.push(d);
   // Dans chaque colonne, le dossier le plus urgent (réclamation en attente, échéance la plus
   // proche) en premier -- même logique de priorité que l'ancienne vue liste unique
   // (dossierPriority.ts), maintenant appliquée à l'intérieur de chaque colonne de statut plutôt
@@ -128,26 +139,30 @@ export function DossiersList({
           {/* Bascule très visible entre les deux tableaux (0064, Jade : « c'est pas assez en
               évidence... j'aimerais qu'on voit qu'il y en a deux qui existent ») -- un vrai
               interrupteur à deux positions (fond, ombre sur l'onglet actif) plutôt que de
-              simples onglets discrets soulignés. */}
+              simples onglets discrets soulignés. Icône distincte par onglet (0065, Jade) --
+              même bibliothèque (lucide-react) et taille que le reste du portail
+              (PortalSidebar.tsx). */}
           <div>
             <p className="mb-1.5 text-xs font-medium text-neutral-500">Affichage</p>
             <div className="inline-flex rounded-lg bg-neutral-100 p-1">
               <button
                 type="button"
                 onClick={() => setActiveTab("own")}
-                className={`rounded-md px-4 py-2 text-sm font-semibold transition ${
+                className={`flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-semibold transition ${
                   activeTab === "own" ? "bg-white text-neutral-900 shadow-sm" : "text-neutral-500 hover:text-neutral-700"
                 }`}
               >
+                <User className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
                 Tes dossiers <span className="font-normal">({own.length})</span>
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab("clients")}
-                className={`rounded-md px-4 py-2 text-sm font-semibold transition ${
+                className={`flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-semibold transition ${
                   activeTab === "clients" ? "bg-white text-neutral-900 shadow-sm" : "text-neutral-500 hover:text-neutral-700"
                 }`}
               >
+                <Users className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
                 Dossiers de tes clients <span className="font-normal">({forClients.length})</span>
               </button>
             </div>

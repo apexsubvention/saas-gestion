@@ -1,7 +1,8 @@
 "use client";
 
 // Carte pour un dossier du portail client -- statut bien visible + indicateur d'urgence
-// (documents à fournir, échéance proche) directement sur la carte, sans avoir à l'ouvrir.
+// (documents à fournir, échéance de paiement/facturation, réclamation due bientôt -- 0065)
+// directement sur la carte, sans avoir à l'ouvrir.
 // Empilée dans une colonne de statut (DossiersList.tsx, tableau façon Trello, 0063) plutôt
 // qu'en grille compacte (0062, dépassé). Un clic ouvre une fenêtre modale (0062, Jade :
 // « comme en ce moment sur Détails, mais plus comme un pop-up ») avec le contenu détaillé --
@@ -26,6 +27,7 @@ import { computeSubsidy } from "@/features/grants/subsidyMath";
 import { buildBillingNarrative, buildBillerSentence } from "@/features/billing/billingSummary";
 import { computePaymentDeadline, paymentDeadlineAlertText } from "@/features/billing/paymentDeadline";
 import { PortalOpenDocumentButton } from "./PortalOpenDocumentButton";
+import { hasClaimDueSoon } from "./dossierPriority";
 
 // Un document demandé se réaffiche avec son formulaire de téléversement tant qu'il
 // n'est pas validé par le personnel -- "issue" (problème signalé) permet donc bien de
@@ -256,9 +258,14 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
     dossier.documentRequests.filter((r) => UPLOADABLE_STATUSES.includes(r.status)).length +
     dossier.claims.reduce((sum, c) => sum + c.documentRequests.filter((r) => UPLOADABLE_STATUSES.includes(r.status)).length, 0);
   const toProvideCount = openRequirementsCount + actionableRequestsCount;
+  // Réclamation (créée ou seulement suggérée par l'entente) due dans 7 jours ou moins, ou déjà
+  // en retard, et pas encore déposée (0065, Jade : « tu as quelque chose à faire ») -- voir
+  // dossierPriority.ts#hasClaimDueSoon pour le détail et la condition d'auto-fermeture.
+  const claimDueSoon = hasClaimDueSoon(dossier);
   // Indicateur d'urgence visible directement sur la vignette (0062, Jade), sans avoir à
-  // l'ouvrir : quelque chose à fournir, ou une échéance de paiement/facturation déjà connue.
-  const isUrgent = toProvideCount > 0 || !!paymentDeadlineText;
+  // l'ouvrir : quelque chose à fournir, une échéance de paiement/facturation déjà connue, ou
+  // une réclamation due bientôt.
+  const isUrgent = toProvideCount > 0 || !!paymentDeadlineText || claimDueSoon;
 
   return (
     <>
@@ -297,6 +304,11 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
             {toProvideCount > 0 && (
               <span className="flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 font-medium text-amber-800">
                 ⚠️ {toProvideCount} à fournir
+              </span>
+            )}
+            {claimDueSoon && (
+              <span className="flex items-center gap-1 rounded-full bg-orange-50 px-2 py-0.5 font-medium text-orange-800">
+                📅 Réclamation à faire
               </span>
             )}
             {paymentDeadlineText && (
