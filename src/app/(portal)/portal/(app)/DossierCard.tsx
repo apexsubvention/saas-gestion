@@ -277,10 +277,11 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
   // dossierPriority.ts#nextClaimDueSoon pour le détail et la condition d'auto-fermeture.
   const dueSoonClaim = nextClaimDueSoon(dossier);
   const claimDueSoon = dueSoonClaim != null;
-  // Factures fournisseurs envoyées mais pas encore marquées payées (0066/0068, Jade : « quelque
-  // chose d'évident sans même cliquer sur le projet » -- même principe que "Réclamation à faire"
-  // ci-dessous). isPariProgram exclu : la section "Factures fournisseurs" elle-même est masquée
-  // pour ces dossiers (0065), donc ce badge n'aurait pas de section à pointer si on cliquait dessus.
+  // Factures fournisseurs envoyées mais pas encore marquées payées. isPariProgram exclu : la
+  // section "Factures fournisseurs" elle-même est masquée pour ces dossiers (0065). Utilisé par le
+  // Résumé ci-dessous (0068) -- Jade (0069) a retiré le badge dédié qui vivait auparavant sur la
+  // vignette elle-même (0066) : gardé ici seulement comme un des signaux d'urgence (bordure ambrée)
+  // et le détail (noms) reste dans le Résumé, jamais réaffiché comme badge séparé.
   const unpaidSupplierNames = dossier.isPariProgram
     ? []
     : Array.from(new Set(dossier.supplierInvoices.filter((inv) => inv.paymentStatus === "sent_unpaid").map((inv) => inv.supplierName)));
@@ -355,11 +356,6 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
             {claimDueSoon && (
               <span className="flex items-center gap-1 rounded-full bg-orange-50 px-2 py-0.5 font-medium text-orange-800">
                 📅 Réclamation à faire
-              </span>
-            )}
-            {hasUnpaidSupplierInvoice && (
-              <span className="flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 font-medium text-rose-700">
-                🧾 Facture à marquer payée
               </span>
             )}
             {paymentDeadlineText && (
