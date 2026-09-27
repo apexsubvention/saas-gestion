@@ -364,7 +364,11 @@ export async function updatePortalInvoicePaymentStatusAction(expenseId: string, 
   if (findError || !expense) {
     return { error: "Facture introuvable ou accès refusé." };
   }
-  const expenseRow = expense as { id: string; grant_project_id: string; supplier_id: string | null; total: number | null; subtotal: number | null; payment_status: string };
+  // payment_status (0057) est absente de database.types.ts (généré, non régénérable dans cet
+  // environnement -- même limitation documentée plus bas pour uploadInvoicePaymentProofAction) :
+  // le SELECT typé la renvoie comme SelectQueryError, d'où le passage par `unknown` avant le cast,
+  // sinon TypeScript refuse la conversion directe (build cassé chez Jade -- 0067).
+  const expenseRow = expense as unknown as { id: string; grant_project_id: string; supplier_id: string | null; total: number | null; subtotal: number | null; payment_status: string };
 
   const admin = createAdminClient();
   try {
