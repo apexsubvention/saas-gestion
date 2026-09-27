@@ -6,7 +6,14 @@ export type SubsidyInputs = {
   rate: number | null; // fraction 0-1 (0,5 = 50 %)
   maxSubsidy: number | null; // subvention maximale ; à défaut taux x coût total du projet
   totalProjectCost: number | null;
-  spent: number; // dépenses facturées à ce jour (avant taxes)
+  spent: number; // dépenses facturées à ce jour (avant taxes) -- ou déjà net, voir netOfRate
+  // Jade (PARI CNRC/IRAP, 0065) : pour ces dossiers, `spent` (somme des DDR) est déjà le montant
+  // NET accepté/remboursé par le programme (après SON PROPRE taux de soutien, ex. 80 % -- lu tel
+  // quel sur le rapport Historique DDR, voir analyzeDdrReport.ts) -- pas une dépense brute à
+  // multiplier par `rate` une deuxième fois. true = la subvention "gagnée" est directement `spent`
+  // (plafonnée au maximum), sans réappliquer `rate`. `rate` reste utilisé pour l'affichage (Taux
+  // d'aide) et requiredSpend (informatif), jamais pour calculer earned/remaining ici.
+  netOfRate?: boolean;
 };
 
 export type SubsidySummary = {
@@ -34,7 +41,8 @@ export function computeSubsidy(input: SubsidyInputs): SubsidySummary {
   if (maxSubsidy == null) return { ...empty, ready: false, missing: "le montant maximal de la subvention ou le coût total du projet" };
 
   const requiredSpend = cents(maxSubsidy / rate);
-  const earned = cents(Math.min(maxSubsidy, rate * spent));
+  const earned = cents(Math.min(maxSubsidy, input.netOfRate ? spent : rate * spent));
+  const remaining = cents(Math.max(0, maxSubsidy - earned));
   return {
     ready: true,
     missing: null,
@@ -43,9 +51,13 @@ export function computeSubsidy(input: SubsidyInputs): SubsidySummary {
     requiredSpend,
     spent,
     earned,
-    remaining: cents(Math.max(0, maxSubsidy - earned)),
-    remainingSpend: cents(Math.max(0, requiredSpend - spent)),
-    excessSpend: cents(Math.max(0, spent - requiredSpend)),
+    remaining,
+    // netOfRate : `spent` est déjà en dollars de subvention (pas de dépense brute), donc "combien
+    // reste à engager pour atteindre le maximum" se mesure dans la même unité que "remaining" --
+    // même chiffre, pas de conversion par le taux (qui donnerait un montant brut incohérent avec
+    // ce que le tableau affiche pour ce type de dossier).
+    remainingSpend: input.netOfRate ? remaining : cents(Math.max(0, requiredSpend - spent)),
+    excessSpend: input.netOfRate ? cents(Math.max(0, spent - maxSubsidy)) : cents(Math.max(0, spent - requiredSpend)),
   };
 }
 

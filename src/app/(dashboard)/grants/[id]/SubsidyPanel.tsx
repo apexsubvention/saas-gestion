@@ -20,12 +20,17 @@ export function SubsidyPanel({
   summary,
   supplierBudgetTotal,
   narrative,
+  netOfRate = false,
 }: {
   summary: SubsidySummary;
   supplierBudgetTotal: number;
   // Résumé en langage clair (src/features/billing/billingSummary.ts) -- mêmes chiffres que
   // ci-dessous, en phrase. Demandé par Jade pour comprendre le dossier sans lire un tableau.
   narrative?: string | null;
+  // Jade (PARI CNRC/IRAP, 0065) : les montants du tableau sont déjà NETS (acceptés par le PARI,
+  // pas des factures avant taxes) -- même valeur que subsidyMath.ts#netOfRate, juste pour adapter
+  // le libellé ici (jamais "avant taxes"/"facturé" pour ce type de dossier).
+  netOfRate?: boolean;
 }) {
   if (!summary.ready) {
     return (
@@ -57,10 +62,10 @@ export function SubsidyPanel({
       <details className="text-xs text-neutral-500">
         <summary className="cursor-pointer text-neutral-600 hover:text-neutral-800">Voir le détail du calcul</summary>
         <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
-          <Stat label="Dépenses requises pour l'atteindre" value={money(summary.requiredSpend)} hint={`${money(summary.maxSubsidy)} ÷ ${ratePct} %`} />
-          <Stat label="Dépensé à ce jour (factures)" value={money(summary.spent)} />
-          <Stat label="Subvention gagnée" value={money(summary.earned)} hint={`${ratePct} % des dépenses facturées`} />
-          <Stat label="Dépenses restantes à engager" value={money(summary.remainingSpend)} hint="pour atteindre la subvention maximale" />
+          {!netOfRate && <Stat label="Dépenses requises pour l'atteindre" value={money(summary.requiredSpend)} hint={`${money(summary.maxSubsidy)} ÷ ${ratePct} %`} />}
+          <Stat label={netOfRate ? "Accepté par le PARI à ce jour" : "Dépensé à ce jour (factures)"} value={money(summary.spent)} />
+          <Stat label="Subvention gagnée" value={money(summary.earned)} hint={netOfRate ? "montant net accepté, déjà après le taux de soutien du PARI" : `${ratePct} % des dépenses facturées`} />
+          {!netOfRate && <Stat label="Dépenses restantes à engager" value={money(summary.remainingSpend)} hint="pour atteindre la subvention maximale" />}
           <Stat
             label="Budget des fournisseurs"
             value={money(supplierBudgetTotal)}
@@ -68,7 +73,9 @@ export function SubsidyPanel({
           />
         </div>
         <p className="mt-2 text-neutral-400">
-          Calcul sur les montants avant taxes des factures du tableau ci-dessous. Chaque dollar facturé rapporte {ratePct.toLocaleString("fr-CA")} % de subvention, jusqu&apos;au maximum.
+          {netOfRate
+            ? "Calcul sur les montants déjà acceptés par le PARI (nets, après son propre taux de soutien) du tableau ci-dessous -- pas de taux d'aide réappliqué par-dessus, jusqu'au maximum de la subvention."
+            : `Calcul sur les montants avant taxes des factures du tableau ci-dessous. Chaque dollar facturé rapporte ${ratePct.toLocaleString("fr-CA")} % de subvention, jusqu'au maximum.`}
         </p>
       </details>
     </div>

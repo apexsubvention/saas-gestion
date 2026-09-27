@@ -553,7 +553,7 @@ function InvoiceRow({
         )}
       </td>
       <td className="px-3 py-2"><input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={input} /></td>
-      <td className="px-3 py-2"><input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Avant taxes" className={input} /></td>
+      <td className="px-3 py-2"><input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={isEmployee ? "Montant accepté par le PARI" : "Avant taxes"} className={input} /></td>
       <td className="px-3 py-2">
         <div className="flex flex-wrap items-center gap-1">
           {dirty && <button onClick={save} disabled={pending} className={`${smallBtn} bg-neutral-900 text-white hover:bg-neutral-800`}>{pending ? "…" : "Enregistrer"}</button>}

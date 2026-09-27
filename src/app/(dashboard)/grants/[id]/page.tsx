@@ -120,7 +120,11 @@ export default async function GrantProjectPage({ params, searchParams }: { param
   const [snapshots, currentProgram] = await Promise.all([programSnapshotService(supabase).list(params.id), programsRepository(supabase).findById(project.program_id)]);
   const { data: staffRows } = await supabase.from("organization_users").select("id, full_name, email").eq("active", true).in("role", ["admin", "employee"]);
   const assignees = (staffRows ?? []).map((u) => ({ id: u.id, name: u.full_name || u.email || "Membre de l'équipe" }));
-  const subsidy = computeSubsidy(resolveSubsidyInputs(project, agreement, ledger.spent));
+  // Jade (PARI CNRC/IRAP, suite à 0065) : ledger.spent est ici la somme des DDR, déjà NETTE
+  // (montant accepté/remboursé par le PARI après son propre taux de soutien) -- ne pas réappliquer
+  // le taux d'aide du dossier par-dessus, sinon la subvention restante est sous-évaluée (le taux
+  // est appliqué deux fois). Voir subsidyMath.ts#netOfRate.
+  const subsidy = computeSubsidy({ ...resolveSubsidyInputs(project, agreement, ledger.spent), netOfRate: isPariProgram });
   // Résumé en langage clair (demandé par Jade) : à partir des mêmes chiffres que SubsidyPanel,
   // mais en phrase plutôt qu'en tableau. deadline = date de fin du projet (entente en priorité,
   // sinon fiche du dossier -- même ordre que "Dates du projet" sur la page Facturation).
@@ -157,7 +161,12 @@ export default async function GrantProjectPage({ params, searchParams }: { param
   const nextMilestone = pendingMilestones[0] ?? null;
 
   const approved = Number(project.approved_grant_amount ?? 0);
-  const balance = approved - totals.claimed;
+  // Jade : pour un dossier PARI, "Solde" (en haut) doit concorder avec "Subvention restante"
+  // (Fournisseurs) et le solde restant PARI (calculés à partir des DDR nets) -- totals.claimed
+  // (budget_line_actuals) reste à 0 tant qu'aucune réclamation formelle n'est créée/liée, ce qui
+  // n'a pas de sens pour un DDR déjà complété par le programme. subsidy.remaining est la même
+  // valeur que celle du bloc "Solde restant PARI" (net des DDR), donc les deux concordent toujours.
+  const balance = isPariProgram ? subsidy.remaining : approved - totals.claimed;
 
   // Échéancier unifié : tâches (manuel), échéances (suggérées ou manuelles depuis
   // l'entente) et réclamations (dossiers réels) forment ensemble UNE liste triée par
@@ -362,7 +371,7 @@ export default async function GrantProjectPage({ params, searchParams }: { param
                 <p className="mt-1">{paymentDeadlineText}</p>
               </div>
             )}
-            <SubsidyPanel summary={subsidy} supplierBudgetTotal={ledger.supplierBudgetTotal} narrative={billingNarrative} />
+            <SubsidyPanel summary={subsidy} supplierBudgetTotal={ledger.supplierBudgetTotal} narrative={billingNarrative} netOfRate={isPariProgram} />
             <p className="text-xs text-neutral-500">
               Un seul tableau, automatique et manuel : modifie, ajoute ou supprime les fournisseurs (ou salariés), même ceux générés automatiquement. Une facture
               téléversée dans « Documents » (catégorie Facture) est lue automatiquement et ajoutée ici sous son fournisseur ; tu peux aussi associer
