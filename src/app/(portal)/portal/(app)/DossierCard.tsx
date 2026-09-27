@@ -249,10 +249,20 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
   // réclamations déjà faites soustraites -- approved_amount une fois confirmé par le
   // gouvernement, sinon claimed_amount (déposée, pas encore confirmée) ; une réclamation refusée
   // ne compte pour rien. null tant que le montant approuvé du dossier lui-même est inconnu.
+  // PARI CNRC (Jade) : ce calcul ne s'applique pas -- un DDR déjà accepté par le programme n'a
+  // jamais de réclamation formelle liée dans Apex (claims reste vide), donc claimedSoFar resterait
+  // à 0 et le solde afficherait le montant approuvé au complet, différent du portail admin. Le
+  // portail client doit montrer EXACTEMENT le même solde que l'admin (encadré vert) -- voir
+  // grants/[id]/page.tsx -- donc pariBalanceRemaining (même source, lue sur le rapport Historique
+  // DDR) prend toujours le dessus pour un dossier PARI, jamais recalculé ici.
   const claimedSoFar = dossier.claims
     .filter((c) => c.status !== "rejected")
     .reduce((sum, c) => sum + (c.approved_amount ?? c.claimed_amount ?? 0), 0);
-  const remainingBalance = dossier.approvedGrantAmount != null ? Math.max(0, dossier.approvedGrantAmount - claimedSoFar) : null;
+  const remainingBalance = dossier.isPariProgram
+    ? dossier.pariBalanceRemaining
+    : dossier.approvedGrantAmount != null
+      ? Math.max(0, dossier.approvedGrantAmount - claimedSoFar)
+      : null;
   const openRequirementsCount = dossier.claims.reduce((sum, c) => sum + c.openRequirements.length, 0);
   const actionableRequestsCount =
     dossier.documentRequests.filter((r) => UPLOADABLE_STATUSES.includes(r.status)).length +
@@ -432,7 +442,12 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
             )
           )}
 
-          <PortalSupplierInvoices invoices={dossier.supplierInvoices} requiresPaymentProof={dossier.requiresPaymentProof} />
+          {/* PARI CNRC (Jade) : pas de factures fournisseurs pour ce type de dossier -- les coûts
+              sont des salariés internes (DDR), pas des factures de fournisseurs externes. Seules
+              les Réclamations restent pertinentes, juste en dessous. */}
+          {!dossier.isPariProgram && (
+            <PortalSupplierInvoices invoices={dossier.supplierInvoices} requiresPaymentProof={dossier.requiresPaymentProof} />
+          )}
 
           <div className="space-y-2">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Réclamations</h3>

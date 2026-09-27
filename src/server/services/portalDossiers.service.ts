@@ -18,6 +18,7 @@ import { billingLineItemsService } from "@/server/services/billingLineItems.serv
 import { billingInstallmentsService } from "@/server/services/billingInstallments.service";
 import { grantAgreementsService } from "@/server/services/grantAgreements.service";
 import { GRANT_PROJECT_STATUS_LABELS, DOCUMENT_REQUEST_STATUS_LABELS } from "@/features/grants/constants";
+import { isPariCnrcProgram } from "@/server/scheduling/monthlyClaims";
 
 // Assemble, pour le portail client, tout ce qui est associé à un dossier -- statut/dates,
 // réclamations (+ documents manquants), texte rédigé du questionnaire, documents
@@ -163,6 +164,14 @@ export type PortalDossier = {
   // renseignée) l'emporte sur la fiche du dossier, comme resolveSubsidyInputs côté interne.
   totalProjectCost: number | null;
   grantRate: number | null;
+  // PARI CNRC/IRAP (0065) -- même détection que côté admin (isPariCnrcProgram sur le nom du
+  // programme). Utilisé par DossierCard.tsx pour : (1) afficher le même "Solde restant" que le
+  // portail admin (pariBalanceRemaining, lu directement sur le rapport Historique DDR -- jamais
+  // recalculé depuis les réclamations formelles, qui n'existent pas pour un DDR) ; (2) masquer le
+  // bloc "Factures fournisseurs", sans objet pour un dossier PARI (coûts = salariés internes, pas
+  // des factures de fournisseurs externes -- Jade).
+  isPariProgram: boolean;
+  pariBalanceRemaining: number | null;
   billingDeadline: string | null;
   // (0060) Faits bruts du délai de paiement/facturation lu dans la convention -- la date
   // effective et le texte d'alerte se calculent en TypeScript pur, voir
@@ -231,6 +240,7 @@ export function portalDossiersService(supabase: SupabaseClient) {
         grant_rate: number | null;
         hidden_from_parent_portal: boolean;
         requires_payment_proof: boolean;
+        pari_balance_remaining: number | null;
         clients: { name: string } | null;
         grant_programs: { name: string } | null;
       }>;
@@ -333,6 +343,8 @@ export function portalDossiersService(supabase: SupabaseClient) {
           // cette lecture pour le portail.
           const documentFilenameById = new Map(projectDocuments.map((d) => [d.id, d.filename]));
           const agreement = agreements[0] ?? null;
+          const programName = programNameById.get(p.program_id) ?? p.grant_programs?.name ?? null;
+          const isPariProgram = isPariCnrcProgram(programName);
 
           const visibleRequests = requestRows.filter(
             (r) => r.visible_in_client_portal && VISIBLE_REQUEST_STATUSES.includes(r.status)
@@ -383,7 +395,7 @@ export function portalDossiersService(supabase: SupabaseClient) {
             name: p.name,
             clientId: p.client_id,
             clientName: p.clients?.name ?? null,
-            programName: programNameById.get(p.program_id) ?? p.grant_programs?.name ?? null,
+            programName,
             status: p.status,
             statusLabel: GRANT_PROJECT_STATUS_LABELS[p.status] ?? p.status,
             // Jade : une fois une convention lue/saisie (grant_agreements), Début/Fin/Montant
@@ -395,6 +407,8 @@ export function portalDossiersService(supabase: SupabaseClient) {
             approvedGrantAmount: p.approved_grant_amount ?? agreement?.grant_amount ?? null,
             totalProjectCost: p.total_project_cost,
             grantRate: p.grant_rate ?? agreement?.grant_rate ?? null,
+            isPariProgram,
+            pariBalanceRemaining: p.pari_balance_remaining ?? null,
             billingDeadline: agreement?.project_end ?? p.official_end_date,
             paymentDeadlineDate: agreement?.payment_deadline_date ?? null,
             paymentDeadlineDaysAfterEnd: agreement?.payment_deadline_days_after_end ?? null,
