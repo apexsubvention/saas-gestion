@@ -34,7 +34,13 @@ export type BillingNarrativeInput = {
   // précision dans la phrase (« X $ de coûts internes ne seront jamais facturés ») ; ne change
   // jamais billerAmount lui-même. null/0 = rien à préciser.
   excludedAmount?: number | null;
+  // (0063, Jade) : le montant facturé se répète à chaque cycle de réclamation (pas un total
+  // unique dû d'un coup) -- ajoute « par cycle » après le montant plutôt que de le recalculer
+  // (le montant fourni reste celui d'UN cycle, jamais multiplié ici).
+  perCycle?: boolean;
 };
+
+export type BillerSentenceInput = Pick<BillingNarrativeInput, "clientName" | "billerLabel" | "billerAmount" | "deadline" | "excludedAmount" | "perCycle">;
 
 function money(n: number): string {
   return new Intl.NumberFormat("fr-CA", { style: "currency", currency: "CAD", maximumFractionDigits: 0 }).format(n);
@@ -42,6 +48,27 @@ function money(n: number): string {
 
 function formatDate(iso: string): string {
   return new Date(`${iso}T00:00:00Z`).toLocaleDateString("fr-CA", { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" });
+}
+
+// Une seule phrase « [qui] devra avoir facturé [montant] [par cycle] d'ici [date] » -- extrait de
+// buildBillingNarrative (0063) pour permettre plusieurs phrases, une par fournisseur, sans
+// répéter la phrase de contexte (dépense totale/subvention) à chaque fois. null si aucun montant.
+export function buildBillerSentence(input: BillerSentenceInput): string | null {
+  if (input.billerAmount == null) return null;
+  const who = input.billerLabel ?? input.clientName;
+  const due = input.deadline ? ` d'ici le ${formatDate(input.deadline)}` : "";
+  const cycle = input.perCycle ? " par cycle" : "";
+  // Pas de fournisseur/sous-traitant nommé : c'est le dossier direct du client -- il DÉPENSE
+  // (reçoit des factures), il ne facture personne -- voix passive. Voir le commentaire en
+  // tête de fichier.
+  const verb = input.billerLabel == null ? "avoir été facturé" : "avoir facturé";
+  let sentence = `${who} devra ${verb} ${money(input.billerAmount)}${cycle}${due}.`;
+  // Jade : évite de laisser croire que TOUT le coût total sera facturé -- précise la portion qui
+  // ne le sera jamais (ex. salaire interne), déjà comprise dans le calcul de la subvention ci-dessus.
+  if (input.excludedAmount != null && input.excludedAmount > 0) {
+    sentence += ` (${money(input.excludedAmount)} de coûts internes -- ex. salaire -- ne seront jamais facturés, mais comptent dans le calcul de la subvention ci-dessus.)`;
+  }
+  return sentence;
 }
 
 /**
@@ -63,21 +90,8 @@ export function buildBillingNarrative(input: BillingNarrativeInput): string | nu
     }
   }
 
-  if (input.billerAmount != null) {
-    const who = input.billerLabel ?? input.clientName;
-    const due = input.deadline ? ` d'ici le ${formatDate(input.deadline)}` : "";
-    // Pas de fournisseur/sous-traitant nommé : c'est le dossier direct du client -- il DÉPENSE
-    // (reçoit des factures), il ne facture personne -- voix passive. Voir le commentaire en
-    // tête de fichier.
-    const verb = input.billerLabel == null ? "avoir été facturé" : "avoir facturé";
-    let sentence = `${who} devra ${verb} ${money(input.billerAmount)}${due}.`;
-    // Jade : évite de laisser croire que TOUT le coût total sera facturé -- précise la portion qui
-    // ne le sera jamais (ex. salaire interne), déjà comprise dans le calcul de la subvention ci-dessus.
-    if (input.excludedAmount != null && input.excludedAmount > 0) {
-      sentence += ` (${money(input.excludedAmount)} de coûts internes -- ex. salaire -- ne seront jamais facturés, mais comptent dans le calcul de la subvention ci-dessus.)`;
-    }
-    parts.push(sentence);
-  }
+  const billerSentence = buildBillerSentence(input);
+  if (billerSentence) parts.push(billerSentence);
 
   return parts.length > 0 ? parts.join(" ") : null;
 }

@@ -8,6 +8,7 @@ import {
 } from "@/server/repositories/claimRequirements.repository";
 import { documentRequestsRepository, type DocumentRequestRow } from "@/server/repositories/documentRequests.repository";
 import { documentsRepository } from "@/server/repositories/documents.repository";
+import { milestonesRepository } from "@/server/repositories/milestones.repository";
 import { questionnaireService } from "@/server/services/questionnaire.service";
 import { dossierNotesService, type DossierNoteView } from "@/server/services/dossierNotes.service";
 import { programSnapshotService } from "@/server/services/programSnapshot.service";
@@ -50,7 +51,30 @@ export type PortalDocumentRequestView = {
 export type PortalClaimView = ClaimRow & {
   openRequirements: ClaimRequirementRow[];
   documentRequests: PortalDocumentRequestView[];
+  // Documents téléversés par le personnel et rattachés à CETTE réclamation précise
+  // (document_links.entity_type = 'claim', voir UploadProjectDocumentForm côté interne) -- 0063,
+  // Jade : montrés même une fois la réclamation payée (contrairement à documentRequests/
+  // openRequirements ci-dessus, qui ne couvrent que ce qui manque encore).
+  documents: Array<{ id: string; filename: string }>;
 };
+
+// Réclamation suggérée/à venir (milestones.type = 'claim', voir MILESTONE_TYPE_LABELS) : PAS
+// encore un dossier de réclamation réel (claims), juste une entrée d'échéancier avec une date --
+// 0063, Jade : « on voit les réclamations avec statut payé, mais pas celles à venir avec les
+// dates ». Seules les échéances encore actives (ni complétées ni annulées) sont montrées --
+// une fois "done", la réclamation réelle a normalement pris le relais.
+export type PortalUpcomingClaim = {
+  id: string;
+  title: string;
+  dueDate: string | null;
+  estimated: boolean; // source === 'ai_proposed' (suggérée depuis la convention, pas encore confirmée)
+};
+
+// Montant à facturer par UN fournisseur précis (0063, Jade) : « le nom du fournisseur » dans le
+// résumé de facturation -- un dossier peut avoir plusieurs fournisseurs, chacun avec son propre
+// montant (Budget prévu, déjà calculé par supplierLedgerService à partir des postes cochés "À
+// facturer" qui lui sont associés -- voir 0059). Jamais recalculé ici, juste transporté.
+export type PortalBillerLine = { supplierName: string; amount: number };
 
 export type PortalRedactionItem = {
   id: string;
@@ -145,6 +169,15 @@ export type PortalDossier = {
   paymentDeadlineDate: string | null;
   paymentDeadlineDaysAfterEnd: number | null;
   claims: PortalClaimView[];
+  upcomingClaims: PortalUpcomingClaim[];
+  // Le plus récent document de catégorie "agreement" (convention) déjà téléversé pour ce dossier,
+  // s'il y en a un -- 0063, Jade : « si la convention a été uploadée, qu'on puisse la voir
+  // directement ». null tant qu'aucune convention n'a été déposée (jamais déduit autrement).
+  agreementDocument: { id: string; filename: string } | null;
+  // Un montant par fournisseur ayant un Budget prévu calculé (0059) -- 0063, Jade : une phrase de
+  // facturation par fournisseur plutôt qu'un seul total combiné. Vide si aucun fournisseur n'est
+  // encore associé à un poste facturable (repli sur le résumé combiné côté DossierCard.tsx).
+  billingBySupplier: PortalBillerLine[];
   redaction: PortalRedactionItem[];
   // Documents demandés au niveau du dossier (claim_id vide -- ex. en vue d'un dépôt),
   // par opposition à ceux rattachés à une réclamation précise (déjà dans claims[].documentRequests).
@@ -164,6 +197,7 @@ export function portalDossiersService(supabase: SupabaseClient) {
   const claimRequirements = claimRequirementsRepository(supabase);
   const documentRequests = documentRequestsRepository(supabase);
   const documents = documentsRepository(supabase);
+  const milestones = milestonesRepository(supabase);
   const questionnaire = questionnaireService(supabase);
   const notes = dossierNotesService(supabase);
   const snapshots = programSnapshotService(supabase);
@@ -200,7 +234,7 @@ export function portalDossiersService(supabase: SupabaseClient) {
 
       const dossiers = await Promise.all(
         projects.map(async (p): Promise<PortalDossier> => {
-          const [claimRows, questionnaireData, requestRows, noteRows, lineItemRows, agreements, installmentRows, projectDocuments, snapshotRows, ledger] = await Promise.all([
+          const [claimRows, questionnaireData, requestRows, noteRows, lineItemRows, agreements, installmentRows, projectDocuments, snapshotRows, ledger, milestoneRows] = await Promise.all([
             claims.listByProject(p.id),
             questionnaire.get(p.id),
             documentRequests.listByProject(p.id),
@@ -218,7 +252,35 @@ export function portalDossiersService(supabase: SupabaseClient) {
             // portail- et hiérarchie-compatibles (can_access_grant_project/can_access_client),
             // donc supplierLedgerService.load() fonctionne tel quel avec ce client RLS.
             supplierLedger.load(p.id),
+            // Réclamations à venir (0063, Jade) -- milestones_select (0016) est déjà
+            // portail-compatible (can_access_grant_project).
+            milestones.listByProject(p.id),
           ]);
+          // Documents rattachés à une réclamation précise -- dépend des claimRows ci-dessus,
+          // donc un aller-retour séparé (une seule requête groupée pour tout le dossier).
+          const claimLinks = await documents.listClaimLinks(claimRows.map((c) => c.id));
+          const claimDocumentsByClaimId = new Map<string, Array<{ id: string; filename: string }>>();
+          for (const link of claimLinks) {
+            const list = claimDocumentsByClaimId.get(link.claim_id) ?? [];
+            list.push({ id: link.document_id, filename: link.filename });
+            claimDocumentsByClaimId.set(link.claim_id, list);
+          }
+          const upcomingClaims: PortalUpcomingClaim[] = milestoneRows
+            .filter((m) => m.type === "claim" && m.status !== "done" && m.status !== "cancelled")
+            .map((m) => ({
+              id: m.id,
+              title: m.title,
+              dueDate: m.internal_due_date ?? m.official_due_date,
+              estimated: m.source === "ai_proposed",
+            }));
+          // Convention (0063, Jade) : le document "agreement" le plus récent déjà téléversé --
+          // projectDocuments est déjà trié created_at desc (documentsRepository.listByProject).
+          const agreementDocument = projectDocuments.find((d) => d.category === "agreement") ?? null;
+          // Un montant par fournisseur (0063) -- seulement ceux dont le Budget prévu (0059) est
+          // déjà calculé (auto ou manuel), jamais un fournisseur sans aucun montant connu.
+          const billingBySupplier: PortalBillerLine[] = ledger.suppliers
+            .filter((s) => s.budget.effective != null && s.budget.effective > 0)
+            .map((s) => ({ supplierName: s.name, amount: s.budget.effective as number }));
           const supplierInvoices: PortalSupplierInvoice[] = ledger.suppliers.flatMap((s) =>
             s.invoices
               .filter((inv) => inv.status === "compliant")
@@ -279,6 +341,7 @@ export function portalDossiersService(supabase: SupabaseClient) {
                 ...c,
                 openRequirements: requirements.filter((r) => OPEN_REQUIREMENT_STATUSES.includes(r.status)),
                 documentRequests: visibleRequests.filter((r) => r.claim_id === c.id).map(toView),
+                documents: claimDocumentsByClaimId.get(c.id) ?? [],
               };
             })
           );
@@ -319,6 +382,9 @@ export function portalDossiersService(supabase: SupabaseClient) {
             paymentDeadlineDate: agreement?.payment_deadline_date ?? null,
             paymentDeadlineDaysAfterEnd: agreement?.payment_deadline_days_after_end ?? null,
             claims: claimsWithRequirements,
+            upcomingClaims,
+            agreementDocument: agreementDocument ? { id: agreementDocument.id, filename: agreementDocument.filename } : null,
+            billingBySupplier,
             redaction,
             documentRequests: projectLevelRequests,
             notes: noteRows,

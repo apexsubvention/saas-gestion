@@ -1,13 +1,13 @@
 "use client";
 
-// Vignette pour un dossier du portail client -- statut bien visible + indicateur d'urgence
+// Carte pour un dossier du portail client -- statut bien visible + indicateur d'urgence
 // (documents à fournir, échéance proche) directement sur la carte, sans avoir à l'ouvrir.
-// Un clic ouvre une fenêtre modale (0062, Jade : « comme en ce moment sur Détails, mais plus
-// comme un pop-up ») avec le même contenu détaillé qu'avant -- dates, réclamations (avec
-// documents manquants), texte rédigé du questionnaire, etc. -- au lieu de déplier la carte sur
-// place. Utile pour un compte parent qui voit aussi les dossiers de ses clients enfants
-// (hiérarchie, cf. 0028) : les vignettes restent compactes, en grille, quel que soit le nombre
-// de dossiers.
+// Empilée dans une colonne de statut (DossiersList.tsx, tableau façon Trello, 0063) plutôt
+// qu'en grille compacte (0062, dépassé). Un clic ouvre une fenêtre modale (0062, Jade :
+// « comme en ce moment sur Détails, mais plus comme un pop-up ») avec le contenu détaillé --
+// dates, réclamations (documents manquants ET déjà déposés, réclamations à venir), résumé de
+// facturation, convention, texte rédigé du questionnaire, etc. -- au lieu de déplier la carte
+// sur place.
 import { useEffect, useState, type ReactNode } from "react";
 import type { PortalDossier, PortalDocumentRequestView } from "@/server/services/portalDossiers.service";
 import {
@@ -23,8 +23,9 @@ import { InstallmentInvoiceUpload } from "./InstallmentInvoiceUpload";
 import { PortalNotes } from "./PortalNotes";
 import { PortalSupplierInvoices } from "./PortalSupplierInvoices";
 import { computeSubsidy } from "@/features/grants/subsidyMath";
-import { buildBillingNarrative } from "@/features/billing/billingSummary";
+import { buildBillingNarrative, buildBillerSentence } from "@/features/billing/billingSummary";
 import { computePaymentDeadline, paymentDeadlineAlertText } from "@/features/billing/paymentDeadline";
+import { PortalOpenDocumentButton } from "./PortalOpenDocumentButton";
 
 // Un document demandé se réaffiche avec son formulaire de téléversement tant qu'il
 // n'est pas validé par le personnel -- "issue" (problème signalé) permet donc bien de
@@ -206,6 +207,11 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
   // l'ancien calcul (coût total requis pour atteindre la subvention) -- jamais de valeur inventée.
   const lineItemsTotal = dossier.billingLineItems.filter((it) => it.includedInBilling).reduce((sum, it) => sum + it.amount, 0);
   const billerAmount = dossier.billingLineItems.length > 0 ? lineItemsTotal : subsidy.ready ? subsidy.requiredSpend : null;
+  // (0063, Jade) : une phrase PAR FOURNISSEUR (« Sitegrow devra avoir facturé... ») plutôt qu'une
+  // seule phrase combinée, dès qu'au moins un fournisseur a un Budget prévu calculé -- voir
+  // portalDossiers.service.ts#billingBySupplier. billerAmount ci-dessus (combiné) sert alors
+  // seulement de repli quand aucun fournisseur n'est encore associé à un poste facturable.
+  const hasSupplierBilling = dossier.billingBySupplier.length > 0;
   // Jade : dans le portail client, on ne mentionne PAS les coûts internes exclus -- seul ce qui est
   // vraiment coché "À facturer" compte pour le client parent, une précision sur les coûts internes
   // pourrait mélanger. Cette nuance reste réservée à l'interne (grants/[id]/page.tsx).
@@ -213,9 +219,22 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
     clientName: dossier.clientName ?? "Le client",
     subsidy,
     billerLabel: null,
-    billerAmount,
+    billerAmount: hasSupplierBilling ? null : billerAmount,
     deadline: dossier.billingDeadline,
   });
+  // Montant récurrent (le fournisseur facture à chaque cycle de réclamation, pas un total unique
+  // dû d'un coup) -- voir buildBillerSentence#perCycle.
+  const supplierBillingSentences = dossier.billingBySupplier
+    .map((s) =>
+      buildBillerSentence({
+        clientName: dossier.clientName ?? "Le client",
+        billerLabel: s.supplierName,
+        billerAmount: s.amount,
+        deadline: dossier.billingDeadline,
+        perCycle: true,
+      })
+    )
+    .filter((s): s is string => !!s);
   // Alerte SÉPARÉE (jamais fondue dans billingNarrative ci-dessus) sur le délai de paiement et
   // de facturation lu dans la convention -- même calcul et même texte que côté admin/fournisseur.
   const paymentDeadline = computePaymentDeadline({
@@ -224,6 +243,14 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
     paymentDeadlineDaysAfterEnd: dossier.paymentDeadlineDaysAfterEnd,
   });
   const paymentDeadlineText = paymentDeadlineAlertText(paymentDeadline, dossier.paymentDeadlineDaysAfterEnd);
+  // Solde restant (0063, Jade) : ce qu'il reste de la subvention approuvée une fois les
+  // réclamations déjà faites soustraites -- approved_amount une fois confirmé par le
+  // gouvernement, sinon claimed_amount (déposée, pas encore confirmée) ; une réclamation refusée
+  // ne compte pour rien. null tant que le montant approuvé du dossier lui-même est inconnu.
+  const claimedSoFar = dossier.claims
+    .filter((c) => c.status !== "rejected")
+    .reduce((sum, c) => sum + (c.approved_amount ?? c.claimed_amount ?? 0), 0);
+  const remainingBalance = dossier.approvedGrantAmount != null ? Math.max(0, dossier.approvedGrantAmount - claimedSoFar) : null;
   const openRequirementsCount = dossier.claims.reduce((sum, c) => sum + c.openRequirements.length, 0);
   const actionableRequestsCount =
     dossier.documentRequests.filter((r) => UPLOADABLE_STATUSES.includes(r.status)).length +
@@ -245,15 +272,24 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
         {isUrgent && <span className="absolute inset-y-0 left-0 w-1 bg-amber-400" aria-hidden="true" />}
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="truncate font-medium text-neutral-900">{dossier.name}</p>
-            <p className="mt-0.5 truncate text-xs text-neutral-500">
-              {dossier.clientName && <span className="mr-2">{dossier.clientName}</span>}
-              {dossier.programName && <span>{dossier.programName}</span>}
-            </p>
+            <p className="truncate font-semibold text-neutral-900">{dossier.name}</p>
+            {/* Programme sur sa propre ligne (0063, Jade : « on voit seulement le titre du projet,
+                j'aimerais qu'on voit le programme ») -- jamais tronqué en même temps que le nom du
+                client, qui pouvait le faire disparaître complètement. */}
+            {dossier.programName && <p className="mt-0.5 truncate text-sm text-neutral-600">{dossier.programName}</p>}
+            {dossier.clientName && <p className="mt-0.5 truncate text-xs text-neutral-400">{dossier.clientName}</p>}
           </div>
-          <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${grantProjectStatusBadgeClass(dossier.status)}`}>
-            {dossier.statusLabel}
-          </span>
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${grantProjectStatusBadgeClass(dossier.status)}`}>
+              {dossier.statusLabel}
+            </span>
+            {/* Convention en évidence, en vert, sous le statut (0063, Jade) -- indicateur seulement
+                ici (pas de bouton imbriqué dans la vignette, qui est elle-même un bouton) ; le vrai
+                lien pour l'ouvrir est dans la fenêtre de détails ci-dessous. */}
+            {dossier.agreementDocument && (
+              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">Convention ✓</span>
+            )}
+          </div>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-neutral-500">
           <span>{dossier.claims.length} réclamation{dossier.claims.length !== 1 ? "s" : ""}</span>
@@ -277,14 +313,20 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
           header={
             <div className="min-w-0">
               <p className="truncate font-semibold text-neutral-900">{dossier.name}</p>
+              {dossier.programName && <p className="mt-0.5 text-sm text-neutral-600">{dossier.programName}</p>}
               <div className="mt-1 flex flex-wrap items-center gap-2">
                 <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${grantProjectStatusBadgeClass(dossier.status)}`}>
                   {dossier.statusLabel}
                 </span>
-                <span className="text-xs text-neutral-500">
-                  {dossier.clientName && <span className="mr-2">{dossier.clientName}</span>}
-                  {dossier.programName}
-                </span>
+                {dossier.clientName && <span className="text-xs text-neutral-500">{dossier.clientName}</span>}
+                {dossier.agreementDocument && (
+                  <PortalOpenDocumentButton
+                    documentId={dossier.agreementDocument.id}
+                    filename={dossier.agreementDocument.filename}
+                    label="Voir la convention"
+                    className="text-xs font-medium text-emerald-700 hover:underline"
+                  />
+                )}
               </div>
             </div>
           }
@@ -304,15 +346,31 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
               <p className="text-xs text-neutral-400">Fin</p>
               <p className="text-neutral-800">{formatDate(dossier.officialEndDate)}</p>
             </div>
-            <div className="col-span-2">
+            <div>
               <p className="text-xs text-neutral-400">Montant approuvé</p>
               <p className="text-neutral-800">{formatAmount(dossier.approvedGrantAmount)}</p>
             </div>
+            {/* Solde restant (0063, Jade) : montant approuvé moins les réclamations déjà faites --
+                voir remainingBalance ci-dessus. Absent (pas seulement "—") quand le montant
+                approuvé lui-même est inconnu, pour ne jamais laisser croire à un solde à 0. */}
+            {remainingBalance != null && (
+              <div>
+                <p className="text-xs text-neutral-400">Solde restant</p>
+                <p className="text-neutral-800">{formatAmount(remainingBalance)}</p>
+              </div>
+            )}
           </div>
 
           {dossier.programSummary && <ProgramSummarySection summary={dossier.programSummary} />}
 
-          {billingNarrative && <p className="rounded-md bg-indigo-50 px-3 py-2 text-sm text-indigo-900">{billingNarrative}</p>}
+          {(billingNarrative || supplierBillingSentences.length > 0) && (
+            <div className="space-y-1.5 rounded-md bg-indigo-50 px-3 py-2 text-sm text-indigo-900">
+              {billingNarrative && <p>{billingNarrative}</p>}
+              {supplierBillingSentences.map((sentence, i) => (
+                <p key={i}>{sentence}</p>
+              ))}
+            </div>
+          )}
 
           {dossier.billingInstallments.length > 0 ? (
             <div className="space-y-2">
@@ -409,11 +467,46 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
                         ))}
                       </div>
                     )}
+                    {/* Documents que le personnel a déposés pour CETTE réclamation (0063, Jade) --
+                        montrés même une fois la réclamation payée, contrairement aux deux sections
+                        ci-dessus qui ne couvrent que ce qu'il manque encore. */}
+                    {c.documents.length > 0 && (
+                      <div className="mt-2 space-y-1 border-t border-neutral-100 pt-2">
+                        <p className="text-xs font-medium text-neutral-500">Voir le dossier</p>
+                        {c.documents.map((d) => (
+                          <div key={d.id} className="flex items-center justify-between gap-2 text-xs">
+                            <span className="truncate text-neutral-700">{d.filename}</span>
+                            <PortalOpenDocumentButton documentId={d.id} filename={d.filename} className="shrink-0 text-xs text-blue-600 hover:underline" />
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
             ) : (
               <p className="text-sm text-neutral-400">Aucune réclamation pour l&apos;instant.</p>
+            )}
+            {/* Réclamations à venir (0063, Jade : « on voit payé, mais pas celles à venir avec les
+                dates ») -- des échéances (milestones.type='claim'), pas encore de vraie
+                réclamation créée. "estimée" = suggérée depuis la convention, pas confirmée. */}
+            {dossier.upcomingClaims.length > 0 && (
+              <div className="space-y-2 border-t border-neutral-100 pt-2">
+                <p className="text-xs font-medium text-neutral-500">Réclamations à venir</p>
+                {dossier.upcomingClaims.map((m) => (
+                  <div key={m.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-dashed border-neutral-200 p-2 text-xs">
+                    <span className="text-neutral-700">
+                      {m.title}
+                      {m.estimated && (
+                        <span className="ml-2 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-700">
+                          estimée
+                        </span>
+                      )}
+                    </span>
+                    <span className="text-neutral-500">{m.dueDate ? formatDate(m.dueDate) : "Date à confirmer"}</span>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
 

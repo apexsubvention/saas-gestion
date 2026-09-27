@@ -154,6 +154,26 @@ export function documentsRepository(supabase: SupabaseClient) {
       }));
     },
 
+    // Documents rattachés à une réclamation précise (document_links.entity_type = 'claim',
+    // 0063) -- contrairement aux liens ci-dessus (au plus un document), une réclamation peut
+    // avoir PLUSIEURS documents liés (UploadProjectDocumentForm, grants/[id], sélecteur
+    // "claim_id"). Jade : montrer au client, dans le portail, tous les documents que le
+    // personnel a téléversés pour une réclamation -- même une fois celle-ci payée.
+    async listClaimLinks(claimIds: string[]): Promise<Array<{ claim_id: string; document_id: string; filename: string }>> {
+      if (claimIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from("document_links")
+        .select("entity_id, document_id, documents(filename)")
+        .eq("entity_type", "claim")
+        .in("entity_id", claimIds);
+      if (error) throw error;
+      return (data ?? []).map((row: any) => ({
+        claim_id: row.entity_id,
+        document_id: row.document_id,
+        filename: row.documents?.filename ?? "",
+      }));
+    },
+
     // organization_id : requis par le type Insert généré (colonne not null sans défaut
     // SQL, seulement réécrite par un trigger) -- le trigger enforce_document_link_integrity
     // ignore de toute façon la valeur envoyée et la recalcule depuis document_id, donc ceci
