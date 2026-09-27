@@ -155,12 +155,15 @@ async function analyzeUploadedDdrReport(
       parts.push("Rapport DDR lu, mais aucun salarié n'a pu y être identifié : rien n'a été ajouté au tableau.");
     } else {
       if (r.created.length > 0) {
+        // Jade : le montant ajouté par salarié est celui RÉELLEMENT remboursé (réparti à partir du
+        // montant corrigé de la période), pas le total brut de la table des coûts de salaires --
+        // le dire explicitement ici pour que ce soit clair sans avoir à ouvrir le tableau.
         const createdLabel = r.created.map((c) => `${c.employeeName}${c.amount != null ? ` (${moneyCad(c.amount)})` : ""}${c.supplierCreated ? " — nouveau" : ""}`).join(", ");
-        parts.push(`DDR ${extraction.ddr_number ?? "?"} lu : ${r.created.length} salarié(s) ajouté(s) — ${createdLabel} — à vérifier.`);
+        parts.push(`DDR ${extraction.ddr_number ?? "?"} lu : ${r.created.length} salarié(s) ajouté(s), montant réellement remboursé (après niveau de support) — ${createdLabel} — à vérifier.`);
       }
       if (r.skippedDuplicates.length > 0) parts.push(`${r.skippedDuplicates.join(", ")} : déjà enregistré(s) pour ce DDR, ignoré(s).`);
     }
-    if (extraction.claimed_amount_for_period != null) parts.push(`Montant réclamé pour la période : ${moneyCad(extraction.claimed_amount_for_period)}.`);
+    if (extraction.claimed_amount_for_period != null) parts.push(`Montant rectifié réclamé pour la période (utilisé ci-dessus) : ${moneyCad(extraction.claimed_amount_for_period)}.`);
     if (extraction.financial_year_balance_remaining != null) {
       parts.push(`Solde restant actualisé${extraction.financial_year_label ? ` (${extraction.financial_year_label})` : ""} : ${moneyCad(extraction.financial_year_balance_remaining)}.`);
     } else {

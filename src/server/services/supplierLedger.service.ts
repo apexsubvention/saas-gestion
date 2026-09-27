@@ -5,7 +5,7 @@ import { documentsRepository } from "@/server/repositories/documents.repository"
 import { billingLineItemsRepository } from "@/server/repositories/billingLineItems.repository";
 import { matchSupplier } from "@/features/invoices/matchSupplier";
 import { amountBeforeTax, type InvoiceExtraction } from "@/features/invoices/analyzeInvoice";
-import { employeeAmount, type DdrExtraction } from "@/features/ddr/analyzeDdrReport";
+import { apportionCorrectedAmounts, type DdrExtraction } from "@/features/ddr/analyzeDdrReport";
 
 // Tableau fournisseurs d'un dossier : fournisseurs + leurs factures (document, date, montant).
 
@@ -362,6 +362,9 @@ export function supplierLedgerService(supabase: SupabaseClient) {
     // même dédoublonnage (fournisseur + numéro + total) que recordAnalyzedInvoice ci-dessus, pour
     // rester cohérent si le même rapport est téléversé deux fois. Chaque ligne créée est marquée
     // « à vérifier », jamais appliquée telle quelle sans revue -- même philosophie que ci-dessus.
+    // Jade (suite à 0065) : le montant de chaque ligne est le montant RÉELLEMENT remboursé pour la
+    // période (réparti entre les salariés -- apportionCorrectedAmounts), pas le total brut des
+    // salariés lu sur la table des coûts de salaires -- voir analyzeDdrReport.ts.
     async recordAnalyzedDdrReport(
       organizationId: string,
       grantProjectId: string,
@@ -381,8 +384,13 @@ export function supplierLedgerService(supabase: SupabaseClient) {
       const existingExpenses = await expensesRepo.listByProject(grantProjectId);
       const created: Array<{ employeeName: string; supplierCreated: boolean; amount: number | null }> = [];
       const skippedDuplicates: string[] = [];
+      // Jade : le montant écrit par salarié est le montant RÉELLEMENT remboursé pour la période
+      // (claimed_amount_for_period -- "Montant rectifié réclamé"/"Montants corrigés"), réparti
+      // entre les salariés listés -- pas le total brut de chacun. Calculé une fois pour tout le
+      // rapport (la répartition dépend de l'ensemble des salariés) -- voir apportionCorrectedAmounts.
+      const amounts = apportionCorrectedAmounts(x.employees, x.claimed_amount_for_period);
 
-      for (const emp of x.employees) {
+      for (const [i, emp] of x.employees.entries()) {
         const name = emp.name ?? "Salarié à identifier";
         let supplier = emp.name ? matchSupplier(emp.name, employeeSuppliers) : null;
         let supplierCreated = false;
@@ -403,7 +411,7 @@ export function supplierLedgerService(supabase: SupabaseClient) {
           employeeSuppliers.push(supplier); // même salarié cité 2x dans le même rapport -> pas 2 fiches créées
         }
 
-        const amount = employeeAmount(emp);
+        const amount = amounts[i] ?? null;
         if (x.ddr_number) {
           const dup = existingExpenses.find((e) => e.supplier_id === supplier!.id && e.invoice_number === x.ddr_number && num(e.total) === amount);
           if (dup) {
