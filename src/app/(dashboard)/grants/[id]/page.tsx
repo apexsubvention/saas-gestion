@@ -161,12 +161,16 @@ export default async function GrantProjectPage({ params, searchParams }: { param
   const nextMilestone = pendingMilestones[0] ?? null;
 
   const approved = Number(project.approved_grant_amount ?? 0);
-  // Jade : pour un dossier PARI, "Solde" (en haut) doit concorder avec "Subvention restante"
-  // (Fournisseurs) et le solde restant PARI (calculés à partir des DDR nets) -- totals.claimed
-  // (budget_line_actuals) reste à 0 tant qu'aucune réclamation formelle n'est créée/liée, ce qui
-  // n'a pas de sens pour un DDR déjà complété par le programme. subsidy.remaining est la même
-  // valeur que celle du bloc "Solde restant PARI" (net des DDR), donc les deux concordent toujours.
-  const balance = isPariProgram ? subsidy.remaining : approved - totals.claimed;
+  // Jade : pour un dossier PARI, "Solde" (en haut) doit toujours refléter la même source que
+  // l'encadré vert "Solde restant PARI" -- project.pari_balance_remaining, lu directement sur le
+  // rapport Historique DDR (solde officiel du programme pour l'exercice financier), pas recalculé
+  // par Apex. subsidy.remaining (entente : taux x montant approuvé) suppose une entente PARI
+  // renseignée dans Apex -- souvent absente/pas encore saisie pour ces dossiers (montant approuvé
+  // à 0 dans l'en-tête) -- donc ne pas s'y fier comme source principale : elle ne sert que de repli
+  // tant qu'aucun rapport DDR n'a encore été lu (pari_balance_remaining est alors null).
+  // totals.claimed (budget_line_actuals) reste à 0 tant qu'aucune réclamation formelle n'est créée/
+  // liée, ce qui n'a pas de sens pour un DDR déjà complété par le programme -- jamais utilisé ici.
+  const balance = isPariProgram ? project.pari_balance_remaining ?? subsidy.remaining : approved - totals.claimed;
 
   // Échéancier unifié : tâches (manuel), échéances (suggérées ou manuelles depuis
   // l'entente) et réclamations (dossiers réels) forment ensemble UNE liste triée par
