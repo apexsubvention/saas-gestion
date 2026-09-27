@@ -15,6 +15,13 @@
 // informations de facturation (contact/fréquence/jour/exigences/lien client) et l'historique -- les
 // factures (ajout, statut, preuve de paiement) restent, elles, gérées directement dans le tableau
 // principal comme avant, sans changement.
+//
+// Taux d'aide par poste (0061, Jade -- dossier Caracol/Sitegrow) : certaines conventions ont un
+// taux différent selon le type de frais (ex. formation à 85 % alors que le taux global du dossier,
+// tous frais confondus, en est un autre) -- chaque poste peut donc porter son propre taux d'aide,
+// optionnel ; sans lui, il utilise le taux du dossier. « Subvention acceptée » (AUTO) est alors
+// calculée poste par poste avec le bon taux plutôt qu'en appliquant le taux global à tout le
+// Budget prévu -- voir supplierLedger.service.ts.
 import { Fragment, useState, useTransition } from "react";
 import { OpenDocumentButton } from "./OpenDocumentButton";
 import {
@@ -49,13 +56,14 @@ const EXCLUSION_REASON_LABELS: Record<string, string> = {
 // juste sous chaque fournisseur (toujours visibles, plus besoin d'ouvrir « Détails »), modifiables
 // directement ici -- même mécanisme, sans changer d'onglet. Budget prévu = somme de ceux cochés
 // « À facturer » ci-dessous.
-function SupplierLineItemRow({ grantProjectId, item }: { grantProjectId: string; item: BillingLineItemRow }) {
+function SupplierLineItemRow({ grantProjectId, item, projectRate }: { grantProjectId: string; item: BillingLineItemRow; projectRate: number | null }) {
   const [label, setLabel] = useState(item.label);
   const [description, setDescription] = useState(item.description ?? "");
   const [amount, setAmount] = useState(String(item.amount ?? 0));
   const [hours, setHours] = useState(item.hours != null ? String(item.hours) : "");
   const [included, setIncluded] = useState(item.included_in_billing);
   const [exclusionReason, setExclusionReason] = useState(item.exclusion_reason ?? "");
+  const [subsidyRatePercent, setSubsidyRatePercent] = useState(item.subsidy_rate != null ? String(Math.round(item.subsidy_rate * 10000) / 100) : "");
   const { pending, error, run } = useLedgerAction();
   const [saved, setSaved] = useState(false);
 
@@ -65,13 +73,23 @@ function SupplierLineItemRow({ grantProjectId, item }: { grantProjectId: string;
     amount !== String(item.amount ?? 0) ||
     hours !== (item.hours != null ? String(item.hours) : "") ||
     included !== item.included_in_billing ||
-    exclusionReason !== (item.exclusion_reason ?? "");
+    exclusionReason !== (item.exclusion_reason ?? "") ||
+    subsidyRatePercent !== (item.subsidy_rate != null ? String(Math.round(item.subsidy_rate * 10000) / 100) : "");
+
+  // Aperçu : montant subventionné de CE poste, avec son propre taux s'il en a un, sinon le taux du
+  // dossier -- affiché même décoché (0061, Jade : « il faudrait quand même le mettre de l'avant, que
+  // ça c'est couvert », pour un coût interne comme un salaire jamais facturé mais bien subventionné).
+  const previewRatePercent = subsidyRatePercent.trim() ? Number(subsidyRatePercent) : projectRate != null ? Math.round(projectRate * 10000) / 100 : null;
+  const previewAmount = parseAmount(amount);
+  const subsidyPreview = previewRatePercent != null && previewAmount != null && !Number.isNaN(previewAmount) ? Math.round(previewAmount * (previewRatePercent / 100) * 100) / 100 : null;
 
   function save() {
     const amt = parseAmount(amount);
     if (amt == null || Number.isNaN(amt)) return run(async () => ({ error: "Montant invalide." }));
     const hrs = hours.trim() ? Number(hours) : null;
     if (hrs != null && !Number.isFinite(hrs)) return run(async () => ({ error: "Heures invalides." }));
+    const ratePercent = subsidyRatePercent.trim() ? Number(subsidyRatePercent) : null;
+    if (ratePercent != null && (!Number.isFinite(ratePercent) || ratePercent < 0 || ratePercent > 100)) return run(async () => ({ error: "Taux d'aide invalide (0 à 100)." }));
     setSaved(false);
     run(
       () =>
@@ -83,6 +101,7 @@ function SupplierLineItemRow({ grantProjectId, item }: { grantProjectId: string;
           included_in_billing: included,
           exclusion_reason: included ? null : (exclusionReason as "internal_salary" | "redistribute_supplier" | "new_supplier" | "") || null,
           supplier_id: item.supplier_id,
+          subsidy_rate: ratePercent != null ? Math.round((ratePercent / 100) * 10000) / 10000 : null,
         }),
       () => setSaved(true)
     );
@@ -105,6 +124,17 @@ function SupplierLineItemRow({ grantProjectId, item }: { grantProjectId: string;
           ))}
         </select>
       )}
+      <input
+        type="number"
+        min={0}
+        max={100}
+        step="0.01"
+        value={subsidyRatePercent}
+        onChange={(e) => setSubsidyRatePercent(e.target.value)}
+        className={`${input} sm:col-span-2`}
+        placeholder={`Taux d'aide %${projectRate != null ? ` (dossier : ${Math.round(projectRate * 10000) / 100}%)` : ""}`}
+        title="Optionnel -- remplace le taux d'aide du dossier pour ce poste précis. Vide = utilise le taux du dossier."
+      />
       <div className={`flex items-center gap-1 ${included ? "sm:col-span-2" : ""}`}>
         {dirty && (
           <button onClick={save} disabled={pending} className={`${smallBtn} bg-neutral-900 text-white hover:bg-neutral-800`}>
@@ -113,6 +143,12 @@ function SupplierLineItemRow({ grantProjectId, item }: { grantProjectId: string;
         )}
         {!dirty && saved && <span className="text-xs text-emerald-700">Enregistré ✓</span>}
       </div>
+      {subsidyPreview != null && (
+        <p className="text-[11px] text-neutral-400 sm:col-span-12">
+          {included ? "Subventionné" : "Couvert par la subvention (non facturé)"} : <span className="font-medium text-neutral-600">{money(subsidyPreview)}</span>
+          {previewRatePercent != null ? ` (${previewRatePercent}%${subsidyRatePercent.trim() ? "" : ", taux du dossier"})` : ""}
+        </p>
+      )}
       {error && <p className="text-xs text-red-600 sm:col-span-12">{error}</p>}
     </div>
   );
@@ -127,11 +163,14 @@ function SupplierLineItems({
   supplierId,
   items,
   budget,
+  projectRate,
 }: {
   grantProjectId: string;
   supplierId: string;
   items: BillingLineItemRow[];
   budget: Tracked;
+  // Taux d'aide du dossier -- utilisé comme repli quand un poste n'a pas son propre taux (0061).
+  projectRate: number | null;
 }) {
   if (items.length === 0) {
     return (
@@ -150,11 +189,12 @@ function SupplierLineItems({
     <div className="space-y-2">
       <p className="text-xs text-neutral-500">
         Postes associés à ce fournisseur ({items.length}) — Budget prévu = somme de ceux cochés « À facturer » ci-dessous :{" "}
-        <span className="font-medium text-neutral-700">{money(includedTotal)}</span>.
+        <span className="font-medium text-neutral-700">{money(includedTotal)}</span>. Subvention acceptée = somme de chaque poste x son
+        propre taux d&apos;aide (ou le taux du dossier si aucun n&apos;est précisé).
       </p>
       <div className="space-y-2">
         {items.map((it) => (
-          <SupplierLineItemRow key={it.id} grantProjectId={grantProjectId} item={it} />
+          <SupplierLineItemRow key={it.id} grantProjectId={grantProjectId} item={it} projectRate={projectRate} />
         ))}
       </div>
     </div>
@@ -511,6 +551,9 @@ function InvoiceRow({
 }
 
 function SupplierGroup({ grantProjectId, supplier, documents, clients, claims, lineItems, isFirst, isLast, billingContext }: { grantProjectId: string; supplier: LedgerSupplier; documents: DocOption[]; clients: ClientOption[]; claims: ClaimOption[]; lineItems: BillingLineItemRow[]; isFirst: boolean; isLast: boolean; billingContext?: SupplierBillingContext }) {
+  // Taux d'aide du dossier (0061) : repli pour les postes qui n'ont pas leur propre taux -- même
+  // valeur que celle utilisée par le narratif ci-dessus (subsidy.rate, computeSubsidy()).
+  const projectRate = billingContext?.subsidy.rate ?? null;
   const [name, setName] = useState(supplier.name);
   const [contact, setContact] = useState(supplier.contact ?? "");
   const [frequency, setFrequency] = useState(supplier.billing_frequency ?? "");
@@ -602,7 +645,7 @@ function SupplierGroup({ grantProjectId, supplier, documents, clients, claims, l
         <td colSpan={6} className="px-3 pb-3">
           {narrative && <p className="mb-2 rounded-md bg-indigo-50 px-3 py-2 text-sm text-indigo-900">{narrative}</p>}
           <h4 className="mb-2 text-xs font-semibold text-neutral-700">Budget prévu — postes de facturation</h4>
-          <SupplierLineItems grantProjectId={grantProjectId} supplierId={supplier.id} items={lineItems} budget={supplier.budget} />
+          <SupplierLineItems grantProjectId={grantProjectId} supplierId={supplier.id} items={lineItems} budget={supplier.budget} projectRate={projectRate} />
         </td>
       </tr>
       {showDetails && (

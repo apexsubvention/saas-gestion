@@ -268,6 +268,9 @@ const lineItemPatchSchema = z.object({
   included_in_billing: z.boolean(),
   exclusion_reason: z.enum(["internal_salary", "redistribute_supplier", "new_supplier"]).nullable(),
   supplier_id: z.string().uuid().nullable(),
+  // Taux d'aide spécifique à ce poste (0061, Jade) -- fraction 0-1, déjà convertie côté client
+  // (saisie en % dans le formulaire) ; null = utilise le taux du dossier.
+  subsidy_rate: z.number().min(0, "Taux invalide").max(1, "Taux invalide").nullable(),
 });
 export type LineItemPatchInput = z.input<typeof lineItemPatchSchema>;
 

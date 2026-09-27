@@ -82,9 +82,22 @@ export function supplierLedgerService(supabase: SupabaseClient) {
       // "À facturer" ET associés à ce fournisseur -- null (pas 0) si aucun poste n'est associé, pour
       // distinguer "rien à calculer" de "calculé, ça fait 0 $".
       const budgetAutoBySupplier = new Map<string, number>();
+      // Subvention acceptée, calculée poste par poste (0061, Jade -- dossier Caracol/Sitegrow) :
+      // une convention peut avoir un taux d'aide différent du taux global du dossier selon le type
+      // de frais (ex. formation à 85% alors que le taux global, tous frais confondus, est autre --
+      // voir migration 0061). Chaque poste utilise SON propre taux (subsidy_rate) s'il en a un,
+      // sinon le taux du dossier (projectRate) -- jamais l'inverse, pour ne pas écraser un taux
+      // précis avec le taux global. Un poste sans AUCUN taux disponible (ni le sien, ni celui du
+      // dossier) ne contribue simplement pas -- pas d'invention de valeur.
+      const acceptedAutoBySupplier = new Map<string, number>();
       for (const it of lineItems) {
         if (it.included_in_billing && it.supplier_id) {
           budgetAutoBySupplier.set(it.supplier_id, Math.round(((budgetAutoBySupplier.get(it.supplier_id) ?? 0) + Number(it.amount ?? 0)) * 100) / 100);
+          const rate = num(it.subsidy_rate) ?? projectRate;
+          if (rate != null) {
+            const contribution = Math.round(Number(it.amount ?? 0) * rate * 100) / 100;
+            acceptedAutoBySupplier.set(it.supplier_id, Math.round(((acceptedAutoBySupplier.get(it.supplier_id) ?? 0) + contribution) * 100) / 100);
+          }
         }
       }
       const [links, proofLinks] = await Promise.all([
@@ -151,10 +164,16 @@ export function supplierLedgerService(supabase: SupabaseClient) {
 
         const accAuto = num(s.accepted_subsidy_auto);
         const accOverride = num(s.accepted_subsidy_override);
+        // Calcul poste par poste (chacun avec son propre taux si précisé) -- prioritaire dès qu'il
+        // existe, exactement comme Budget prévu, car plus précis que le taux global appliqué en
+        // bloc. accAuto (lu par l'IA à la création du fournisseur) ne sert plus que de repli quand
+        // aucun poste ne permet encore de calculer.
+        const acceptedFromItems = acceptedAutoBySupplier.has(s.id) ? acceptedAutoBySupplier.get(s.id)! : null;
+        const autoValue = acceptedFromItems ?? accAuto;
         const fallback = budget.effective != null && projectRate != null ? Math.round(budget.effective * projectRate * 100) / 100 : null;
         const accepted: Tracked =
-          accOverride != null ? { effective: accOverride, auto: accAuto ?? fallback, override: accOverride, mode: "manual" }
-          : accAuto != null ? { effective: accAuto, auto: accAuto, override: null, mode: "auto" }
+          accOverride != null ? { effective: accOverride, auto: autoValue ?? fallback, override: accOverride, mode: "manual" }
+          : autoValue != null ? { effective: autoValue, auto: autoValue, override: null, mode: "auto" }
           : fallback != null ? { effective: fallback, auto: fallback, override: null, mode: "calculated" }
           : { effective: null, auto: null, override: null, mode: "none" };
 

@@ -99,7 +99,7 @@ export async function saveBillingLineItemsAction(grantProjectId: string, _prev: 
   const supabase = await createClient();
   try {
     const count = Number(formData.get("item_count") ?? 0);
-    const items: { label: string; description: string | null; amount: number; hours: number | null; included_in_billing: boolean; exclusion_reason: "internal_salary" | "redistribute_supplier" | "new_supplier" | null; supplier_id: string | null }[] = [];
+    const items: { label: string; description: string | null; amount: number; hours: number | null; included_in_billing: boolean; exclusion_reason: "internal_salary" | "redistribute_supplier" | "new_supplier" | null; supplier_id: string | null; subsidy_rate: number | null }[] = [];
     for (let i = 0; i < count; i++) {
       const label = String(formData.get(`item_label_${i}`) ?? "").trim();
       if (!label) continue;
@@ -110,7 +110,10 @@ export async function saveBillingLineItemsAction(grantProjectId: string, _prev: 
       const reasonRaw = String(formData.get(`item_exclusion_reason_${i}`) ?? "");
       const reason = reasonRaw === "internal_salary" || reasonRaw === "redistribute_supplier" || reasonRaw === "new_supplier" ? reasonRaw : null;
       const supplierId = String(formData.get(`item_supplier_id_${i}`) ?? "").trim() || null;
-      items.push({ label, description, amount, hours, included_in_billing: included, exclusion_reason: reason, supplier_id: supplierId });
+      // Taux d'aide spécifique (0061) : saisi en % (0-100) dans le formulaire, converti en fraction ici.
+      const ratePercent = numberOrNull(formData.get(`item_subsidy_rate_${i}`));
+      const subsidyRate = ratePercent != null ? Math.round((ratePercent / 100) * 10000) / 10000 : null;
+      items.push({ label, description, amount, hours, included_in_billing: included, exclusion_reason: reason, supplier_id: supplierId, subsidy_rate: subsidyRate });
     }
     await billingLineItemsService(supabase).replaceAll(ctx.organizationId, grantProjectId, items, "manual");
     refresh(grantProjectId);

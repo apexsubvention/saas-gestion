@@ -8,12 +8,12 @@ import { useState, useTransition } from "react";
 import type { BillingLineItemRow } from "@/server/repositories/billingLineItems.repository";
 import { saveBillingLineItemsAction } from "./actions";
 
-type Row = { key: string; label: string; description: string; amount: string; hours: string; included: boolean; exclusionReason: string; supplierId: string };
+type Row = { key: string; label: string; description: string; amount: string; hours: string; included: boolean; exclusionReason: string; supplierId: string; subsidyRatePercent: string };
 
 let nextKey = 0;
 function newRow(): Row {
   nextKey += 1;
-  return { key: `new-${nextKey}`, label: "", description: "", amount: "", hours: "", included: true, exclusionReason: "", supplierId: "" };
+  return { key: `new-${nextKey}`, label: "", description: "", amount: "", hours: "", included: true, exclusionReason: "", supplierId: "", subsidyRatePercent: "" };
 }
 
 const input = "w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm";
@@ -50,6 +50,7 @@ export function LineItemsEditor({
           included: it.included_in_billing,
           exclusionReason: it.exclusion_reason ?? "",
           supplierId: it.supplier_id ?? "",
+          subsidyRatePercent: it.subsidy_rate != null ? String(Math.round(it.subsidy_rate * 10000) / 100) : "",
         }))
       : [newRow()]
   );
@@ -81,6 +82,7 @@ export function LineItemsEditor({
       fd.set(`item_included_${i}`, r.included ? "true" : "false");
       fd.set(`item_exclusion_reason_${i}`, r.exclusionReason);
       fd.set(`item_supplier_id_${i}`, r.supplierId);
+      fd.set(`item_subsidy_rate_${i}`, r.subsidyRatePercent);
     });
     startTransition(async () => {
       const res = await saveBillingLineItemsAction(grantProjectId, { error: null }, fd);
@@ -130,6 +132,17 @@ export function LineItemsEditor({
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
+            <input
+              placeholder="Taux d'aide (%)"
+              type="number"
+              min={0}
+              max={100}
+              step="0.01"
+              value={r.subsidyRatePercent}
+              onChange={(e) => update(r.key, { subsidyRatePercent: e.target.value })}
+              className={`${input} sm:col-span-2`}
+              title="Optionnel -- remplace le taux d'aide du dossier pour ce poste précis (ex. une convention où la formation est subventionnée à un taux différent du taux global). Vide = utilise le taux du dossier."
+            />
             <button type="button" onClick={() => removeRow(r.key)} className="rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50 sm:col-span-1">
               Retirer
             </button>
@@ -137,7 +150,7 @@ export function LineItemsEditor({
         ))}
       </div>
       <p className="text-xs text-neutral-500">
-        Décoche un poste qui n&apos;est pas facturé au client (ex. un salaire interne remboursé directement par la subvention) -- seuls les postes cochés « À facturer » comptent dans le total réparti sur les versements. Associe un poste coché à un fournisseur pour que son montant apparaisse dans le « Budget prévu » de ce fournisseur, dans le tableau Fournisseurs du Dossier.
+        Décoche un poste qui n&apos;est pas facturé au client (ex. un salaire interne remboursé directement par la subvention) -- seuls les postes cochés « À facturer » comptent dans le total réparti sur les versements. Associe un poste coché à un fournisseur pour que son montant apparaisse dans le « Budget prévu » de ce fournisseur, dans le tableau Fournisseurs du Dossier. Taux d&apos;aide (%) : à remplir seulement si ce poste précis a un taux différent du taux global du dossier (ex. une convention qui subventionne la formation à 85 % mais dont le taux global du projet, tous frais confondus, est différent) -- laisse vide pour utiliser le taux du dossier.
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={addRow} className="rounded-md border border-neutral-300 px-2 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50">

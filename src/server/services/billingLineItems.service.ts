@@ -9,6 +9,15 @@ function clampAmount(n: number): number {
 
 const EXCLUSION_REASONS = new Set(["internal_salary", "redistribute_supplier", "new_supplier"]);
 
+// Taux d'aide spécifique à un poste (0061, Jade) : fraction 0-1 ou null (utilise le taux du
+// dossier). Une convention peut prévoir des taux différents selon le type de frais (ex. 85% pour
+// la formation, un taux plus bas pour un salaire plafonné à 25$/h) -- jamais inventé ici, juste
+// validé/borné.
+function clampRate(n: number | null | undefined): number | null {
+  if (n == null || !Number.isFinite(n)) return null;
+  return Math.max(0, Math.min(1, Math.round(n * 10000) / 10000));
+}
+
 // Validation partagée entre replaceAll (liste complète, Aide à la facturation) et updateOne
 // (édition inline d'un seul poste, tableau Fournisseurs) -- mêmes règles dans les deux cas.
 function sanitizeItem(it: BillingLineItemInput, validSupplierIds: Set<string>) {
@@ -25,6 +34,7 @@ function sanitizeItem(it: BillingLineItemInput, validSupplierIds: Set<string>) {
     included_in_billing: included,
     exclusion_reason: reason,
     supplier_id: supplierId,
+    subsidy_rate: clampRate(it.subsidy_rate),
   };
 }
 

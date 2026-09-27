@@ -24,6 +24,11 @@ export type BillingLineItemRow = {
   // fournisseur, son montant alimente automatiquement le "Budget prévu" de ce fournisseur dans le
   // tableau Fournisseurs -- voir supplierLedger.service. null si pas encore associé.
   supplier_id: string | null;
+  // Taux d'aide spécifique à ce poste (0061, Jade) : fraction 0-1, ex. 0.85 -- remplace le taux du
+  // dossier pour calculer la part de Subvention acceptée QUE CE POSTE représente, quand une
+  // convention a des taux différents selon le type de frais (ex. formation vs salaire plafonné).
+  // null = utilise le taux du dossier (comportement historique).
+  subsidy_rate: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -37,6 +42,7 @@ export type BillingLineItemInput = {
   included_in_billing?: boolean;
   exclusion_reason?: "internal_salary" | "redistribute_supplier" | "new_supplier" | null;
   supplier_id?: string | null;
+  subsidy_rate?: number | null;
 };
 
 export function billingLineItemsRepository(supabase: SupabaseClient) {
@@ -68,6 +74,7 @@ export function billingLineItemsRepository(supabase: SupabaseClient) {
         included_in_billing: item.included_in_billing ?? true,
         exclusion_reason: item.exclusion_reason ?? null,
         supplier_id: item.supplier_id ?? null,
+        subsidy_rate: item.subsidy_rate ?? null,
         source,
       }));
       const { data, error } = await supabase.from("billing_line_items").insert(rows).select();
