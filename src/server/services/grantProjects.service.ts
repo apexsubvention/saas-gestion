@@ -33,6 +33,7 @@ export function grantProjectsService(supabase: SupabaseClient) {
     },
 
     updateHiddenFromParentPortal: (id: string, hidden: boolean) => repo.updateHiddenFromParentPortal(id, hidden),
+    updateRequiresPaymentProof: (id: string, required: boolean) => repo.updateRequiresPaymentProof(id, required),
 
     async updateName(id: string, name: string) {
       const trimmed = name.trim();

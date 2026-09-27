@@ -20,6 +20,11 @@ export type GrantProjectRow = {
   // du personnel. Filtré côté application dans portalDossiersService.listDossiers(), pas par
   // RLS -- voir 0056 pour le raisonnement complet.
   hidden_from_parent_portal: boolean;
+  // Jade (0064) : certaines subventions ne demandent jamais de preuve de paiement des factures
+  // fournisseurs -- réglage par dossier, true par défaut (comportement inchangé pour les
+  // dossiers existants). Contrôle uniquement l'affichage du bloc "Preuve de paiement" côté
+  // portail client -- voir portalDossiers.service.ts / PortalSupplierInvoices.tsx.
+  requires_payment_proof: boolean;
 };
 
 export function grantProjectsRepository(supabase: SupabaseClient) {
@@ -100,6 +105,17 @@ export function grantProjectsRepository(supabase: SupabaseClient) {
       const { data, error } = await supabase
         .from("grant_projects")
         .update({ hidden_from_parent_portal: hidden, updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as GrantProjectRow;
+    },
+
+    async updateRequiresPaymentProof(id: string, required: boolean): Promise<GrantProjectRow> {
+      const { data, error } = await supabase
+        .from("grant_projects")
+        .update({ requires_payment_proof: required, updated_at: new Date().toISOString() })
         .eq("id", id)
         .select()
         .single();

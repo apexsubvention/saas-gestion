@@ -47,8 +47,7 @@ export function DossierNotes({ grantProjectId, clientId, notes }: { grantProject
   const [state, formAction] = useFormState(action, initialState);
 
   return (
-    <section className="space-y-3">
-      <h2 className="text-sm font-semibold text-neutral-900">Notes partagées avec le client</h2>
+    <div className="space-y-3">
       <p className="text-xs text-neutral-500">
         Un fil simple, visible dans le portail du client par défaut — décoche « Visible pour le client » pour te laisser
         une note interne sur le même dossier.
@@ -98,6 +97,6 @@ export function DossierNotes({ grantProjectId, clientId, notes }: { grantProject
         </div>
         {state.error && <p className="text-sm text-red-600">{state.error}</p>}
       </form>
-    </section>
+    </div>
   );
 }

@@ -449,6 +449,24 @@ export async function updateMilestoneStatusAction(
   return { error: null };
 }
 
+// Jade : pouvoir corriger le libellé d'une échéance après coup, y compris une échéance générée
+// automatiquement à partir de l'entente (ex. « Réclamation mi-projet ») -- voir le commentaire
+// sur milestonesRepository.updateTitle pour la limite connue (dédoublonnage des suggestions).
+export async function updateMilestoneTitleAction(grantProjectId: string, milestoneId: string, title: string): Promise<{ error: string | null }> {
+  const ctx = await requireOrgContext();
+  const supabase = await createClient();
+  const trimmed = title.trim();
+  try {
+    await milestonesService(supabase).updateTitle(milestoneId, trimmed);
+  } catch (e) {
+    return { error: formatCaughtError(e) };
+  }
+  await logDossierEvent(supabase, ctx, { grant_project_id: grantProjectId, kind: "milestone_renamed", title: `Échéance renommée : ${trimmed}`, source: "manual" });
+  revalidatePath(`/grants/${grantProjectId}`);
+  revalidatePath("/echeancier");
+  return { error: null };
+}
+
 export type SuggestMilestonesState = { error: string | null; created: number; skipped: number };
 
 export async function suggestMilestonesAction(
@@ -625,6 +643,30 @@ export async function toggleHiddenFromParentPortalAction(grantProjectId: string,
     grant_project_id: grantProjectId,
     kind: "portal_visibility_changed",
     title: hidden ? "Masqué du portail du client parent" : "Redevenu visible du portail du client parent",
+    source: "manual",
+  });
+  revalidatePath(`/grants/${grantProjectId}`);
+  return { error: null };
+}
+
+// ---- Preuve de paiement facultative (portail) ----------------------------------
+// Jade : certaines subventions ne demandent jamais de preuve de paiement des factures
+// fournisseurs -- réglage par dossier (0064), transmis au portail client
+// (PortalSupplierInvoices.tsx n'affiche plus le bloc "Preuve de paiement" quand false). Le
+// personnel garde toujours la possibilité d'en joindre une côté interne (SuppliersTable.tsx),
+// ce réglage ne contrôle que ce qui est demandé au client.
+export async function toggleRequiresPaymentProofAction(grantProjectId: string, required: boolean): Promise<{ error: string | null }> {
+  const ctx = await requireOrgContext();
+  const supabase = await createClient();
+  try {
+    await grantProjectsService(supabase).updateRequiresPaymentProof(grantProjectId, required);
+  } catch (e) {
+    return { error: formatCaughtError(e) };
+  }
+  await logDossierEvent(supabase, ctx, {
+    grant_project_id: grantProjectId,
+    kind: "payment_proof_requirement_changed",
+    title: required ? "Preuve de paiement redevenue requise" : "Preuve de paiement rendue facultative",
     source: "manual",
   });
   revalidatePath(`/grants/${grantProjectId}`);

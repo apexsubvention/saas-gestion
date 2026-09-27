@@ -11,8 +11,7 @@ const SOURCE_LABELS: Record<DossierEventRow["source"], { label: string; classNam
 // modifications manuelles...). Un événement n'est jamais réécrit.
 export function DossierTimeline({ events }: { events: DossierEventRow[] }) {
   return (
-    <section className="space-y-3">
-      <h2 className="text-sm font-semibold text-neutral-900">Journal du dossier</h2>
+    <div className="space-y-3">
       {events.length === 0 ? (
         <p className="rounded-lg border border-dashed border-neutral-300 bg-white px-4 py-6 text-sm text-neutral-400">
           Aucun événement pour l&apos;instant. Les changements de statut, l&apos;entente, les factures et les documents s&apos;y ajoutent automatiquement.
@@ -37,6 +36,6 @@ export function DossierTimeline({ events }: { events: DossierEventRow[] }) {
           })}
         </ol>
       )}
-    </section>
+    </div>
   );
 }

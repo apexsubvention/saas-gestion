@@ -190,6 +190,9 @@ export type PortalDossier = {
   // dossier (ex. migration pas encore appliquée côté programme, ou dossier créé avant 0038).
   programSummary: PortalProgramSummary | null;
   supplierInvoices: PortalSupplierInvoice[];
+  // Jade (0064) : certaines subventions ne demandent jamais de preuve de paiement -- quand
+  // false, PortalSupplierInvoices.tsx n'affiche plus le bloc "Preuve de paiement" au client.
+  requiresPaymentProof: boolean;
 };
 
 export function portalDossiersService(supabase: SupabaseClient) {
@@ -227,6 +230,7 @@ export function portalDossiersService(supabase: SupabaseClient) {
         total_project_cost: number | null;
         grant_rate: number | null;
         hidden_from_parent_portal: boolean;
+        requires_payment_proof: boolean;
         clients: { name: string } | null;
         grant_programs: { name: string } | null;
       }>;
@@ -415,6 +419,7 @@ export function portalDossiersService(supabase: SupabaseClient) {
             })),
             programSummary,
             supplierInvoices,
+            requiresPaymentProof: p.requires_payment_proof,
           };
         })
       );

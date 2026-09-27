@@ -10,9 +10,8 @@ export function ProgramRulesSnapshot({ grantProjectId, program, snapshots }: { g
   const dateOf = (iso: string) => new Intl.DateTimeFormat("fr-CA", { dateStyle: "long" }).format(new Date(iso));
 
   return (
-    <section className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-neutral-900">Règles du programme figées pour ce dossier</h2>
+    <div className="space-y-3">
+      <div className="flex justify-end">
         <form action={takeSnapshotAction.bind(null, grantProjectId)}>
           <button className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50">Figer les règles actuelles</button>
         </form>
@@ -48,6 +47,6 @@ export function ProgramRulesSnapshot({ grantProjectId, program, snapshots }: { g
           )}
         </div>
       )}
-    </section>
+    </div>
   );
 }

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -40,12 +41,31 @@ import { DocumentRequestsList, type DocumentRequestListItem } from "./DocumentRe
 import { dossierNotesService } from "@/server/services/dossierNotes.service";
 import { DossierNotes } from "./DossierNotes";
 import { HideFromParentPortalToggle } from "./HideFromParentPortalToggle";
+import { RequiresPaymentProofToggle } from "./RequiresPaymentProofToggle";
 import { EditableGrantProjectName } from "./EditableGrantProjectName";
 import { DocumentCategorySelect } from "./DocumentCategorySelect";
 import { DeleteDocumentButton } from "./DeleteDocumentButton";
 
 // Le téléversement d'une facture déclenche sa lecture automatique (jusqu'à ~1 min).
 export const maxDuration = 60;
+
+// Jade : la fiche dossier était devenue une trop longue page à faire défiler -- les sections
+// consultées moins souvent (Documents demandés au client, Notes partagées, Entente de
+// convention, Règles du programme, Journal du dossier) sont repliées par défaut, avec un
+// indicateur de contenu dans l'intitulé pour savoir d'un coup d'œil s'il y a quelque chose à
+// voir sans avoir à ouvrir. <details>/<summary> natif (déjà utilisé ailleurs sur cette page,
+// ex. « Ajouter un fournisseur ») -- pas de JS nécessaire pour ouvrir/fermer.
+function CollapsibleSection({ title, badge, children }: { title: string; badge?: string; children: ReactNode }) {
+  return (
+    <details className="rounded-lg border border-neutral-200 bg-white">
+      <summary className="cursor-pointer select-none px-4 py-3 text-sm font-semibold text-neutral-900">
+        {title}
+        {badge && <span className="ml-2 text-xs font-normal text-neutral-400">{badge}</span>}
+      </summary>
+      <div className="space-y-3 border-t border-neutral-200 p-4">{children}</div>
+    </details>
+  );
+}
 
 export default async function GrantProjectPage({ params, searchParams }: { params: { id: string }; searchParams?: { tab?: string } }) {
   const tab = searchParams?.tab === "echeancier" ? "echeancier" : "dossier";
@@ -297,8 +317,7 @@ export default async function GrantProjectPage({ params, searchParams }: { param
             </div>
           </section>
 
-          <section className="space-y-3">
-            <h2 className="text-sm font-semibold text-neutral-900">Documents demandés au client</h2>
+          <CollapsibleSection title="Documents demandés au client" badge={`(${documentRequestItems.length})`}>
             <p className="text-xs text-neutral-500">
               Demande un document précis (lettre, facture, preuve de paiement...) — visible et téléversable
               depuis le portail du client, pour un dépôt de programme ou pour une réclamation précise.
@@ -313,12 +332,15 @@ export default async function GrantProjectPage({ params, searchParams }: { param
             <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
               <DocumentRequestsList grantProjectId={project.id} items={documentRequestItems} />
             </div>
-          </section>
+          </CollapsibleSection>
 
-          <DossierNotes grantProjectId={project.id} clientId={project.client_id} notes={dossierNotes} />
+          <CollapsibleSection title="Notes partagées avec le client" badge={`(${dossierNotes.length})`}>
+            <DossierNotes grantProjectId={project.id} clientId={project.client_id} notes={dossierNotes} />
+          </CollapsibleSection>
 
           <section className="space-y-3">
             <h2 className="text-sm font-semibold text-neutral-900">Fournisseurs et factures</h2>
+            <RequiresPaymentProofToggle grantProjectId={project.id} initialRequired={project.requires_payment_proof} />
             <SuggestionsPanel grantProjectId={project.id} suggestions={suggestions} />
             {paymentDeadlineText && (
               <div className="rounded-lg border-2 border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900">
@@ -375,8 +397,7 @@ export default async function GrantProjectPage({ params, searchParams }: { param
             </details>
           </section>
 
-          <section className="space-y-3">
-            <h2 className="text-sm font-semibold text-neutral-900">Entente de convention</h2>
+          <CollapsibleSection title="Entente de convention" badge={agreement ? "· Enregistrée" : "· Non enregistrée"}>
             <p className="text-xs text-neutral-500">
               Saisis les dates et montants de l&apos;entente : les dates de réclamation sont alors ajoutées à l&apos;échéancier et le statut du dossier
               devient « Approuvé — en attente de réclamation ».
@@ -384,11 +405,15 @@ export default async function GrantProjectPage({ params, searchParams }: { param
             <div className="rounded-lg border border-neutral-200 bg-white p-4">
               <AgreementForm grantProjectId={project.id} agreement={agreement} />
             </div>
-          </section>
+          </CollapsibleSection>
 
-          <ProgramRulesSnapshot grantProjectId={project.id} program={currentProgram} snapshots={snapshots} />
+          <CollapsibleSection title="Règles du programme figées pour ce dossier" badge={snapshots.length > 0 ? `(${snapshots.length})` : "· Aucune"}>
+            <ProgramRulesSnapshot grantProjectId={project.id} program={currentProgram} snapshots={snapshots} />
+          </CollapsibleSection>
 
-          <DossierTimeline events={dossierEvents} />
+          <CollapsibleSection title="Journal du dossier" badge={`(${dossierEvents.length})`}>
+            <DossierTimeline events={dossierEvents} />
+          </CollapsibleSection>
 
           <div className="rounded-lg border border-dashed border-neutral-300 bg-white p-6 text-sm text-neutral-400">
             Onglets Application / Budget / Expenses détaillés — arrivent à l&apos;Étape 3 (moteur opérationnel).

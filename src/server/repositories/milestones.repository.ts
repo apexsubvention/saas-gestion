@@ -56,6 +56,21 @@ export function milestonesRepository(supabase: SupabaseClient) {
       return data?.length ?? 0;
     },
 
+    // Jade : pouvoir corriger le libellé d'une échéance générée automatiquement à partir de
+    // l'entente (ex. « Réclamation mi-projet ») -- jusqu'ici seul le statut était modifiable après
+    // création. Note (type='claim' seulement) : le dédoublonnage des suggestions IA
+    // (milestonesService.suggestForProject, dismissals.ts#milestoneDedupeKey) compare le TITRE --
+    // renommer une échéance de type 'claim' puis recliquer « Suggérer l'échéancier » peut donc
+    // recréer une suggestion sous son libellé d'origine (elle ne sera plus reconnue comme déjà
+    // présente). Cas limite mineur, pas bloquant : le doublon éventuel se supprime comme n'importe
+    // quel élément de l'échéancier. Les autres types (project_end, eligibility_end...) sont
+    // dédoublonnés par TYPE seul, donc jamais affectés par un renommage.
+    async updateTitle(id: string, title: string): Promise<MilestoneRow> {
+      const { data, error } = await supabase.from("milestones").update({ title }).eq("id", id).select().single();
+      if (error) throw error;
+      return data as MilestoneRow;
+    },
+
     // Reprogrammation depuis le glisser-déposer de la vue Kanban de l'échéancier --
     // voir src/app/(dashboard)/echeancier/actions.ts.
     async updateDueDate(id: string, dueDate: string): Promise<MilestoneRow> {

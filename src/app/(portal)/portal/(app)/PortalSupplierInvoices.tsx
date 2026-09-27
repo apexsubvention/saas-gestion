@@ -23,7 +23,7 @@ function formatAmount(amount: number | null): string {
   return `${Number(amount).toLocaleString("fr-CA", { minimumFractionDigits: 2 })} $`;
 }
 
-function InvoiceCard({ invoice }: { invoice: PortalSupplierInvoice }) {
+function InvoiceCard({ invoice, requiresPaymentProof }: { invoice: PortalSupplierInvoice; requiresPaymentProof: boolean }) {
   const [status, setStatus] = useState(invoice.paymentStatus);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -68,7 +68,7 @@ function InvoiceCard({ invoice }: { invoice: PortalSupplierInvoice }) {
         </label>
         {error && <span className="text-xs text-red-600">{error}</span>}
       </div>
-      {status === "paid" && (
+      {status === "paid" && requiresPaymentProof && (
         <div className="mt-2 border-t border-neutral-100 pt-2">
           <PaymentProofUpload expenseId={invoice.id} proof={invoice.paymentProof} />
         </div>
@@ -77,17 +77,21 @@ function InvoiceCard({ invoice }: { invoice: PortalSupplierInvoice }) {
   );
 }
 
-export function PortalSupplierInvoices({ invoices }: { invoices: PortalSupplierInvoice[] }) {
+// requiresPaymentProof (0064) : certaines subventions ne demandent jamais de preuve de paiement
+// -- réglé par dossier (RequiresPaymentProofToggle.tsx, grants/[id]), transmis ici tel quel.
+export function PortalSupplierInvoices({ invoices, requiresPaymentProof }: { invoices: PortalSupplierInvoice[]; requiresPaymentProof: boolean }) {
   if (invoices.length === 0) return null;
   return (
     <div className="space-y-2">
       <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Factures fournisseurs</h3>
       <p className="text-xs text-neutral-400">
-        Marque une facture « Payée » une fois réglée à ton fournisseur, et joins-en la preuve (reçu, virement...).
+        {requiresPaymentProof
+          ? "Marque une facture « Payée » une fois réglée à ton fournisseur, et joins-en la preuve (reçu, virement...)."
+          : "Marque une facture « Payée » une fois réglée à ton fournisseur."}
       </p>
       <div className="space-y-2">
         {invoices.map((inv) => (
-          <InvoiceCard key={inv.id} invoice={inv} />
+          <InvoiceCard key={inv.id} invoice={inv} requiresPaymentProof={requiresPaymentProof} />
         ))}
       </div>
     </div>

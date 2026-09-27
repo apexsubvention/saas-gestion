@@ -20,6 +20,13 @@ export function milestonesService(supabase: SupabaseClient) {
     remove: (id: string) => repo.remove(id),
     updateDueDate: (id: string, dueDate: string) => repo.updateDueDate(id, dueDate),
 
+    async updateTitle(id: string, title: string) {
+      const trimmed = title.trim();
+      if (!trimmed) throw new Error("Le titre de l'échéance est requis.");
+      if (trimmed.length > 200) throw new Error("Titre trop long (200 caractères max).");
+      return repo.updateTitle(id, trimmed);
+    },
+
     // Idempotent : ne recrée pas une suggestion déjà présente pour ce projet, parmi les
     // jalons source='ai_proposed'. Clé de dédoublonnage :
     //  - type 'project_end'/'eligibility_end' : par TYPE seul -- une entente n'a qu'une

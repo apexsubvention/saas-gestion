@@ -14,6 +14,7 @@ import { TaskStatusSelect } from "./TaskStatusSelect";
 import { MilestoneStatusSelect } from "./MilestoneStatusSelect";
 import { ClaimStatusSelect } from "./ClaimStatusSelect";
 import { DeleteScheduleItemButton } from "./DeleteScheduleItemButton";
+import { EditableMilestoneTitle } from "./EditableMilestoneTitle";
 
 const KIND_LABELS = { task: "Tâche", milestone: "Échéance", claim: "Réclamation" } as const;
 const KIND_BADGE = {
@@ -108,7 +109,11 @@ export function SchedulePanel({
                       {entry.origin && <span className="ml-2 text-[11px] text-neutral-400">{entry.origin}</span>}
                     </td>
                     <td className="px-4 py-2 text-neutral-900">
-                      {entry.title}
+                      {entry.kind === "milestone" ? (
+                        <EditableMilestoneTitle grantProjectId={grantProjectId} milestoneId={entry.id} initialTitle={entry.title} />
+                      ) : (
+                        entry.title
+                      )}
                       {entry.subtitle && <span className="ml-2 text-xs text-neutral-400">{entry.subtitle}</span>}
                       {entry.estimated && <span className="ml-2 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-700">estimée</span>}
                       {entry.missingCount != null && entry.missingCount > 0 && (
@@ -150,7 +155,10 @@ export function SchedulePanel({
               {closedMilestones.map((m) => (
                 <li key={`m-${m.id}`} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-neutral-200 p-3">
                   <div className="min-w-0 text-sm">
-                    <KindBadge kind="milestone" /> <span className="ml-2 text-neutral-900">{m.title}</span>
+                    <KindBadge kind="milestone" />{" "}
+                    <span className="ml-2 text-neutral-900">
+                      <EditableMilestoneTitle grantProjectId={grantProjectId} milestoneId={m.id} initialTitle={m.title} />
+                    </span>
                     <span className="ml-2 text-xs text-neutral-400">{m.internal_due_date ?? "sans date"}</span>
                     <span className={`ml-2 rounded-full px-2 py-0.5 text-[11px] font-medium ${milestoneStatusBadgeClass(m.status)}`}>{MILESTONE_STATUS_LABELS[m.status] ?? m.status}</span>
                   </div>

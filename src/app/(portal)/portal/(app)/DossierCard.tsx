@@ -420,7 +420,7 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
             )
           )}
 
-          <PortalSupplierInvoices invoices={dossier.supplierInvoices} />
+          <PortalSupplierInvoices invoices={dossier.supplierInvoices} requiresPaymentProof={dossier.requiresPaymentProof} />
 
           <div className="space-y-2">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Réclamations</h3>

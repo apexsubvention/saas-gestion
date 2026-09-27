@@ -1,0 +1,11 @@
+-- 0064_payment_proof_optional.sql
+--
+-- Jade : certaines subventions ne demandent jamais de preuve de paiement des factures
+-- fournisseurs -- jusqu'ici le portail client demandait systématiquement d'en joindre une dès
+-- qu'une facture est marquée « Payée » (0057). Réglage PAR DOSSIER (pas par programme -- décision
+-- prise avec Jade : plus simple, et elle veut pouvoir décider cas par cas) : une case à cocher
+-- dans la fiche du dossier (RequiresPaymentProofToggle.tsx), true par défaut pour ne rien changer
+-- aux dossiers existants. Quand false, le portail (PortalSupplierInvoices.tsx) n'affiche plus le
+-- bloc "Preuve de paiement" -- côté personnel (SuppliersTable.tsx), le champ reste disponible
+-- (aucune raison d'empêcher un ajout volontaire, même quand ce n'est pas exigé).
+alter table grant_projects add column requires_payment_proof boolean not null default true;
