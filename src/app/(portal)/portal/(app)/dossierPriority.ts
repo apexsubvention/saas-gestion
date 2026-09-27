@@ -23,18 +23,31 @@ const PRE_SUBMISSION_CLAIM_STATUSES = ["planned", "preparing", "missing_document
 // attente" ou plus loin) ou marque l'échéance suggérée comme terminée/annulée
 // (MilestoneStatusSelect) -- aucun nouveau mécanisme d'acquittement nécessaire, ces deux
 // contrôles existent déjà côté admin.
-export function hasClaimDueSoon(dossier: PortalDossier): boolean {
-  const claimSoon = dossier.claims.some((c) => {
-    if (!PRE_SUBMISSION_CLAIM_STATUSES.includes(c.status)) return false;
-    const bucket = computePriorityBucket(c.due_date, false);
-    return bucket === "overdue" || bucket === "this_week";
-  });
-  if (claimSoon) return true;
+// Jade (0068) : « RÉSUMÉ » du dossier -- besoin du DÉTAIL (titre + date), pas seulement du
+// booléen, pour écrire une phrase utile ("Réclamation X à déposer avant le..."). Même seuil et
+// mêmes candidats que hasClaimDueSoon ci-dessous (qui délègue ici) : la réclamation ou l'échéance
+// suggérée la plus proche parmi celles encore en retard ou dues cette semaine.
+export type DueSoonClaim = { title: string; dueDate: string };
 
-  return dossier.upcomingClaims.some((m) => {
+export function nextClaimDueSoon(dossier: PortalDossier): DueSoonClaim | null {
+  const candidates: DueSoonClaim[] = [];
+  for (const c of dossier.claims) {
+    if (!PRE_SUBMISSION_CLAIM_STATUSES.includes(c.status) || !c.due_date) continue;
+    const bucket = computePriorityBucket(c.due_date, false);
+    if (bucket === "overdue" || bucket === "this_week") candidates.push({ title: c.claim_number ?? "Réclamation", dueDate: c.due_date });
+  }
+  for (const m of dossier.upcomingClaims) {
+    if (!m.dueDate) continue;
     const bucket = computePriorityBucket(m.dueDate, false);
-    return bucket === "overdue" || bucket === "this_week";
-  });
+    if (bucket === "overdue" || bucket === "this_week") candidates.push({ title: m.title, dueDate: m.dueDate });
+  }
+  if (candidates.length === 0) return null;
+  candidates.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  return candidates[0]!;
+}
+
+export function hasClaimDueSoon(dossier: PortalDossier): boolean {
+  return nextClaimDueSoon(dossier) != null;
 }
 
 export type DossierPriority = { hasPendingClaim: boolean; nextClaimDueDate: string | null };
