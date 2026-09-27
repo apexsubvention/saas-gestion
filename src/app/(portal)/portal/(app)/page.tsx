@@ -4,6 +4,7 @@ import { projectSuppliersService } from "@/server/services/projectSuppliers.serv
 import { portalDossiersService } from "@/server/services/portalDossiers.service";
 import { DossiersList } from "./DossiersList";
 import { SupplierDossierCard, type SupplierBillingRow } from "./SupplierDossierCard";
+import { collectToProvideTitles, collectUnpaidSupplierNames, nextClaimDueSoon } from "./dossierPriority";
 
 // Page d'accueil du portail : « Mes dossiers » -- pour chaque dossier accessible à ce
 // compte (le sien, et ceux de ses clients enfants s'il en a -- hiérarchie, cf. 0028),
@@ -27,6 +28,13 @@ const ACTIVE_CLAIM_STATUSES_EXCLUDED = ["paid", "rejected"];
 // Un dossier est considéré « obtenu » dès qu'il est approuvé -- qu'il soit encore en attente de
 // réclamation ou déjà complété (voir GRANT_PROJECT_STATUS_LABELS, features/grants/constants.ts).
 const OBTAINED_PROJECT_STATUSES = ["approved", "awaiting_claim", "completed"];
+
+function formatDate(iso: string | null): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("fr-CA");
+}
+
+type SummaryLine = { dossierName: string; text: string };
 
 export default async function PortalHomePage() {
   const ctx = await requirePortalContext();
@@ -55,6 +63,23 @@ export default async function PortalHomePage() {
     return sum + projectLevel + perClaim;
   }, 0);
 
+  // Résumé global (0070, Jade : « je veux un résumé de tout... concentré sur les trucs à fournir
+  // et les échéances à venir » -- remplace l'encadré qui vivait avant DANS chaque dossier, voir
+  // DossierCard.tsx) : une ligne PAR DOSSIER concerné, juste sous les tuiles ci-dessus. Un dossier
+  // sans rien à signaler n'apparaît tout simplement pas -- jamais de "à jour" énuméré ici, ce
+  // serait juste du bruit une fois qu'il y a plusieurs dossiers.
+  const today = new Date().toISOString().slice(0, 10);
+  const toProvideLines: SummaryLine[] = dossiers.flatMap((d) => {
+    const titles = [...collectToProvideTitles(d), ...collectUnpaidSupplierNames(d).map((name) => `preuve de paiement (${name})`)];
+    return titles.length > 0 ? [{ dossierName: d.name, text: titles.join(", ") }] : [];
+  });
+  const upcomingLines: SummaryLine[] = dossiers.flatMap((d) => {
+    const claim = nextClaimDueSoon(d);
+    if (!claim) return [];
+    const overdue = claim.dueDate <= today;
+    return [{ dossierName: d.name, text: `« ${claim.title} »${overdue ? " — en retard" : ""} : échéance le ${formatDate(claim.dueDate)}` }];
+  });
+
   return (
     <div className="space-y-8">
       <div>
@@ -71,6 +96,38 @@ export default async function PortalHomePage() {
           <SummaryTile label="Subventions obtenues" value={obtainedCount} />
           <SummaryTile label="Réclamations en cours" value={upcomingClaims} />
           <SummaryTile label="Éléments à fournir" value={toProvideCount} highlight={toProvideCount > 0} />
+        </div>
+      )}
+
+      {(toProvideLines.length > 0 || upcomingLines.length > 0) && (
+        <div className="rounded-lg border border-indigo-200 bg-indigo-50/60 px-4 py-3 text-sm text-indigo-950">
+          <p className="font-semibold uppercase tracking-wide text-indigo-700">Résumé</p>
+          <div className="mt-2 space-y-3">
+            {toProvideLines.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">À fournir</p>
+                <ul className="mt-1 list-disc space-y-1 pl-4">
+                  {toProvideLines.map((l, i) => (
+                    <li key={i}>
+                      <span className="font-medium">{l.dossierName}</span> — {l.text}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {upcomingLines.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">Échéances à venir</p>
+                <ul className="mt-1 list-disc space-y-1 pl-4">
+                  {upcomingLines.map((l, i) => (
+                    <li key={i}>
+                      <span className="font-medium">{l.dossierName}</span> — {l.text}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

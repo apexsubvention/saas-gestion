@@ -28,7 +28,7 @@ import { computeSubsidy } from "@/features/grants/subsidyMath";
 import { buildBillingNarrative, buildBillerSentence } from "@/features/billing/billingSummary";
 import { computePaymentDeadline, paymentDeadlineAlertText } from "@/features/billing/paymentDeadline";
 import { PortalOpenDocumentButton } from "./PortalOpenDocumentButton";
-import { nextClaimDueSoon } from "./dossierPriority";
+import { nextClaimDueSoon, collectToProvideTitles, collectUnpaidSupplierNames } from "./dossierPriority";
 
 // Un document demandé se réaffiche avec son formulaire de téléversement tant qu'il
 // n'est pas validé par le personnel -- "issue" (problème signalé) permet donc bien de
@@ -270,56 +270,23 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
     : dossier.approvedGrantAmount != null
       ? Math.max(0, dossier.approvedGrantAmount - claimedSoFar)
       : null;
-  // Titres des documents/pièces encore à fournir (0068, RÉSUMÉ) -- mêmes filtres que
-  // toProvideCount ci-dessous, mais on garde les libellés, pas seulement le compte.
-  const openRequirementLabels = dossier.claims.flatMap((c) => c.openRequirements.map((r) => r.label));
-  const uploadableRequestTitles = [
-    ...dossier.documentRequests.filter((r) => UPLOADABLE_STATUSES.includes(r.status)).map((r) => r.title),
-    ...dossier.claims.flatMap((c) => c.documentRequests.filter((r) => UPLOADABLE_STATUSES.includes(r.status)).map((r) => r.title)),
-  ];
-  const toProvideTitles = [...openRequirementLabels, ...uploadableRequestTitles];
+  // Titres des documents/pièces encore à fournir -- mêmes filtres que toProvideCount ci-dessous,
+  // partagés avec le résumé global (0070) affiché maintenant en haut de la page d'accueil du
+  // portail plutôt qu'ici, voir page.tsx et dossierPriority.ts#collectToProvideTitles.
+  const toProvideTitles = collectToProvideTitles(dossier);
   const toProvideCount = toProvideTitles.length;
   // Réclamation (créée ou seulement suggérée par l'entente) due dans 7 jours ou moins, ou déjà
   // en retard, et pas encore déposée (0065, Jade : « tu as quelque chose à faire ») -- voir
   // dossierPriority.ts#nextClaimDueSoon pour le détail et la condition d'auto-fermeture.
   const dueSoonClaim = nextClaimDueSoon(dossier);
   const claimDueSoon = dueSoonClaim != null;
-  // Factures fournisseurs envoyées mais pas encore marquées payées. isPariProgram exclu : la
-  // section "Factures fournisseurs" elle-même est masquée pour ces dossiers (0065). Utilisé par le
-  // Résumé ci-dessous (0068) -- Jade (0069) a retiré le badge dédié qui vivait auparavant sur la
-  // vignette elle-même (0066) : gardé ici seulement comme un des signaux d'urgence (bordure ambrée)
-  // et le détail (noms) reste dans le Résumé, jamais réaffiché comme badge séparé.
-  const unpaidSupplierNames = dossier.isPariProgram
-    ? []
-    : Array.from(new Set(dossier.supplierInvoices.filter((inv) => inv.paymentStatus === "sent_unpaid").map((inv) => inv.supplierName)));
-  const hasUnpaidSupplierInvoice = unpaidSupplierNames.length > 0;
+  // Factures fournisseurs envoyées mais pas encore marquées payées -- gardé seulement comme
+  // signal d'urgence (bordure ambrée) ; le détail (noms) vit dans le résumé global, page.tsx.
+  const hasUnpaidSupplierInvoice = collectUnpaidSupplierNames(dossier).length > 0;
   // Indicateur d'urgence visible directement sur la vignette (0062, Jade), sans avoir à
   // l'ouvrir : quelque chose à fournir, une échéance de paiement/facturation déjà connue, une
   // réclamation due bientôt, ou une facture envoyée pas encore marquée payée.
   const isUrgent = toProvideCount > 0 || !!paymentDeadlineText || claimDueSoon || hasUnpaidSupplierInvoice;
-  // RÉSUMÉ (0068, Jade : « un petit résumé en format texte... choses à faire : fournir preuve de
-  // paiement, échéancier qui arrive bientôt = tout avoir dépensé pour le projet x le montant x »)
-  // -- synthèse en phrases des mêmes signaux que ci-dessus (déjà calculés), affichée dès
-  // l'ouverture du dossier plutôt que dispersée dans le reste de la fenêtre. N'en RETIRE rien : les
-  // encadrés détaillés (délai de paiement, facturation, documents, réclamations) restent en
-  // dessous tels quels -- ceci est un aperçu, pas un remplacement.
-  const summaryItems: string[] = [];
-  if (paymentDeadlineText) summaryItems.push(paymentDeadlineText);
-  if (billingNarrative) summaryItems.push(billingNarrative);
-  for (const sentence of supplierBillingSentences) summaryItems.push(sentence);
-  if (dueSoonClaim) {
-    summaryItems.push(
-      `Réclamation « ${dueSoonClaim.title} » à préparer${dueSoonClaim.dueDate <= new Date().toISOString().slice(0, 10) ? " — en retard" : ""} : échéance le ${formatDate(dueSoonClaim.dueDate)}.`
-    );
-  }
-  if (hasUnpaidSupplierInvoice) {
-    summaryItems.push(
-      `Fournir la preuve de paiement pour ${unpaidSupplierNames.length > 1 ? "les factures de " : "la facture de "}${unpaidSupplierNames.join(", ")}, une fois payée${unpaidSupplierNames.length > 1 ? "s" : ""}.`
-    );
-  }
-  if (toProvideTitles.length > 0) {
-    summaryItems.push(`Fournir : ${toProvideTitles.join(", ")}.`);
-  }
 
   return (
     <>
@@ -397,19 +364,9 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
             </div>
           }
         >
-          <div className="rounded-lg border border-indigo-200 bg-indigo-50/60 px-4 py-3 text-sm text-indigo-950">
-            <p className="font-semibold uppercase tracking-wide text-indigo-700">Résumé</p>
-            {summaryItems.length > 0 ? (
-              <ul className="mt-2 list-disc space-y-1 pl-4">
-                {summaryItems.map((item, i) => (
-                  <li key={i}>{item}</li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-1 text-indigo-800">Rien à faire pour l&apos;instant — ce dossier est à jour.</p>
-            )}
-          </div>
-
+          {/* Résumé (0068) retiré d'ici (0070, Jade : « je veux un résumé de tout » plutôt qu'un
+              par dossier caché dans chaque fiche) -- déplacé en un seul encadré global tout en
+              haut de la page d'accueil du portail, voir page.tsx. */}
           {paymentDeadlineText && (
             <div className="rounded-lg border-2 border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900">
               <p className="font-semibold">⏰ Délai de paiement et de facturation</p>

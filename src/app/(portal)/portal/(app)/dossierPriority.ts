@@ -50,6 +50,33 @@ export function hasClaimDueSoon(dossier: PortalDossier): boolean {
   return nextClaimDueSoon(dossier) != null;
 }
 
+// Un document demandé se réaffiche avec son formulaire tant qu'il n'est pas validé -- "issue"
+// (problème signalé) permet de renvoyer un fichier corrigé, pas seulement "requested" (première
+// fois). Même liste que DossierCard.tsx#UPLOADABLE_STATUSES -- dupliquée ici plutôt
+// qu'importée : ce fichier ne dépend que du type PortalDossier, jamais d'un composant "use client".
+const UPLOADABLE_STATUSES = ["requested", "issue"];
+
+// Jade (0070) : « je veux un résumé de tout... concentré sur les trucs à fournir et les échéances
+// à venir » -- déplacé de l'encadré Résumé PAR dossier (retiré, voir DossierCard.tsx) vers un seul
+// encadré global en haut de la page d'accueil du portail (page.tsx). Mêmes filtres que la vignette
+// (toProvideCount) et le badge "⚠️ X à fournir" -- projet ET réclamations confondus.
+export function collectToProvideTitles(dossier: PortalDossier): string[] {
+  const openRequirementLabels = dossier.claims.flatMap((c) => c.openRequirements.map((r) => r.label));
+  const uploadableRequestTitles = [
+    ...dossier.documentRequests.filter((r) => UPLOADABLE_STATUSES.includes(r.status)).map((r) => r.title),
+    ...dossier.claims.flatMap((c) => c.documentRequests.filter((r) => UPLOADABLE_STATUSES.includes(r.status)).map((r) => r.title)),
+  ];
+  return [...openRequirementLabels, ...uploadableRequestTitles];
+}
+
+// Factures fournisseurs envoyées mais pas encore marquées payées -- isPariProgram exclu, comme
+// DossierCard.tsx (0065) : la section "Factures fournisseurs" elle-même est masquée pour ces
+// dossiers (coûts = salariés internes, pas des factures de fournisseurs externes).
+export function collectUnpaidSupplierNames(dossier: PortalDossier): string[] {
+  if (dossier.isPariProgram) return [];
+  return Array.from(new Set(dossier.supplierInvoices.filter((inv) => inv.paymentStatus === "sent_unpaid").map((inv) => inv.supplierName)));
+}
+
 export type DossierPriority = { hasPendingClaim: boolean; nextClaimDueDate: string | null };
 
 export function computeDossierPriority(dossier: PortalDossier): DossierPriority {
