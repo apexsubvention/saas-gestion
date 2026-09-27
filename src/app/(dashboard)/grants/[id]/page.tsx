@@ -77,20 +77,14 @@ export default async function GrantProjectPage({ params, searchParams }: { param
 
   if (!project) notFound();
 
-  // Agrege budget_line_actuals pour ce projet (source de verite = transactions reelles, pas de colonnes stockees).
-  const { data: budgetRows } = await supabase
-    .from("budget_line_actuals")
-    .select("spent_amount, claimed_amount, paid_amount")
-    .eq("grant_project_id", params.id);
-
-  const totals = (budgetRows ?? []).reduce(
-    (acc: any, r: any) => ({
-      spent: acc.spent + Number(r.spent_amount ?? 0),
-      claimed: acc.claimed + Number(r.claimed_amount ?? 0),
-      paid: acc.paid + Number(r.paid_amount ?? 0),
-    }),
-    { spent: 0, claimed: 0, paid: 0 }
-  );
+  // Jade (0069) : « il faut que l'entête du dossier se mette à jour avec la portion fournisseur et
+  // factures ». L'en-tête (Dépensé/Réclamé/Payé/Solde) lisait jusqu'ici budget_line_actuals --
+  // une table qu'aucun code de l'application n'écrit plus nulle part (vérifié -- vestige d'une
+  // ancienne version du suivi budgétaire, avant le tableau Fournisseurs et factures actuel) : elle
+  // reste donc TOUJOURS à 0, peu importe les vraies factures. Remplacé plus bas par `ledger`
+  // (supplierLedgerService.load(), déjà chargé pour le tableau Fournisseurs et le panneau de
+  // subvention juste en dessous) -- la même source de vérité partout sur cette page, jamais
+  // recalculée séparément.
 
   const [documents, claims, tasks, milestones, allClients, agreements] = await Promise.all([
     documentsService(supabase).listByProject(params.id),
@@ -168,9 +162,9 @@ export default async function GrantProjectPage({ params, searchParams }: { param
   // renseignée dans Apex -- souvent absente/pas encore saisie pour ces dossiers (montant approuvé
   // à 0 dans l'en-tête) -- donc ne pas s'y fier comme source principale : elle ne sert que de repli
   // tant qu'aucun rapport DDR n'a encore été lu (pari_balance_remaining est alors null).
-  // totals.claimed (budget_line_actuals) reste à 0 tant qu'aucune réclamation formelle n'est créée/
-  // liée, ce qui n'a pas de sens pour un DDR déjà complété par le programme -- jamais utilisé ici.
-  const balance = isPariProgram ? project.pari_balance_remaining ?? subsidy.remaining : approved - totals.claimed;
+  // ledger.totals.claimed (claim_expenses, tableau Fournisseurs) -- jamais budget_line_actuals
+  // (mort, voir plus haut).
+  const balance = isPariProgram ? project.pari_balance_remaining ?? subsidy.remaining : approved - ledger.totals.claimed;
 
   // Échéancier unifié : tâches (manuel), échéances (suggérées ou manuelles depuis
   // l'entente) et réclamations (dossiers réels) forment ensemble UNE liste triée par
@@ -255,9 +249,9 @@ export default async function GrantProjectPage({ params, searchParams }: { param
             </div>
           </div>
           <Metric label="Approuvé" value={money(approved)} />
-          <Metric label="Dépensé" value={money(totals.spent)} />
-          <Metric label="Réclamé" value={money(totals.claimed)} />
-          <Metric label="Payé" value={money(totals.paid)} />
+          <Metric label="Dépensé" value={money(ledger.spent)} />
+          <Metric label="Réclamé" value={money(ledger.totals.claimed)} />
+          <Metric label="Payé" value={money(ledger.paid)} />
           <Metric label="Solde" value={money(balance)} />
           <Metric
             label="Prochaine échéance"

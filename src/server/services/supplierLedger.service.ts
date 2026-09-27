@@ -55,6 +55,11 @@ export type Ledger = {
   suppliers: LedgerSupplier[];
   unassigned: LedgerInvoice[]; // factures dont le fournisseur a été supprimé ou n'est pas encore choisi
   spent: number; // toutes les factures, avant taxes
+  // Jade (0069) : « il faut que l'entête du dossier se mette à jour avec la portion fournisseur et
+  // factures » -- toutes les factures (assignées ET non assignées, comme `spent` ci-dessus) dont le
+  // statut de PAIEMENT (payment_status, 0057) est "paid". Distinct de `totals.claimed`
+  // (claim_expenses -- une facture peut être payée sans jamais avoir été formellement réclamée).
+  paid: number;
   supplierBudgetTotal: number;
   totals: { budget: number; accepted: number; claimed: number; remaining: number };
 };
@@ -204,6 +209,7 @@ export function supplierLedgerService(supabase: SupabaseClient) {
         suppliers: ledgerSuppliers,
         unassigned,
         spent: invoices.reduce((sum, i) => sum + (i.amount ?? 0), 0),
+        paid: invoices.reduce((sum, i) => sum + (i.paymentStatus === "paid" ? (i.amount ?? 0) : 0), 0),
         supplierBudgetTotal: sumOf((s) => s.budget.effective),
         totals: {
           budget: sumOf((s) => s.budget.effective),
