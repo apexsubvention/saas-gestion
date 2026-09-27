@@ -2,6 +2,7 @@ import { requirePortalContext } from "@/lib/portal/auth";
 import { createClient } from "@/lib/supabase/server";
 import { projectSuppliersService } from "@/server/services/projectSuppliers.service";
 import { portalDossiersService } from "@/server/services/portalDossiers.service";
+import { clientNotesService, type ClientNoteView } from "@/server/services/clientNotes.service";
 import { DossiersList } from "./DossiersList";
 import { SupplierDossierCard, type SupplierBillingRow } from "./SupplierDossierCard";
 
@@ -37,6 +38,15 @@ export default async function PortalHomePage() {
     projectSuppliersService(supabase).listBySupplierClient(ctx.clientId),
   ]);
 
+  // Tâches discutées / commentaires (0062, Jade) : un fil PAR CLIENT plutôt que par dossier --
+  // le sien (ctx.clientId) et celui de chacun de ses clients enfants présents dans "Dossiers de
+  // tes clients", pour les choses discutées qui n'ont pas forcément de rapport avec un dossier
+  // précis. Converti en objet simple (pas de Map) pour traverser la frontière Server->Client.
+  const relevantClientIds = Array.from(new Set([ctx.clientId, ...dossiers.map((d) => d.clientId)]));
+  const notesByClientMap = await clientNotesService(supabase).listByClientsGrouped(relevantClientIds);
+  const notesByClient: Record<string, ClientNoteView[]> = {};
+  for (const id of relevantClientIds) notesByClient[id] = notesByClientMap.get(id) ?? [];
+
   const upcomingClaims = dossiers.reduce(
     (sum, d) => sum + d.claims.filter((c) => !ACTIVE_CLAIM_STATUSES_EXCLUDED.includes(c.status)).length,
     0
@@ -70,7 +80,7 @@ export default async function PortalHomePage() {
         </div>
       )}
 
-      <DossiersList dossiers={dossiers} ownClientId={ctx.clientId} currentOrgUserId={ctx.organizationUserId} />
+      <DossiersList dossiers={dossiers} ownClientId={ctx.clientId} currentOrgUserId={ctx.organizationUserId} notesByClient={notesByClient} />
 
       {supplierRows && supplierRows.length > 0 && (
         <div className="space-y-3">

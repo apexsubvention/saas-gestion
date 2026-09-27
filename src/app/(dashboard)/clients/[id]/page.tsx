@@ -16,18 +16,21 @@ import { ClientTabs } from "./ClientTabs";
 import { GRANT_PROJECT_STATUS_LABELS, grantProjectStatusBadgeClass } from "@/features/grants/constants";
 import { clientOpportunityInterestsService } from "@/server/services/clientOpportunityInterests.service";
 import { OpportunityInterests } from "./OpportunityInterests";
+import { clientNotesService } from "@/server/services/clientNotes.service";
+import { ClientNotesPanel } from "./ClientNotesPanel";
 
 export default async function ClientDetailPage({ params }: { params: { id: string } }) {
   const supabase = await createClient();
   const client = await clientsService(supabase).get(params.id);
   if (!client) notFound();
 
-  const [projects, documents, children, allClients, opportunityInterests] = await Promise.all([
+  const [projects, documents, children, allClients, opportunityInterests, clientNotes] = await Promise.all([
     grantProjectsService(supabase).listByClient(params.id),
     documentsService(supabase).listByClient(params.id),
     clientsService(supabase).listChildren(params.id),
     clientsService(supabase).list(),
     clientOpportunityInterestsService(supabase).listByClient(params.id),
+    clientNotesService(supabase).listByClient(params.id),
   ]);
   const parentCandidates = allClients.filter((c) => c.id !== client.id);
   const currentParent = client.parent_client_id ? allClients.find((c) => c.id === client.parent_client_id) : null;
@@ -229,6 +232,12 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
     </>
   );
 
+  const notesTab = (
+    <>
+      <ClientNotesPanel clientId={client.id} notes={clientNotes} />
+    </>
+  );
+
   return (
     <div className="space-y-6">
       <div className="rounded-lg border border-neutral-200 bg-white p-6">
@@ -243,7 +252,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
         )}
       </div>
 
-      <ClientTabs overview={overview} dossiers={dossiers} documents={documentsTab} />
+      <ClientTabs overview={overview} dossiers={dossiers} documents={documentsTab} notes={notesTab} />
     </div>
   );
 }

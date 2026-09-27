@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requirePortalContext } from "@/lib/portal/auth";
 import { createClient } from "@/lib/supabase/server";
 import { dossierNotesService } from "@/server/services/dossierNotes.service";
+import { clientNotesService } from "@/server/services/clientNotes.service";
 import { formatCaughtError } from "@/lib/errors";
 
 // Fil de notes partagées (0046) -- écriture directe via RLS (dossier_notes_insert_portal),
@@ -50,6 +51,54 @@ export async function deletePortalNoteAction(noteId: string): Promise<{ error: s
   const supabase = await createClient();
   try {
     await dossierNotesService(supabase).remove(noteId);
+  } catch (e) {
+    return { error: formatCaughtError(e) };
+  }
+  revalidatePath("/portal");
+  return { error: null };
+}
+
+// Fil de notes partagées PAR CLIENT plutôt que par dossier (0062, Jade) -- pour les petites
+// choses discutées (rencontre ou autrement) qui n'ont pas forcément de rapport avec un dossier
+// précis. Même principe d'écriture directe via RLS que ci-dessus (client_notes_insert_portal).
+
+export type AddClientNoteFormState = { error: string | null };
+
+export async function addClientNoteAction(
+  clientId: string,
+  _prev: AddClientNoteFormState,
+  formData: FormData
+): Promise<AddClientNoteFormState> {
+  const ctx = await requirePortalContext();
+  if (!ctx.organizationUserId) {
+    return { error: "Compte portail incomplet -- contacte ton équipe chez Apex." };
+  }
+  const body = String(formData.get("body") ?? "");
+
+  const supabase = await createClient();
+  try {
+    await clientNotesService(supabase).add({
+      organizationId: ctx.organizationId,
+      clientId,
+      authorOrgUserId: ctx.organizationUserId,
+      authorRole: "client",
+      authorName: ctx.fullName || ctx.clientName || "Le client",
+      body,
+      visibleToClient: true,
+    });
+  } catch (e) {
+    return { error: formatCaughtError(e) };
+  }
+
+  revalidatePath("/portal");
+  return { error: null };
+}
+
+export async function deleteClientNoteAction(noteId: string): Promise<{ error: string | null }> {
+  await requirePortalContext();
+  const supabase = await createClient();
+  try {
+    await clientNotesService(supabase).remove(noteId);
   } catch (e) {
     return { error: formatCaughtError(e) };
   }

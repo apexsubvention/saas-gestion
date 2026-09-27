@@ -1,11 +1,14 @@
 "use client";
 
-// Carte dépliable pour un dossier du portail client -- statut/dates, réclamations (avec
-// documents manquants), et texte rédigé du questionnaire (pour révision par le client).
-// Repliée par défaut : le client ouvre celle qui l'intéresse plutôt que de tout voir
-// d'un coup, surtout utile pour un compte parent qui voit aussi les dossiers de ses
-// clients enfants (hiérarchie, cf. 0028).
-import { useState } from "react";
+// Vignette pour un dossier du portail client -- statut bien visible + indicateur d'urgence
+// (documents à fournir, échéance proche) directement sur la carte, sans avoir à l'ouvrir.
+// Un clic ouvre une fenêtre modale (0062, Jade : « comme en ce moment sur Détails, mais plus
+// comme un pop-up ») avec le même contenu détaillé qu'avant -- dates, réclamations (avec
+// documents manquants), texte rédigé du questionnaire, etc. -- au lieu de déplier la carte sur
+// place. Utile pour un compte parent qui voit aussi les dossiers de ses clients enfants
+// (hiérarchie, cf. 0028) : les vignettes restent compactes, en grille, quel que soit le nombre
+// de dossiers.
+import { useEffect, useState, type ReactNode } from "react";
 import type { PortalDossier, PortalDocumentRequestView } from "@/server/services/portalDossiers.service";
 import {
   CLAIM_STATUS_LABELS,
@@ -27,6 +30,41 @@ import { computePaymentDeadline, paymentDeadlineAlertText } from "@/features/bil
 // n'est pas validé par le personnel -- "issue" (problème signalé) permet donc bien de
 // renvoyer un fichier corrigé, pas seulement "requested" (première fois).
 const UPLOADABLE_STATUSES = ["requested", "issue"];
+
+// Fenêtre modale générique (0062) : superposée à la page plutôt que de pousser le contenu --
+// ferme sur Échap, sur clic à l'extérieur, ou sur le bouton ×. Le défilement se fait dans le
+// panneau (max-h-[85vh] overflow-y-auto), jamais sur la page en arrière-plan.
+function Modal({ onClose, header, children }: { onClose: () => void; header: ReactNode; children: ReactNode }) {
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-neutral-900/40 px-4 py-8 sm:items-center" onClick={onClose}>
+      <div
+        className="w-full max-w-2xl rounded-xl bg-white shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3 border-b border-neutral-100 px-5 py-4">
+          {header}
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Fermer"
+            className="shrink-0 rounded-full p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+          >
+            ✕
+          </button>
+        </div>
+        <div className="max-h-[75vh] space-y-5 overflow-y-auto px-5 py-4">{children}</div>
+      </div>
+    </div>
+  );
+}
 
 function DocumentRequestItem({ request }: { request: PortalDocumentRequestView }) {
   return (
@@ -156,7 +194,7 @@ function ProgramSummarySection({ summary }: { summary: NonNullable<PortalDossier
 }
 
 export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDossier; currentOrgUserId: string | null }) {
-  const [expanded, setExpanded] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
   // Résumé en langage clair (Jade) : mêmes chiffres que le tableau interne (SubsidyPanel), en
   // phrase -- voir src/features/billing/billingSummary.ts. spent=0 : on ne connaît pas les
   // dépenses déjà facturées ici (pas nécessaire, seule la cible totale compte pour ce résumé).
@@ -191,39 +229,66 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
     dossier.documentRequests.filter((r) => UPLOADABLE_STATUSES.includes(r.status)).length +
     dossier.claims.reduce((sum, c) => sum + c.documentRequests.filter((r) => UPLOADABLE_STATUSES.includes(r.status)).length, 0);
   const toProvideCount = openRequirementsCount + actionableRequestsCount;
+  // Indicateur d'urgence visible directement sur la vignette (0062, Jade), sans avoir à
+  // l'ouvrir : quelque chose à fournir, ou une échéance de paiement/facturation déjà connue.
+  const isUrgent = toProvideCount > 0 || !!paymentDeadlineText;
 
   return (
-    <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+    <>
       <button
         type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className="flex w-full flex-wrap items-center justify-between gap-3 px-4 py-3 text-left hover:bg-neutral-50"
+        onClick={() => setModalOpen(true)}
+        className={`relative flex w-full flex-col gap-2 overflow-hidden rounded-xl border bg-white p-4 text-left shadow-sm transition hover:shadow-md ${
+          isUrgent ? "border-amber-200" : "border-neutral-200 hover:border-neutral-300"
+        }`}
       >
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-medium text-neutral-900">{dossier.name}</span>
-            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${grantProjectStatusBadgeClass(dossier.status)}`}>
-              {dossier.statusLabel}
-            </span>
+        {isUrgent && <span className="absolute inset-y-0 left-0 w-1 bg-amber-400" aria-hidden="true" />}
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="truncate font-medium text-neutral-900">{dossier.name}</p>
+            <p className="mt-0.5 truncate text-xs text-neutral-500">
+              {dossier.clientName && <span className="mr-2">{dossier.clientName}</span>}
+              {dossier.programName && <span>{dossier.programName}</span>}
+            </p>
           </div>
-          <p className="mt-1 text-xs text-neutral-500">
-            {dossier.clientName && <span className="mr-2">{dossier.clientName}</span>}
-            {dossier.programName && <span>{dossier.programName}</span>}
-          </p>
+          <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${grantProjectStatusBadgeClass(dossier.status)}`}>
+            {dossier.statusLabel}
+          </span>
         </div>
-        <div className="flex items-center gap-4 text-xs text-neutral-500">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-neutral-500">
           <span>{dossier.claims.length} réclamation{dossier.claims.length !== 1 ? "s" : ""}</span>
-          {toProvideCount > 0 && (
-            <span className="rounded-full bg-amber-50 px-2 py-0.5 font-medium text-amber-800">
-              {toProvideCount} à fournir
-            </span>
-          )}
-          <span>{expanded ? "Réduire ▲" : "Détails ▼"}</span>
+          <div className="flex items-center gap-2">
+            {toProvideCount > 0 && (
+              <span className="flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 font-medium text-amber-800">
+                ⚠️ {toProvideCount} à fournir
+              </span>
+            )}
+            {paymentDeadlineText && (
+              <span className="flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 font-medium text-red-700">⏰ Échéance</span>
+            )}
+            <span className="text-neutral-400">Détails →</span>
+          </div>
         </div>
       </button>
 
-      {expanded && (
-        <div className="space-y-5 border-t border-neutral-100 px-4 py-4">
+      {modalOpen && (
+        <Modal
+          onClose={() => setModalOpen(false)}
+          header={
+            <div className="min-w-0">
+              <p className="truncate font-semibold text-neutral-900">{dossier.name}</p>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${grantProjectStatusBadgeClass(dossier.status)}`}>
+                  {dossier.statusLabel}
+                </span>
+                <span className="text-xs text-neutral-500">
+                  {dossier.clientName && <span className="mr-2">{dossier.clientName}</span>}
+                  {dossier.programName}
+                </span>
+              </div>
+            </div>
+          }
+        >
           {paymentDeadlineText && (
             <div className="rounded-lg border-2 border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900">
               <p className="font-semibold">⏰ Délai de paiement et de facturation</p>
@@ -391,8 +456,8 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
             currentOrgUserId={currentOrgUserId}
             hint={dossier.status === "draft" ? "Décris les grandes lignes de ton projet, ou commente les dépenses prévues -- ton équipe chez Apex le lira ici." : undefined}
           />
-        </div>
+        </Modal>
       )}
-    </div>
+    </>
   );
 }

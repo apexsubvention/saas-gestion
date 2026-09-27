@@ -8,22 +8,25 @@
 // existait déjà comme sections empilées. Même pattern que ScheduleTabs (échéancier).
 import { useState, type ReactNode } from "react";
 
-type Tab = "overview" | "dossiers" | "documents";
+type Tab = "overview" | "dossiers" | "documents" | "notes";
 
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: "overview", label: "Aperçu" },
   { id: "dossiers", label: "Dossiers" },
   { id: "documents", label: "Documents" },
+  { id: "notes", label: "Tâches discutées" },
 ];
 
 export function ClientTabs({
   overview,
   dossiers,
   documents,
+  notes,
 }: {
   overview: ReactNode;
   dossiers: ReactNode;
   documents: ReactNode;
+  notes: ReactNode;
 }) {
   const [tab, setTab] = useState<Tab>("overview");
 
@@ -47,6 +50,7 @@ export function ClientTabs({
       <div className={tab === "overview" ? "space-y-6" : "hidden"}>{overview}</div>
       <div className={tab === "dossiers" ? "space-y-6" : "hidden"}>{dossiers}</div>
       <div className={tab === "documents" ? "space-y-6" : "hidden"}>{documents}</div>
+      <div className={tab === "notes" ? "space-y-6" : "hidden"}>{notes}</div>
     </div>
   );
 }
