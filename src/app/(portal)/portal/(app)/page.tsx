@@ -36,6 +36,17 @@ function formatDate(iso: string | null): string {
 
 type SummaryLine = { dossierName: string; text: string };
 
+// Jade (0070) : « ajouter le nom du client quand c'est un parent enfant » -- un compte parent
+// (hiérarchie, cf. 0028) voit dans ce résumé global les dossiers de ses clients enfants
+// mélangés aux siens ; le nom du projet seul ne dit pas à quelle entreprise il appartient (ex.
+// « ADI Laval (Diversification et consolidation des marchés du Canada hors Québec) »). Pour un
+// dossier qui est bien le sien (clientId === son propre compte), le nom du projet seul suffit
+// comme avant -- inutile de se citer soi-même.
+function dossierLabel(dossier: { clientId: string; clientName: string | null; name: string; programName: string | null }, ownClientId: string): string {
+  if (dossier.clientId === ownClientId) return dossier.name;
+  return `${dossier.clientName ?? dossier.name} (${dossier.programName ?? dossier.name})`;
+}
+
 export default async function PortalHomePage() {
   const ctx = await requirePortalContext();
   const supabase = await createClient();
@@ -71,13 +82,13 @@ export default async function PortalHomePage() {
   const today = new Date().toISOString().slice(0, 10);
   const toProvideLines: SummaryLine[] = dossiers.flatMap((d) => {
     const titles = [...collectToProvideTitles(d), ...collectUnpaidSupplierNames(d).map((name) => `preuve de paiement (${name})`)];
-    return titles.length > 0 ? [{ dossierName: d.name, text: titles.join(", ") }] : [];
+    return titles.length > 0 ? [{ dossierName: dossierLabel(d, ctx.clientId), text: titles.join(", ") }] : [];
   });
   const upcomingLines: SummaryLine[] = dossiers.flatMap((d) => {
     const claim = nextClaimDueSoon(d);
     if (!claim) return [];
     const overdue = claim.dueDate <= today;
-    return [{ dossierName: d.name, text: `« ${claim.title} »${overdue ? " — en retard" : ""} : échéance le ${formatDate(claim.dueDate)}` }];
+    return [{ dossierName: dossierLabel(d, ctx.clientId), text: `« ${claim.title} »${overdue ? " — en retard" : ""} : échéance le ${formatDate(claim.dueDate)}` }];
   });
 
   return (
