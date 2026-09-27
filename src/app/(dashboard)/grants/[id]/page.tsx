@@ -154,7 +154,14 @@ export default async function GrantProjectPage({ params, searchParams }: { param
   const pendingMilestones = milestones.filter((m) => m.status === "pending" || m.status === "at_risk");
   const nextMilestone = pendingMilestones[0] ?? null;
 
-  const approved = Number(project.approved_grant_amount ?? 0);
+  // Jade (0072) : « l'entête ne se met pas à jour automatiquement quand je rentre des dépenses,
+  // factures » -- "Approuvé" lisait UNIQUEMENT project.approved_grant_amount (un champ saisi à la
+  // main, souvent jamais rempli quand l'entente donne déjà le montant), ignorant le repli sur
+  // agreement.grant_amount que `subsidy` (ci-dessus, resolveSubsidyInputs) applique déjà et que
+  // "Subvention maximale" affiche juste en dessous (SubsidyPanel) -- d'où un en-tête à 0 $ à côté
+  // d'un panneau à 13 463 $ pour le même dossier. subsidy.maxSubsidy est la même valeur déjà
+  // résolue avec la bonne priorité (fiche du dossier > entente) : plus de deuxième calcul à côté.
+  const approved = subsidy.maxSubsidy ?? Number(project.approved_grant_amount ?? 0);
   // Jade : pour un dossier PARI, "Solde" (en haut) doit toujours refléter la même source que
   // l'encadré vert "Solde restant PARI" -- project.pari_balance_remaining, lu directement sur le
   // rapport Historique DDR (solde officiel du programme pour l'exercice financier), pas recalculé
@@ -162,9 +169,19 @@ export default async function GrantProjectPage({ params, searchParams }: { param
   // renseignée dans Apex -- souvent absente/pas encore saisie pour ces dossiers (montant approuvé
   // à 0 dans l'en-tête) -- donc ne pas s'y fier comme source principale : elle ne sert que de repli
   // tant qu'aucun rapport DDR n'a encore été lu (pari_balance_remaining est alors null).
-  // ledger.totals.claimed (claim_expenses, tableau Fournisseurs) -- jamais budget_line_actuals
-  // (mort, voir plus haut).
-  const balance = isPariProgram ? project.pari_balance_remaining ?? subsidy.remaining : approved - ledger.totals.claimed;
+  //
+  // Pour un dossier NON PARI (0072) : même correction que pour "Approuvé" ci-dessus -- "Solde"
+  // reflète maintenant subsidy.remaining (taux x dépenses déjà facturées, plafonné au maximum),
+  // EXACTEMENT la même valeur que "Subvention restante" dans le panneau juste en dessous, donc
+  // qui bouge dès qu'une dépense/facture est ajoutée (ledger.spent), sans attendre une
+  // réclamation formelle. Repli sur l'ancien calcul (approuvé - réclamé) seulement quand le calcul
+  // de subvention n'est pas encore possible (taux ou montant maximal manquant) -- jamais un Solde
+  // à 0 $ alors qu'un montant approuvé existe déjà dans la fiche du dossier.
+  const balance = isPariProgram
+    ? project.pari_balance_remaining ?? subsidy.remaining
+    : subsidy.ready
+      ? subsidy.remaining
+      : approved - ledger.totals.claimed;
 
   // Échéancier unifié : tâches (manuel), échéances (suggérées ou manuelles depuis
   // l'entente) et réclamations (dossiers réels) forment ensemble UNE liste triée par
