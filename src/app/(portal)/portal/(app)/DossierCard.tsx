@@ -439,6 +439,17 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
             dossier.billingLineItems.length > 0 && (
               <div className="space-y-2">
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">À inscrire sur les factures</h3>
+                {/* Jade : les postes non facturés (ex. salaire interne) comptent quand même dans le
+                    coût total du projet -- un client se dit souvent "j'aurais payé mon employé de
+                    toute façon", donc voir ce montant aide à comprendre le budget global du projet.
+                    Affiché SEULEMENT pour ces postes (jamais pour ceux à facturer -- ni leur
+                    affichage ni Montant approuvé/Solde restant plus haut ne changent), avec une
+                    étiquette qui le distingue clairement du budget sous-traitant facturable. */}
+                {dossier.billingLineItems.some((it) => !it.includedInBilling) && (
+                  <p className="text-xs text-neutral-400">
+                    Les postes « Non facturé » (ex. salaire interne) comptent dans le coût total du projet mais ne s&apos;ajoutent pas au budget facturable ci-dessus -- montant affiché à titre indicatif seulement.
+                  </p>
+                )}
                 <div className="space-y-2">
                   {dossier.billingLineItems.map((it) => (
                     <div key={it.id} className={`rounded-md border border-neutral-100 p-3 text-sm ${it.includedInBilling ? "" : "opacity-70"}`}>
@@ -446,7 +457,12 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
                         <span className="font-medium text-neutral-900">{it.label}</span>
                         <span className="flex items-center gap-2 text-xs text-neutral-500">
                           {it.hours != null && <span>{it.hours} h</span>}
-                          {!it.includedInBilling && <span className="rounded-full bg-neutral-100 px-2 py-0.5 font-medium text-neutral-600">Non facturé</span>}
+                          {!it.includedInBilling && (
+                            <>
+                              <span className="text-neutral-600">{formatAmount(it.amount)}</span>
+                              <span className="rounded-full bg-neutral-100 px-2 py-0.5 font-medium text-neutral-600">Non facturé</span>
+                            </>
+                          )}
                         </span>
                       </div>
                       {it.description && <p className="mt-1 text-xs text-neutral-500">{it.description}</p>}
