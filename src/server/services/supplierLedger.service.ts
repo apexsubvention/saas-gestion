@@ -3,6 +3,7 @@ import { projectSuppliersRepository, type ProjectSupplierRow } from "@/server/re
 import { expensesRepository, type ExpenseRow } from "@/server/repositories/expenses.repository";
 import { documentsRepository } from "@/server/repositories/documents.repository";
 import { billingLineItemsRepository } from "@/server/repositories/billingLineItems.repository";
+import { budgetLinesRepository } from "@/server/repositories/budgetLines.repository";
 import { claimsRepository } from "@/server/repositories/claims.repository";
 import { matchSupplier } from "@/features/invoices/matchSupplier";
 import { amountBeforeTax, type InvoiceExtraction } from "@/features/invoices/analyzeInvoice";
@@ -49,6 +50,10 @@ export type LedgerSupplier = ProjectSupplierRow & {
   accepted: Tracked; // subvention acceptée
   claimed: Tracked; // réclamé à ce jour (auto = réclamations liées à ses factures)
   remaining: number | null; // subvention acceptée - réclamé
+  // Jade (0069, Suivi budgétaire) : catégorie(s) du/des poste(s) de « Ce qui a été déposé »
+  // (budget_lines) associé(s) à ce fournisseur -- purement informatif (affichage), voir plus bas
+  // pour l'usage de ces mêmes postes dans le calcul de budget/accepted ci-dessus.
+  budgetLineCategories: string[];
 };
 
 export type Ledger = {
@@ -84,16 +89,40 @@ export function supplierLedgerService(supabase: SupabaseClient) {
   const expensesRepo = expensesRepository(supabase);
   const documentsRepo = documentsRepository(supabase);
   const lineItemsRepo = billingLineItemsRepository(supabase);
+  const budgetLinesRepo = budgetLinesRepository(supabase);
   const claimsRepo = claimsRepository(supabase);
 
   return {
     // `projectRate` (fraction) sert au calcul de repli de la subvention acceptée : budget x taux.
     async load(grantProjectId: string, projectRate: number | null = null): Promise<Ledger> {
-      const [suppliers, expenses, lineItems] = await Promise.all([
+      const [suppliers, expenses, lineItems, budgetLines] = await Promise.all([
         suppliersRepo.listByProject(grantProjectId),
         expensesRepo.listByProject(grantProjectId),
         lineItemsRepo.listByProject(grantProjectId),
+        budgetLinesRepo.listByProject(grantProjectId),
       ]);
+      // Jade (0069) : « Ce qui a été déposé » (budget_lines) devient la source de Budget prévu/
+      // Subvention acceptée d'un fournisseur dès qu'un poste lui est associé -- prioritaire sur
+      // l'ancien calcul par postes de facturation juste en dessous, qui ne sert plus que de repli
+      // pour un dossier pas encore migré vers le nouveau tableau (jamais de régression à 0 $ du
+      // jour au lendemain juste parce que « Ce qui a été déposé » n'a pas encore été rempli).
+      const depositedFromBudgetLinesBySupplier = new Map<string, number>();
+      const acceptedFromBudgetLinesBySupplier = new Map<string, number>();
+      const budgetLineCategoriesBySupplier = new Map<string, string[]>();
+      for (const bl of budgetLines) {
+        if (!bl.supplier_id) continue;
+        const deposited = num(bl.deposited_amount_override) ?? num(bl.deposited_amount_auto);
+        const accepted = num(bl.accepted_amount_override) ?? num(bl.accepted_amount_auto);
+        if (deposited != null) {
+          depositedFromBudgetLinesBySupplier.set(bl.supplier_id, Math.round(((depositedFromBudgetLinesBySupplier.get(bl.supplier_id) ?? 0) + deposited) * 100) / 100);
+        }
+        if (accepted != null) {
+          acceptedFromBudgetLinesBySupplier.set(bl.supplier_id, Math.round(((acceptedFromBudgetLinesBySupplier.get(bl.supplier_id) ?? 0) + accepted) * 100) / 100);
+        }
+        const categories = budgetLineCategoriesBySupplier.get(bl.supplier_id) ?? [];
+        categories.push(bl.category);
+        budgetLineCategoriesBySupplier.set(bl.supplier_id, categories);
+      }
       // Budget prévu (0059, Jade) : somme des postes budgétaires (Aide à la facturation) cochés
       // "À facturer" ET associés à ce fournisseur -- null (pas 0) si aucun poste n'est associé, pour
       // distinguer "rien à calculer" de "calculé, ça fait 0 $".
@@ -165,7 +194,8 @@ export function supplierLedgerService(supabase: SupabaseClient) {
 
       const ledgerSuppliers: LedgerSupplier[] = suppliers.map((s) => {
         const list = bySupplier.get(s.id) ?? [];
-        const budgetAuto = budgetAutoBySupplier.has(s.id) ? budgetAutoBySupplier.get(s.id)! : null;
+        const budgetAutoFromLegacyItems = budgetAutoBySupplier.has(s.id) ? budgetAutoBySupplier.get(s.id)! : null;
+        const budgetAuto = depositedFromBudgetLinesBySupplier.has(s.id) ? depositedFromBudgetLinesBySupplier.get(s.id)! : budgetAutoFromLegacyItems;
         const budgetOverride = num(s.budget_amount);
         // budget_amount reste le champ "saisi à la main" -- comportement historique (avant 0059)
         // conservé pour les fournisseurs sans poste budgétaire associé. Jade (suite au test réel du
@@ -186,8 +216,9 @@ export function supplierLedgerService(supabase: SupabaseClient) {
         // existe, exactement comme Budget prévu, car plus précis que le taux global appliqué en
         // bloc. accAuto (lu par l'IA à la création du fournisseur) ne sert plus que de repli quand
         // aucun poste ne permet encore de calculer.
-        const acceptedFromItems = acceptedAutoBySupplier.has(s.id) ? acceptedAutoBySupplier.get(s.id)! : null;
-        const autoValue = acceptedFromItems ?? accAuto;
+        const acceptedFromLegacyItems = acceptedAutoBySupplier.has(s.id) ? acceptedAutoBySupplier.get(s.id)! : null;
+        const acceptedFromBudgetLines = acceptedFromBudgetLinesBySupplier.has(s.id) ? acceptedFromBudgetLinesBySupplier.get(s.id)! : null;
+        const autoValue = acceptedFromBudgetLines ?? acceptedFromLegacyItems ?? accAuto;
         const fallback = budget.effective != null && projectRate != null ? Math.round(budget.effective * projectRate * 100) / 100 : null;
         const accepted: Tracked =
           accOverride != null ? { effective: accOverride, auto: autoValue ?? fallback, override: accOverride, mode: "manual" }
@@ -202,7 +233,16 @@ export function supplierLedgerService(supabase: SupabaseClient) {
           : { effective: claimAuto, auto: claimAuto, override: null, mode: "auto" };
 
         const remaining = accepted.effective != null ? Math.round((accepted.effective - (claimed.effective ?? 0)) * 100) / 100 : null;
-        return { ...s, invoices: list, invoiced: list.reduce((sum, i) => sum + (i.amount ?? 0), 0), budget, accepted, claimed, remaining };
+        return {
+          ...s,
+          invoices: list,
+          invoiced: list.reduce((sum, i) => sum + (i.amount ?? 0), 0),
+          budget,
+          accepted,
+          claimed,
+          remaining,
+          budgetLineCategories: budgetLineCategoriesBySupplier.get(s.id) ?? [],
+        };
       });
       const sumOf = (pick: (s: LedgerSupplier) => number | null) => Math.round(ledgerSuppliers.reduce((sum, s) => sum + (pick(s) ?? 0), 0) * 100) / 100;
       return {

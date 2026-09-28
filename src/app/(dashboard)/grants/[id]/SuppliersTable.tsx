@@ -652,6 +652,11 @@ function SupplierGroup({ grantProjectId, supplier, documents, clients, claims, l
         <td className="px-3 py-2">
           <input value={name} onChange={(e) => setName(e.target.value)} className={`${input} font-medium`} aria-label={isEmployee ? "Nom du salarié" : "Nom du fournisseur"} />
           {isEmployee && <span className="mt-1 inline-block rounded-full bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700">SALARIÉ INTERNE</span>}
+          {/* Jade (0068) : poste(s) de « Ce qui a été déposé » associé(s) -- purement informatif,
+              c'est ce lien qui alimente Subvention acceptée ci-contre dès qu'il existe. */}
+          {supplier.budgetLineCategories.length > 0 && (
+            <p className="mt-1 text-[11px] text-neutral-400">Poste : {supplier.budgetLineCategories.join(", ")}</p>
+          )}
         </td>
         <td className="px-3 py-2"><TrackedCell grantProjectId={grantProjectId} supplierId={supplier.id} field="accepted" tracked={supplier.accepted} /></td>
         <td className="px-3 py-2"><TrackedCell grantProjectId={grantProjectId} supplierId={supplier.id} field="claimed" tracked={supplier.claimed} /></td>

@@ -398,60 +398,65 @@ export default async function GrantProjectPage({ params, searchParams }: { param
                 grantRatePercent={subsidy.rate != null ? Math.round(subsidy.rate * 10000) / 100 : null}
               />
             </div>
-            {paymentDeadlineText && (
-              <div className="rounded-lg border-2 border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900">
-                <p className="font-semibold">⏰ Délai de paiement et de facturation</p>
-                <p className="mt-1">{paymentDeadlineText}</p>
-              </div>
-            )}
-            <SubsidyPanel summary={subsidy} supplierBudgetTotal={ledger.supplierBudgetTotal} narrative={billingNarrative} netOfRate={isPariProgram} />
-            <p className="text-xs text-neutral-500">
-              Un seul tableau, automatique et manuel : modifie, ajoute ou supprime les fournisseurs (ou salariés), même ceux générés automatiquement. Une facture
-              téléversée dans « Documents » (catégorie Facture) est lue automatiquement et ajoutée ici sous son fournisseur ; tu peux aussi associer
-              un document toi-même. Ouvre « Détails » sur un fournisseur pour voir l&apos;historique de ses modifications.
-              {isPariProgram && " Pour un rapport « Historique DDR », choisis la catégorie « Rapport DDR » -- Apex y lit les salariés, heures, taux et le solde restant, et les ajoute ci-dessous par DDR."}
-            </p>
-            {lineItems.length > 0 ? (
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-neutral-200 bg-white p-4">
-                <p className="text-sm text-neutral-700">
-                  <span className="font-medium text-neutral-900">Activités et postes budgétaires acceptés</span> (repris de la convention) :{" "}
-                  {lineItemsSummary.includedCount} à facturer ({money(lineItemsSummary.includedTotal)})
-                  {lineItemsSummary.excludedCount > 0 ? `, ${lineItemsSummary.excludedCount} exclu(s)` : ""}.
-                </p>
-                <Link
-                  href={`/grants/${project.id}/facturation`}
-                  className="inline-block whitespace-nowrap rounded-md border border-purple-200 bg-purple-50 px-3 py-1.5 text-xs font-medium text-purple-700 hover:bg-purple-100"
-                >
-                  Voir / cocher le détail →
-                </Link>
-              </div>
-            ) : (
-              <p className="text-xs text-neutral-400">
-                Aucune activité/poste budgétaire détecté pour l&apos;instant -- téléverse la convention dans « Documents », ou ajoute-les toi-même
-                dans{" "}
-                <Link href={`/grants/${project.id}/facturation`} className="underline hover:text-neutral-600">
-                  Aide à la facturation
-                </Link>
-                .
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold text-neutral-900">Suivi budgétaire</h3>
+              {paymentDeadlineText && (
+                <div className="rounded-lg border-2 border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900">
+                  <p className="font-semibold">⏰ Délai de paiement et de facturation</p>
+                  <p className="mt-1">{paymentDeadlineText}</p>
+                </div>
+              )}
+              <SubsidyPanel summary={subsidy} supplierBudgetTotal={ledger.supplierBudgetTotal} narrative={billingNarrative} netOfRate={isPariProgram} />
+              <p className="text-xs text-neutral-500">
+                Ce qui a été dépensé et réclamé, fournisseur par fournisseur (salariés internes inclus, même sans facture). Un seul tableau, automatique et
+                manuel : modifie, ajoute ou supprime les fournisseurs (ou salariés), même ceux générés automatiquement. Une facture téléversée dans
+                « Documents » (catégorie Facture) est lue automatiquement et ajoutée ici sous son fournisseur ; tu peux aussi associer un document
+                toi-même. Quand un poste correspondant existe dans « Ce qui a été déposé » ci-dessus, il est indiqué sous le nom du fournisseur et alimente
+                sa subvention acceptée. Ouvre « Détails » sur un fournisseur pour voir l&apos;historique de ses modifications.
+                {isPariProgram && " Pour un rapport « Historique DDR », choisis la catégorie « Rapport DDR » -- Apex y lit les salariés, heures, taux et le solde restant, et les ajoute ci-dessous par DDR."}
               </p>
-            )}
-            <SuppliersTable
-              grantProjectId={project.id}
-              suppliers={ledger.suppliers}
-              unassigned={ledger.unassigned}
-              documents={documents.map((d) => ({ id: d.id, filename: d.filename, category: d.category }))}
-              clients={allClients.map((c) => ({ id: c.id, name: c.name }))}
-              claims={claims.map((c) => ({ id: c.id, label: c.claim_number || `Réclamation (${c.period_start ?? "—"})` }))}
-              lineItems={lineItems}
-              totals={ledger.totals}
-              billingContext={{ clientName, subsidy, deadline: projectDeadline }}
-            />
-            <details className="rounded-lg border border-neutral-200 bg-white p-4">
-              <summary className="cursor-pointer text-sm font-medium text-neutral-800">{isPariProgram ? "Ajouter un salarié ou un fournisseur" : "Ajouter un fournisseur avec ses détails de facturation"}</summary>
-              <div className="mt-3">
-                <NewSupplierForm grantProjectId={project.id} clients={otherClients.map((c) => ({ id: c.id, name: c.name }))} suggestEmployee={isPariProgram} />
-              </div>
-            </details>
+              {lineItems.length > 0 ? (
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-neutral-200 bg-white p-4">
+                  <p className="text-sm text-neutral-700">
+                    <span className="font-medium text-neutral-900">Activités et postes budgétaires acceptés</span> (repris de la convention) :{" "}
+                    {lineItemsSummary.includedCount} à facturer ({money(lineItemsSummary.includedTotal)})
+                    {lineItemsSummary.excludedCount > 0 ? `, ${lineItemsSummary.excludedCount} exclu(s)` : ""}.
+                  </p>
+                  <Link
+                    href={`/grants/${project.id}/facturation`}
+                    className="inline-block whitespace-nowrap rounded-md border border-purple-200 bg-purple-50 px-3 py-1.5 text-xs font-medium text-purple-700 hover:bg-purple-100"
+                  >
+                    Voir / cocher le détail →
+                  </Link>
+                </div>
+              ) : (
+                <p className="text-xs text-neutral-400">
+                  Aucune activité/poste budgétaire détecté pour l&apos;instant -- téléverse la convention dans « Documents », ou ajoute-les toi-même
+                  dans{" "}
+                  <Link href={`/grants/${project.id}/facturation`} className="underline hover:text-neutral-600">
+                    Aide à la facturation
+                  </Link>
+                  .
+                </p>
+              )}
+              <SuppliersTable
+                grantProjectId={project.id}
+                suppliers={ledger.suppliers}
+                unassigned={ledger.unassigned}
+                documents={documents.map((d) => ({ id: d.id, filename: d.filename, category: d.category }))}
+                clients={allClients.map((c) => ({ id: c.id, name: c.name }))}
+                claims={claims.map((c) => ({ id: c.id, label: c.claim_number || `Réclamation (${c.period_start ?? "—"})` }))}
+                lineItems={lineItems}
+                totals={ledger.totals}
+                billingContext={{ clientName, subsidy, deadline: projectDeadline }}
+              />
+              <details className="rounded-lg border border-neutral-200 bg-white p-4">
+                <summary className="cursor-pointer text-sm font-medium text-neutral-800">{isPariProgram ? "Ajouter un salarié ou un fournisseur" : "Ajouter un fournisseur avec ses détails de facturation"}</summary>
+                <div className="mt-3">
+                  <NewSupplierForm grantProjectId={project.id} clients={otherClients.map((c) => ({ id: c.id, name: c.name }))} suggestEmployee={isPariProgram} />
+                </div>
+              </details>
+            </div>
           </section>
 
           <CollapsibleSection title="Entente de convention" badge={agreement ? "· Enregistrée" : "· Non enregistrée"}>
