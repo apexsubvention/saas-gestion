@@ -11,35 +11,56 @@
 -- de la convention) reste modifiable à la main sans jamais être perdue -- « Revenir au calcul
 -- automatique » redonne exactement la valeur lue, elle n'est jamais écrasée par la correction.
 
+-- "if not exists" sur chaque colonne : rend le fichier rejouable sans erreur si un run précédent
+-- avait déjà appliqué cette partie avant d'échouer plus loin (voir plus bas).
 alter table budget_lines
-  add column deposited_amount_auto numeric(14,2),
-  add column deposited_amount_override numeric(14,2),
-  add column deposited_amount_override_by uuid references organization_users(id),
-  add column deposited_amount_override_at timestamptz,
-  add column accepted_amount_auto numeric(14,2),
-  add column accepted_amount_override numeric(14,2),
-  add column accepted_amount_override_by uuid references organization_users(id),
-  add column accepted_amount_override_at timestamptz,
-  add column subsidy_rate_auto numeric(5,4),
-  add column subsidy_rate_override numeric(5,4),
-  add column source text not null default 'manual' check (source in ('ai','manual')),
-  add column position int not null default 0;
+  add column if not exists deposited_amount_auto numeric(14,2),
+  add column if not exists deposited_amount_override numeric(14,2),
+  add column if not exists deposited_amount_override_by uuid references organization_users(id),
+  add column if not exists deposited_amount_override_at timestamptz,
+  add column if not exists accepted_amount_auto numeric(14,2),
+  add column if not exists accepted_amount_override numeric(14,2),
+  add column if not exists accepted_amount_override_by uuid references organization_users(id),
+  add column if not exists accepted_amount_override_at timestamptz,
+  add column if not exists subsidy_rate_auto numeric(5,4),
+  add column if not exists subsidy_rate_override numeric(5,4),
+  add column if not exists source text not null default 'manual' check (source in ('ai','manual')),
+  add column if not exists position int not null default 0;
 
 -- approved_amount (colonne d'origine, jamais utilisée en pratique -- confirmé, table vide) migrée
 -- vers accepted_amount_override pour ne rien perdre si des lignes existaient malgré tout. Fait
--- AVANT de toucher la vue ci-dessous (aucune dépendance encore cassée à ce stade).
-update budget_lines set accepted_amount_override = approved_amount where approved_amount is not null and approved_amount <> 0;
+-- AVANT de toucher la vue ci-dessous (aucune dépendance encore cassée à ce stade). Protégé par un
+-- test d'existence de la colonne : si un run précédent l'avait déjà supprimée plus bas, cette
+-- étape ne fait rien plutôt que d'échouer sur une colonne qui n'existe plus.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'budget_lines' and column_name = 'approved_amount'
+  ) then
+    update budget_lines
+      set accepted_amount_override = approved_amount
+      where approved_amount is not null and approved_amount <> 0 and accepted_amount_override is null;
+  end if;
+end $$;
 
 -- Vue « Suivi budgétaire » (Bundle 2, préparée ici pour ne pas refaire une migration séparée) --
 -- étend budget_line_actuals (0017) avec les montants déposé/accepté/taux effectifs (override si
 -- présent, sinon auto) à côté de spent/claimed/paid déjà calculés à partir des vraies transactions.
 -- security_invoker = true conservé (RLS des tables sous-jacentes, jamais contournée).
 --
--- IMPORTANT : redéfinie ICI, AVANT de supprimer approved_amount ci-dessous -- l'ancienne définition
--- de cette vue référence bl.approved_amount ; la remplacer d'abord (par une définition qui ne s'en
--- sert plus) évite l'erreur Postgres "cannot drop column approved_amount because other objects
--- depend on it" que provoquerait un DROP COLUMN pendant qu'une vue en dépend encore.
-create or replace view budget_line_actuals
+-- IMPORTANT : DROP VIEW + CREATE VIEW, jamais CREATE OR REPLACE VIEW ici. CREATE OR REPLACE
+-- interdit d'insérer une colonne au milieu d'une vue déjà existante -- chaque colonne déjà
+-- exposée doit garder EXACTEMENT le même nom à la même position, seul un ajout à la toute fin
+-- est permis. L'ancienne vue (0017) exposait, dans cet ordre : budget_line_id, grant_project_id,
+-- approved_amount, spent_amount, claimed_amount, paid_amount -- category/supplier_id/... ne
+-- peuvent pas prendre la 3e position (où était approved_amount) via CREATE OR REPLACE, d'où
+-- l'erreur "cannot change name of view column approved_amount to category" (SQLSTATE 42P16)
+-- obtenue lors du premier npx supabase db push. Un DROP + CREATE n'a pas cette contrainte de
+-- position, et rien d'autre dans l'app ne dépend de cette vue (confirmé) donc rien à recasser.
+drop view if exists budget_line_actuals;
+
+create view budget_line_actuals
 with (security_invoker = true)
 as
 select
@@ -75,7 +96,8 @@ group by
   bl.subsidy_rate_auto;
 
 -- La vue ne dépend plus de approved_amount : elle peut maintenant être supprimée sans erreur.
-alter table budget_lines drop column approved_amount;
+-- "if exists" au cas où un run précédent l'aurait déjà fait avant d'échouer plus loin.
+alter table budget_lines drop column if exists approved_amount;
 
 -- budget_lines_delete (0016) était réservée aux admins -- une restriction plus stricte que
 -- billing_line_items_delete (0042 : is_org_staff, admin OU employé), qui gère la même sorte
@@ -84,7 +106,8 @@ alter table budget_lines drop column approved_amount;
 -- tout membre du personnel peut déjà ajouter/modifier/retirer une ligne) -- alignée ici sur le même
 -- droit, pour que « Générer depuis la convention » (qui retire les postes IA obsolètes) et la
 -- suppression manuelle d'un poste ne soient pas silencieusement bloquées pour un employé.
-drop policy "budget_lines_delete" on budget_lines;
+-- "if exists" sur le drop : ne jamais échouer si un run précédent avait déjà recréé la policy.
+drop policy if exists "budget_lines_delete" on budget_lines;
 create policy "budget_lines_delete" on budget_lines
   for delete using (is_org_staff(organization_id) and can_access_grant_project(grant_project_id));
 
