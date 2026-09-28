@@ -280,7 +280,20 @@ export default async function GrantProjectPage({ params, searchParams }: { param
               non ; "Payé" juste à côté n'en est qu'un sous-ensemble (les factures marquées
               "Payée"), pas la même donnée sous un autre nom. */}
           <Metric label="Facturé" value={money(ledger.spent)} />
-          <Metric label="Réclamé" value={money(ledger.totals.claimed)} />
+          {/* Jade : "Réclamé" reste le coût admissible tel qu'inscrit sur le vrai formulaire de
+              réclamation (ledger.totals.claimed, jamais converti) -- même distinction qu'au
+              Tableau 2, voir supplierLedger.service.ts. Repère "≈ X $ de subvention" ajouté ici
+              pour la même raison (voir le montant qui alimente réellement Solde), masqué quand ça
+              ne change rien (rien claimed encore, ou taux à 100 %). */}
+          <Metric
+            label="Réclamé"
+            value={money(ledger.totals.claimed)}
+            hint={
+              ledger.totals.claimed !== 0 && Math.abs(ledger.totals.claimedSubsidyEquivalent - ledger.totals.claimed) > 0.01
+                ? `≈ ${money(ledger.totals.claimedSubsidyEquivalent)} de subvention`
+                : undefined
+            }
+          />
           <Metric label="Payé" value={money(ledger.paid)} />
           <Metric label="Solde" value={money(balance)} />
           <Metric
@@ -505,11 +518,12 @@ export default async function GrantProjectPage({ params, searchParams }: { param
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div>
       <p className="text-xs text-neutral-400">{label}</p>
       <p className="text-sm font-medium text-neutral-900">{value}</p>
+      {hint && <p className="mt-0.5 text-[11px] text-neutral-400">{hint}</p>}
     </div>
   );
 }
