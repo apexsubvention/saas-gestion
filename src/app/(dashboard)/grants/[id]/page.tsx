@@ -270,7 +270,11 @@ export default async function GrantProjectPage({ params, searchParams }: { param
             </div>
           </div>
           <Metric label="Approuvé" value={money(approved)} />
-          <Metric label="Dépensé" value={money(ledger.spent)} />
+          {/* Jade : renommé de "Dépensé" à "Facturé" -- c'est la somme de TOUTES les factures
+              avant taxes (ledger.spent), peu importe si elles sont payées à ton fournisseur ou
+              non ; "Payé" juste à côté n'en est qu'un sous-ensemble (les factures marquées
+              "Payée"), pas la même donnée sous un autre nom. */}
+          <Metric label="Facturé" value={money(ledger.spent)} />
           <Metric label="Réclamé" value={money(ledger.totals.claimed)} />
           <Metric label="Payé" value={money(ledger.paid)} />
           <Metric label="Solde" value={money(balance)} />

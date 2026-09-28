@@ -63,7 +63,7 @@ export function SubsidyPanel({
         <summary className="cursor-pointer text-neutral-600 hover:text-neutral-800">Voir le détail du calcul</summary>
         <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
           {!netOfRate && <Stat label="Dépenses requises pour l'atteindre" value={money(summary.requiredSpend)} hint={`${money(summary.maxSubsidy)} ÷ ${ratePct} %`} />}
-          <Stat label={netOfRate ? "Accepté par le PARI à ce jour" : "Dépensé à ce jour (factures)"} value={money(summary.spent)} />
+          <Stat label={netOfRate ? "Accepté par le PARI à ce jour" : "Facturé à ce jour"} value={money(summary.spent)} />
           <Stat label="Subvention gagnée" value={money(summary.earned)} hint={netOfRate ? "montant net accepté, déjà après le taux de soutien du PARI" : `${ratePct} % des dépenses facturées`} />
           {!netOfRate && <Stat label="Dépenses restantes à engager" value={money(summary.remainingSpend)} hint="pour atteindre la subvention maximale" />}
           <Stat
