@@ -61,6 +61,12 @@ export type LedgerSupplier = ProjectSupplierRow & {
   // Solde restant sans avoir à recalculer le taux à la main. null quand le taux n'est pas
   // calculable (aucun budget/accepted connu) -- dans ce cas remaining retombe sur claimed brut.
   claimedSubsidyEquivalent: number | null;
+  // Jade (0072, corrigé) : subvention gagnée à ce jour sur CE poste -- invoiced x taux effectif
+  // de ce fournisseur, plafonné à sa propre Subvention acceptée -- jamais un seul taux global
+  // appliqué à tout le dossier (voir le commentaire sur son calcul plus bas). Sert au « Solde »
+  // d'en-tête du dossier (ledger.totals.earned), pas à `remaining` ci-dessus (qui suit plutôt
+  // Réclamé, une donnée différente). null seulement si aucun taux n'est connu du tout.
+  earnedFromInvoices: number | null;
   remaining: number | null; // subvention acceptée - (réclamé traduit en dollars de subvention)
   // Jade (0069, Suivi budgétaire) : catégorie(s) du/des poste(s) de « Ce qui a été déposé »
   // (budget_lines) associé(s) à ce fournisseur -- purement informatif (affichage), voir plus bas
@@ -78,7 +84,14 @@ export type Ledger = {
   // (claim_expenses -- une facture peut être payée sans jamais avoir été formellement réclamée).
   paid: number;
   supplierBudgetTotal: number;
-  totals: { budget: number; accepted: number; claimed: number; remaining: number };
+  // Jade : `claimedSubsidyEquivalent` (somme de s.claimedSubsidyEquivalent) sert au Solde restant
+  // PAR FOURNISSEUR dans le Tableau 2 (voir `remaining` plus haut) -- approved - claimed brut
+  // mélangeait coût admissible et dollars de subvention. `earned` (somme de s.earnedFromInvoices
+  // + la part non rattachée à un fournisseur, voir load() plus bas) sert plutôt au « Solde »
+  // d'EN-TÊTE du dossier (0072) : basé sur FACTURÉ, pas réclamé, pour bouger dès qu'une facture
+  // est ajoutée sans attendre une réclamation formelle -- mais avec le taux propre de chaque
+  // poste plutôt qu'un seul taux global appliqué en bloc à tout le dossier.
+  totals: { budget: number; accepted: number; claimed: number; claimedSubsidyEquivalent: number; earned: number; remaining: number };
 };
 
 const num = (v: unknown) => (v == null || v === "" ? null : Number(v));
@@ -267,19 +280,41 @@ export function supplierLedgerService(supabase: SupabaseClient) {
                 ? Math.round(claimed.effective * effectiveRate * 100) / 100
                 : claimed.effective; // aucun taux connu : on ne peut pas traduire, on prend le brut tel quel (repli historique)
         const remaining = accepted.effective != null ? Math.round((accepted.effective - (claimedSubsidyEquivalent ?? 0)) * 100) / 100 : null;
+        const invoicedAmount = list.reduce((sum, i) => sum + (i.amount ?? 0), 0);
+        // Jade : « Solde » en en-tête du dossier (0072) doit bouger dès qu'une facture est ajoutée,
+        // SANS attendre une réclamation formelle -- donc basé sur facturé (invoicedAmount), pas sur
+        // claimed comme `remaining` ci-dessus. Mais appliquer un seul taux global à tout le dossier
+        // mélange les postes à taux différents (ex. 85 % ici, 100 % pour un autre poste) -- chaque
+        // fournisseur applique donc SON PROPRE taux effectif (déjà calculé plus haut), plafonné à
+        // sa propre Subvention acceptée (jamais plus "gagné" sur un poste que son propre plafond).
+        // null seulement si même projectRate est inconnu (repli global impossible) -- le dossier
+        // retombe alors entièrement sur l'ancien calcul (subsidyMath.ts) pour ce fournisseur.
+        const earnedFromInvoices =
+          netOfRate
+            ? (accepted.effective != null ? Math.min(accepted.effective, invoicedAmount) : invoicedAmount)
+            : effectiveRate != null
+              ? Math.round((accepted.effective != null ? Math.min(accepted.effective, invoicedAmount * effectiveRate) : invoicedAmount * effectiveRate) * 100) / 100
+              : null;
         return {
           ...s,
           invoices: list,
-          invoiced: list.reduce((sum, i) => sum + (i.amount ?? 0), 0),
+          invoiced: invoicedAmount,
           budget,
           accepted,
           claimed,
           claimedSubsidyEquivalent,
+          earnedFromInvoices,
           remaining,
           budgetLineCategories: budgetLineCategoriesBySupplier.get(s.id) ?? [],
         };
       });
       const sumOf = (pick: (s: LedgerSupplier) => number | null) => Math.round(ledgerSuppliers.reduce((sum, s) => sum + (pick(s) ?? 0), 0) * 100) / 100;
+      // Jade : factures sans fournisseur (rarissime -- fournisseur supprimé, ou pas encore choisi)
+      // n'ont aucun poste/taux connu -- comptées au taux global du dossier (projectRate), comme
+      // l'était TOUT le dossier avant cette correction. Portion résiduelle seulement : dès qu'une
+      // facture est rattachée à un fournisseur, elle rejoint le calcul précis ci-dessus.
+      const unassignedInvoicedTotal = unassigned.reduce((sum, i) => sum + (i.amount ?? 0), 0);
+      const earned = Math.round((sumOf((s) => s.earnedFromInvoices) + unassignedInvoicedTotal * (projectRate ?? 0)) * 100) / 100;
       return {
         suppliers: ledgerSuppliers,
         unassigned,
@@ -290,6 +325,8 @@ export function supplierLedgerService(supabase: SupabaseClient) {
           budget: sumOf((s) => s.budget.effective),
           accepted: sumOf((s) => s.accepted.effective),
           claimed: sumOf((s) => s.claimed.effective),
+          claimedSubsidyEquivalent: sumOf((s) => s.claimedSubsidyEquivalent),
+          earned,
           remaining: sumOf((s) => s.remaining),
         },
       };

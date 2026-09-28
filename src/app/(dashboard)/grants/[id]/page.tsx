@@ -175,18 +175,21 @@ export default async function GrantProjectPage({ params, searchParams }: { param
   // à 0 dans l'en-tête) -- donc ne pas s'y fier comme source principale : elle ne sert que de repli
   // tant qu'aucun rapport DDR n'a encore été lu (pari_balance_remaining est alors null).
   //
-  // Pour un dossier NON PARI (0072) : même correction que pour "Approuvé" ci-dessus -- "Solde"
-  // reflète maintenant subsidy.remaining (taux x dépenses déjà facturées, plafonné au maximum),
-  // EXACTEMENT la même valeur que "Subvention restante" dans le panneau juste en dessous, donc
-  // qui bouge dès qu'une dépense/facture est ajoutée (ledger.spent), sans attendre une
-  // réclamation formelle. Repli sur l'ancien calcul (approuvé - réclamé) seulement quand le calcul
-  // de subvention n'est pas encore possible (taux ou montant maximal manquant) -- jamais un Solde
-  // à 0 $ alors qu'un montant approuvé existe déjà dans la fiche du dossier.
+  // Pour un dossier NON PARI (0072, puis corrigé) : "Solde" bouge dès qu'une dépense/facture est
+  // ajoutée (ledger.totals.earned, basé sur facturé), sans attendre une réclamation formelle --
+  // MAIS avec le taux propre de chaque poste du Tableau 1/2 (85 % ici, 100 % là) plutôt qu'un
+  // seul taux global (subsidy.remaining/project.grant_rate) appliqué en bloc à tout le dossier,
+  // qui mélangeait des postes à taux différents. Jade (test réel, poste Formation employeur à
+  // 85 % vs taux global du dossier à 100 %) : les deux pouvaient diverger significativement --
+  // ledger.totals.earned suit maintenant la même précision par poste que le Tableau 2. Peut donc
+  // légitimement différer de "Subvention restante" dans SubsidyPanel juste en dessous (qui reste
+  // au taux global, plus simple, utile tant qu'aucun poste détaillé n'existe) -- ce n'est plus une
+  // erreur de synchronisation, juste deux questions différentes (taux global vs réel par poste).
+  // approved - earned peut dépasser 0 même à earned négatif ou nul -- jamais un Solde à 0 $ alors
+  // qu'un montant approuvé existe déjà (même garde-fou que pour "Approuvé" ci-dessus).
   const balance = isPariProgram
     ? project.pari_balance_remaining ?? subsidy.remaining
-    : subsidy.ready
-      ? subsidy.remaining
-      : approved - ledger.totals.claimed;
+    : Math.max(0, Math.round((approved - ledger.totals.earned) * 100) / 100);
 
   // Échéancier unifié : tâches (manuel), échéances (suggérées ou manuelles depuis
   // l'entente) et réclamations (dossiers réels) forment ensemble UNE liste triée par
