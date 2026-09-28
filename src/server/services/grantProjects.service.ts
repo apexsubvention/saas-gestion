@@ -46,6 +46,23 @@ export function grantProjectsService(supabase: SupabaseClient) {
       return repo.updatePariBalance(id, remaining, trimmedLabel);
     },
 
+    // Jade (0068) : mode simple de la section « Ce qui a été déposé » -- tant qu'aucun poste détaillé
+    // n'existe, ces 3 champs restent la source des totaux du dossier (voir resolveSubsidyInputs).
+    async updateFinancials(id: string, input: { total_project_cost: number | null; approved_grant_amount: number | null; grant_rate_percent: number | null }) {
+      const money = (v: number | null) => {
+        if (v == null) return null;
+        if (!Number.isFinite(v) || v < 0 || v > 100_000_000) throw new Error("Montant invalide.");
+        return v;
+      };
+      const ratePercent = input.grant_rate_percent;
+      if (ratePercent != null && (!Number.isFinite(ratePercent) || ratePercent < 0 || ratePercent > 100)) throw new Error("Taux d'aide invalide (0 à 100).");
+      return repo.updateFinancials(id, {
+        total_project_cost: money(input.total_project_cost),
+        approved_grant_amount: money(input.approved_grant_amount),
+        grant_rate: ratePercent != null ? Math.round((ratePercent / 100) * 10000) / 10000 : null,
+      });
+    },
+
     async updateName(id: string, name: string) {
       const trimmed = name.trim();
       if (!trimmed) throw new Error("Le titre du dossier est requis.");

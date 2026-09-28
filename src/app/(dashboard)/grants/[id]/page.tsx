@@ -30,6 +30,8 @@ import { aiSuggestionsService } from "@/server/services/aiSuggestions.service";
 import { listDossierEvents } from "@/server/services/audit";
 import { supplierLedgerService } from "@/server/services/supplierLedger.service";
 import { billingLineItemsService } from "@/server/services/billingLineItems.service";
+import { budgetLinesService } from "@/server/services/budgetLines.service";
+import { BudgetDeposeSection } from "./BudgetDeposeSection";
 import { computeSubsidy, resolveSubsidyInputs } from "@/features/grants/subsidyMath";
 import { buildBillingNarrative } from "@/features/billing/billingSummary";
 import { computePaymentDeadline, paymentDeadlineAlertText } from "@/features/billing/paymentDeadline";
@@ -102,6 +104,7 @@ export default async function GrantProjectPage({ params, searchParams }: { param
   const isPariProgram = isPariCnrcProgram(project.grant_programs?.name ?? null);
   const ledger = await supplierLedgerService(supabase).load(params.id, rateForLedger);
   const lineItems = await billingLineItemsService(supabase).listByProject(params.id);
+  const budgetLines = await budgetLinesService(supabase).load(params.id);
   // Résumé seulement dans le Dossier (Jade : trop de tableaux qui se ressemblent) -- le détail
   // éditable (cocher/décocher, raison d'exclusion) reste dans l'onglet Aide à la facturation.
   const lineItemsSummary = {
@@ -383,6 +386,18 @@ export default async function GrantProjectPage({ params, searchParams }: { param
               />
             )}
             <SuggestionsPanel grantProjectId={project.id} suggestions={suggestions} />
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold text-neutral-900">Ce qui a été déposé</h3>
+              <BudgetDeposeSection
+                grantProjectId={project.id}
+                lines={budgetLines.lines}
+                totals={budgetLines.totals}
+                suppliers={ledger.suppliers.map((s) => ({ id: s.id, name: s.name }))}
+                totalProjectCost={project.total_project_cost != null ? Number(project.total_project_cost) : null}
+                approvedGrantAmount={subsidy.maxSubsidy}
+                grantRatePercent={subsidy.rate != null ? Math.round(subsidy.rate * 10000) / 100 : null}
+              />
+            </div>
             {paymentDeadlineText && (
               <div className="rounded-lg border-2 border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900">
                 <p className="font-semibold">⏰ Délai de paiement et de facturation</p>

@@ -130,6 +130,20 @@ export function grantProjectsRepository(supabase: SupabaseClient) {
       return data as GrantProjectRow;
     },
 
+    // Jade (0068) : coût total du projet / montant approuvé / taux d'aide n'étaient modifiables
+    // qu'à la création du dossier -- désormais éditables en tout temps depuis la section « Ce qui a
+    // été déposé » (mode simple, tant qu'aucun poste détaillé n'existe -- voir budgetLines.service).
+    async updateFinancials(id: string, patch: { total_project_cost: number | null; approved_grant_amount: number | null; grant_rate: number | null }): Promise<GrantProjectRow> {
+      const { data, error } = await supabase
+        .from("grant_projects")
+        .update({ ...patch, updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as GrantProjectRow;
+    },
+
     // Jade : le titre du dossier n'était modifiable qu'à la création -- ajouté pour corriger une
     // erreur de saisie après coup (ex. mauvais nom de projet).
     async updateName(id: string, name: string): Promise<GrantProjectRow> {
