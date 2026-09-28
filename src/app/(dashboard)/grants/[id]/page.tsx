@@ -102,7 +102,9 @@ export default async function GrantProjectPage({ params, searchParams }: { param
   // programme -- même signal que le calendrier de réclamations mensuelles (isMonthlyClaimProgram),
   // jamais imposé (toujours modifiable par ligne, voir SuppliersTable.tsx).
   const isPariProgram = isPariCnrcProgram(project.grant_programs?.name ?? null);
-  const ledger = await supplierLedgerService(supabase).load(params.id, rateForLedger);
+  // netOfRate (isPariProgram) : voir le commentaire sur load() dans supplierLedger.service.ts --
+  // pour ces dossiers, claimed vient du DDR et est déjà net, jamais retraduit par le taux.
+  const ledger = await supplierLedgerService(supabase).load(params.id, rateForLedger, isPariProgram);
   const lineItems = await billingLineItemsService(supabase).listByProject(params.id);
   const budgetLines = await budgetLinesService(supabase).load(params.id);
   // Résumé seulement dans le Dossier (Jade : trop de tableaux qui se ressemblent) -- le détail

@@ -659,7 +659,20 @@ function SupplierGroup({ grantProjectId, supplier, documents, clients, claims, l
           )}
         </td>
         <td className="px-3 py-2"><TrackedCell grantProjectId={grantProjectId} supplierId={supplier.id} field="accepted" tracked={supplier.accepted} /></td>
-        <td className="px-3 py-2"><TrackedCell grantProjectId={grantProjectId} supplierId={supplier.id} field="claimed" tracked={supplier.claimed} /></td>
+        <td className="px-3 py-2">
+          <TrackedCell grantProjectId={grantProjectId} supplierId={supplier.id} field="claimed" tracked={supplier.claimed} />
+          {/* Jade (confirmé) : ce montant est le coût ADMISSIBLE réclamé au programme (ce qu'elle
+              inscrit sur le vrai formulaire) -- pas déjà un montant de subvention. Repère affiché
+              pour qu'on voie tout de suite ce que ça vaut en dollars de subvention (ce qui alimente
+              réellement Solde restant) sans calculer le taux à la main. Masqué quand ça ne change
+              rien (taux 100 % ou pas encore de réclamation). */}
+          {supplier.claimed.effective != null &&
+            supplier.claimed.effective !== 0 &&
+            supplier.claimedSubsidyEquivalent != null &&
+            Math.abs(supplier.claimedSubsidyEquivalent - supplier.claimed.effective) > 0.01 && (
+              <p className="mt-1 text-[11px] text-neutral-400">≈ {money(supplier.claimedSubsidyEquivalent)} de subvention</p>
+            )}
+        </td>
         <td className={`px-3 py-2 text-sm font-semibold ${supplier.remaining != null && supplier.remaining < 0 ? "text-red-700" : "text-neutral-900"}`}>{money(supplier.remaining)}</td>
         <td className="px-3 py-2 text-xs text-neutral-500">
           {supplier.invoices.length} {isEmployee ? "DDR" : `facture${supplier.invoices.length > 1 ? "s" : ""}`}

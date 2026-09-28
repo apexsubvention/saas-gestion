@@ -270,6 +270,11 @@ export function portalDossiersService(supabase: SupabaseClient) {
 
       const dossiers = await Promise.all(
         projects.map(async (p): Promise<PortalDossier> => {
+          // Jade (0065) : calculé ici (avant le ledger) plutôt que plus bas -- supplierLedger.load()
+          // a besoin de savoir si ce dossier est PARI CNRC/IRAP (claim_expenses déjà net, voir le
+          // commentaire sur load() dans supplierLedger.service.ts) pour calculer `remaining`
+          // correctement par fournisseur, même si le portail n'affiche pas encore ce champ.
+          const isPariProgram = isPariCnrcProgram(programNameById.get(p.program_id) ?? p.grant_programs?.name ?? null);
           const [claimRows, questionnaireData, requestRows, noteRows, lineItemRows, agreements, installmentRows, projectDocuments, snapshotRows, ledger, milestoneRows] = await Promise.all([
             claims.listByProject(p.id),
             questionnaire.get(p.id),
@@ -287,7 +292,7 @@ export function portalDossiersService(supabase: SupabaseClient) {
             // document_links_select (0016) et documents_select_portal_full (0045) sont déjà
             // portail- et hiérarchie-compatibles (can_access_grant_project/can_access_client),
             // donc supplierLedgerService.load() fonctionne tel quel avec ce client RLS.
-            supplierLedger.load(p.id),
+            supplierLedger.load(p.id, null, isPariProgram),
             // Réclamations à venir (0063, Jade) -- milestones_select (0016) est déjà
             // portail-compatible (can_access_grant_project).
             milestones.listByProject(p.id),
@@ -352,8 +357,9 @@ export function portalDossiersService(supabase: SupabaseClient) {
           // cette lecture pour le portail.
           const documentFilenameById = new Map(projectDocuments.map((d) => [d.id, d.filename]));
           const agreement = agreements[0] ?? null;
+          // isPariProgram calculé plus haut (avant le ledger) -- programName recalculé ici pour
+          // l'affichage seulement, même source (programNameById), aucun changement de valeur.
           const programName = programNameById.get(p.program_id) ?? p.grant_programs?.name ?? null;
-          const isPariProgram = isPariCnrcProgram(programName);
 
           const visibleRequests = requestRows.filter(
             (r) => r.visible_in_client_portal && VISIBLE_REQUEST_STATUSES.includes(r.status)

@@ -48,8 +48,20 @@ export type LedgerSupplier = ProjectSupplierRow & {
   // avant 0059 -- comportement historique conservé pour les fournisseurs sans poste associé).
   budget: Tracked;
   accepted: Tracked; // subvention acceptée
-  claimed: Tracked; // réclamé à ce jour (auto = réclamations liées à ses factures)
-  remaining: number | null; // subvention acceptée - réclamé
+  // réclamé à ce jour (auto = réclamations liées à ses factures) -- Jade (confirmé) : c'est le
+  // coût ADMISSIBLE réclamé au programme (ce qu'elle inscrit sur le vrai formulaire de
+  // réclamation), PAS déjà un montant de subvention -- c'est le programme qui applique ensuite
+  // son propre taux pour calculer ce qu'il rembourse. Ne jamais soustraire directement de
+  // `accepted` (qui EST déjà un montant de subvention, budget x taux) sans repasser par le taux,
+  // voir `remaining` ci-dessous.
+  claimed: Tracked;
+  // Jade : équivalent de `claimed.effective` en dollars de SUBVENTION (claimed x taux effectif
+  // de ce fournisseur -- accepted/budget, même taux qu'utilisé pour calculer `accepted`) --
+  // affiché comme repère sous Réclamé à ce jour, pour qu'on voie tout de suite le lien avec
+  // Solde restant sans avoir à recalculer le taux à la main. null quand le taux n'est pas
+  // calculable (aucun budget/accepted connu) -- dans ce cas remaining retombe sur claimed brut.
+  claimedSubsidyEquivalent: number | null;
+  remaining: number | null; // subvention acceptée - (réclamé traduit en dollars de subvention)
   // Jade (0069, Suivi budgétaire) : catégorie(s) du/des poste(s) de « Ce qui a été déposé »
   // (budget_lines) associé(s) à ce fournisseur -- purement informatif (affichage), voir plus bas
   // pour l'usage de ces mêmes postes dans le calcul de budget/accepted ci-dessus.
@@ -94,7 +106,13 @@ export function supplierLedgerService(supabase: SupabaseClient) {
 
   return {
     // `projectRate` (fraction) sert au calcul de repli de la subvention acceptée : budget x taux.
-    async load(grantProjectId: string, projectRate: number | null = null): Promise<Ledger> {
+    // `netOfRate` (PARI CNRC/IRAP, 0065) : pour ces dossiers, claim_expenses.claimed_amount vient
+    // du rapport DDR et est déjà le montant NET réellement remboursé pour la période (voir
+    // recordAnalyzedDdrReport ci-dessous) -- PAS un coût admissible brut à traduire en dollars de
+    // subvention. true = on saute la conversion par le taux effectif (claimedSubsidyEquivalent =
+    // claimed.effective tel quel), exactement comme subsidyMath.ts#netOfRate ne réapplique jamais
+    // le taux sur un montant déjà net. Même flag qu'isPariProgram côté page.tsx.
+    async load(grantProjectId: string, projectRate: number | null = null, netOfRate = false): Promise<Ledger> {
       const [suppliers, expenses, lineItems, budgetLines] = await Promise.all([
         suppliersRepo.listByProject(grantProjectId),
         expensesRepo.listByProject(grantProjectId),
@@ -232,7 +250,23 @@ export function supplierLedgerService(supabase: SupabaseClient) {
           claimOverride != null ? { effective: claimOverride, auto: claimAuto, override: claimOverride, mode: "manual" }
           : { effective: claimAuto, auto: claimAuto, override: null, mode: "auto" };
 
-        const remaining = accepted.effective != null ? Math.round((accepted.effective - (claimed.effective ?? 0)) * 100) / 100 : null;
+        // Taux effectif de CE fournisseur = accepted/budget (déjà le bon taux, qu'il vienne d'un
+        // poste précis ou du taux global du dossier -- exactement celui qui a servi à calculer
+        // `accepted` plus haut) -- repli sur projectRate si budget est inconnu/à 0 (ex. fournisseur
+        // sans poste associé, accepted en mode manuel pur), jamais de division par 0.
+        const effectiveRate =
+          accepted.effective != null && budget.effective != null && budget.effective > 0
+            ? accepted.effective / budget.effective
+            : projectRate;
+        const claimedSubsidyEquivalent =
+          claimed.effective == null
+            ? null
+            : netOfRate
+              ? claimed.effective // déjà net (DDR) -- ne jamais réappliquer le taux par-dessus
+              : effectiveRate != null
+                ? Math.round(claimed.effective * effectiveRate * 100) / 100
+                : claimed.effective; // aucun taux connu : on ne peut pas traduire, on prend le brut tel quel (repli historique)
+        const remaining = accepted.effective != null ? Math.round((accepted.effective - (claimedSubsidyEquivalent ?? 0)) * 100) / 100 : null;
         return {
           ...s,
           invoices: list,
@@ -240,6 +274,7 @@ export function supplierLedgerService(supabase: SupabaseClient) {
           budget,
           accepted,
           claimed,
+          claimedSubsidyEquivalent,
           remaining,
           budgetLineCategories: budgetLineCategoriesBySupplier.get(s.id) ?? [],
         };
