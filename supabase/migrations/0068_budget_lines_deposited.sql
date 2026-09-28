@@ -26,14 +26,19 @@ alter table budget_lines
   add column position int not null default 0;
 
 -- approved_amount (colonne d'origine, jamais utilisée en pratique -- confirmé, table vide) migrée
--- vers accepted_amount_override pour ne rien perdre si des lignes existaient malgré tout :
+-- vers accepted_amount_override pour ne rien perdre si des lignes existaient malgré tout. Fait
+-- AVANT de toucher la vue ci-dessous (aucune dépendance encore cassée à ce stade).
 update budget_lines set accepted_amount_override = approved_amount where approved_amount is not null and approved_amount <> 0;
-alter table budget_lines drop column approved_amount;
 
 -- Vue « Suivi budgétaire » (Bundle 2, préparée ici pour ne pas refaire une migration séparée) --
 -- étend budget_line_actuals (0017) avec les montants déposé/accepté/taux effectifs (override si
 -- présent, sinon auto) à côté de spent/claimed/paid déjà calculés à partir des vraies transactions.
 -- security_invoker = true conservé (RLS des tables sous-jacentes, jamais contournée).
+--
+-- IMPORTANT : redéfinie ICI, AVANT de supprimer approved_amount ci-dessous -- l'ancienne définition
+-- de cette vue référence bl.approved_amount ; la remplacer d'abord (par une définition qui ne s'en
+-- sert plus) évite l'erreur Postgres "cannot drop column approved_amount because other objects
+-- depend on it" que provoquerait un DROP COLUMN pendant qu'une vue en dépend encore.
 create or replace view budget_line_actuals
 with (security_invoker = true)
 as
@@ -68,6 +73,20 @@ group by
   bl.accepted_amount_auto,
   bl.subsidy_rate_override,
   bl.subsidy_rate_auto;
+
+-- La vue ne dépend plus de approved_amount : elle peut maintenant être supprimée sans erreur.
+alter table budget_lines drop column approved_amount;
+
+-- budget_lines_delete (0016) était réservée aux admins -- une restriction plus stricte que
+-- billing_line_items_delete (0042 : is_org_staff, admin OU employé), qui gère la même sorte
+-- d'opération (replaceAll d'une lecture de convention, incluant le retrait des lignes obsolètes).
+-- Cette table redevient un tableau actif du dossier (comme Fournisseurs/Aide à la facturation, où
+-- tout membre du personnel peut déjà ajouter/modifier/retirer une ligne) -- alignée ici sur le même
+-- droit, pour que « Générer depuis la convention » (qui retire les postes IA obsolètes) et la
+-- suppression manuelle d'un poste ne soient pas silencieusement bloquées pour un employé.
+drop policy "budget_lines_delete" on budget_lines;
+create policy "budget_lines_delete" on budget_lines
+  for delete using (is_org_staff(organization_id) and can_access_grant_project(grant_project_id));
 
 -- Jade : le coût total/montant approuvé/taux du dossier n'étaient modifiables qu'à la création --
 -- désormais éditables en tout temps depuis la nouvelle section « Ce qui a été déposé » (mode
