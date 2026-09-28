@@ -815,7 +815,7 @@ export function SuppliersTable({
               <th className="px-3 py-2 font-medium">Nom</th>
               <th className="px-3 py-2 font-medium">Subvention acceptée</th>
               <th className="px-3 py-2 font-medium">Réclamé à ce jour</th>
-              <th className="px-3 py-2 font-medium">Solde restant</th>
+              <th className="px-3 py-2 font-medium">Portion subvention restante</th>
               <th className="px-3 py-2 font-medium">Factures</th>
               <th className="px-3 py-2 font-medium" />
             </tr>
