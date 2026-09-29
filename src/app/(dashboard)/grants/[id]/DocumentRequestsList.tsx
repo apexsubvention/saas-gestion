@@ -25,6 +25,10 @@ export type DocumentRequestListItem = {
   // 0067 -- Jade : « Documents demandés au client » devient « Tâches à faire pour le client » --
   // ce n'est pas chaque tâche qui a besoin d'un fichier téléversé (ex. « signer la convention »).
   requiresUpload: boolean;
+  // 0070 -- à qui la demande est attribuée (client du dossier / parent / enfant / fournisseur
+  // inscrit) -- déjà résolu en texte affichable côté serveur (page.tsx), voir
+  // documentRequestTargetOptions.ts.
+  targetLabel: string;
 };
 
 // useFormStatus() ne lit l'état d'un <form> que depuis un composant ENFANT de ce
@@ -106,6 +110,7 @@ export function DocumentRequestsList({ grantProjectId, items }: { grantProjectId
                   Sans document — à cocher
                 </span>
               )}
+              <span className="ml-2">Pour : {item.targetLabel}</span>
               {item.dueDate && <span className="ml-2">Échéance : {new Date(item.dueDate).toLocaleDateString("fr-CA")}</span>}
               {item.instructions && <span className="ml-2">— {item.instructions}</span>}
             </p>

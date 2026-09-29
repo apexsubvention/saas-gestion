@@ -7,6 +7,7 @@ import { formatCaughtError } from "@/lib/errors";
 import { documentRequestsService } from "@/server/services/documentRequests.service";
 import { claimsService } from "@/server/services/claims.service";
 import { logDossierEvent } from "@/server/services/audit";
+import { resolveDocumentRequestTarget } from "./documentRequestTargetResolve";
 
 // Demandes de documents au client (« l'admin va pouvoir demander un document, le client
 // pourra le téléverser ») : côté personnel, ce fichier crée/gère les demandes elles-mêmes
@@ -15,6 +16,8 @@ import { logDossierEvent } from "@/server/services/audit";
 
 export type DocumentRequestFormState = { error: string | null };
 
+// clientId = client DU DOSSIER (contexte pour résoudre "client parent"/"client enfant", pas
+// forcément la cible réelle -- voir target dans formData, 0070).
 export async function createDocumentRequestAction(
   grantProjectId: string,
   clientId: string,
@@ -28,6 +31,7 @@ export async function createDocumentRequestAction(
   const due_date = String(formData.get("due_date") ?? "").trim() || null;
   const claimIdRaw = formData.get("claim_id");
   const claim_id = typeof claimIdRaw === "string" && claimIdRaw.length > 0 ? claimIdRaw : null;
+  const targetRaw = String(formData.get("target") ?? "").trim();
   // Une case à cocher absente du FormData quand décochée -- présence = téléversement requis
   // (défaut coché dans le formulaire, voir NewDocumentRequestForm.tsx).
   const requires_upload = formData.has("requires_upload");
@@ -40,7 +44,14 @@ export async function createDocumentRequestAction(
       const ok = (await claimsService(supabase).listByProject(grantProjectId)).some((c) => c.id === claim_id);
       if (!ok) return { error: "Réclamation introuvable dans ce dossier." };
     }
-    const created = await documentRequestsService(supabase).create(ctx.organizationId, clientId, {
+    // 0070 -- à qui attribuer la demande (client du dossier par défaut) -- revalidé côté serveur,
+    // jamais seulement le <select> du formulaire.
+    const target = await resolveDocumentRequestTarget(supabase, { grantProjectId, dossierClientId: clientId, targetRaw: targetRaw || `client:${clientId}` });
+    if ("error" in target) return { error: target.error };
+    const created = await documentRequestsService(supabase).create(ctx.organizationId, {
+      client_id: target.client_id,
+      target_kind: target.target_kind,
+      supplier_id: target.supplier_id,
       grant_project_id: grantProjectId,
       claim_id,
       document_type,
@@ -51,7 +62,7 @@ export async function createDocumentRequestAction(
     });
     await logDossierEvent(supabase, ctx, {
       grant_project_id: grantProjectId,
-      client_id: clientId,
+      client_id: target.client_id,
       kind: "document_requested",
       title: `Document demandé au client : ${title}`,
       source: "manual",

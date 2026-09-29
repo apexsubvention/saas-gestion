@@ -43,27 +43,19 @@ function AddCard({ title, open, children }: { title: string; open?: boolean; chi
 export function SchedulePanel({
   grantProjectId,
   clientId,
-  clientName,
   entries,
   tasks,
   milestones,
   claims,
   assignees,
-  parentClient,
-  childClients,
-  suppliers,
 }: {
   grantProjectId: string;
   clientId: string;
-  clientName: string;
   entries: ScheduleEntry[];
   tasks: TaskRow[];
   milestones: MilestoneRow[];
   claims: ClaimRow[];
   assignees: Array<{ id: string; name: string }>;
-  parentClient: { id: string; name: string } | null;
-  childClients: Array<{ id: string; name: string }>;
-  suppliers: Array<{ id: string; name: string; hasPortalAccess: boolean }>;
 }) {
   const closedMilestones = milestones.filter((m) => m.status === "done" || m.status === "cancelled");
   const closedClaims = claims.filter((c) => c.status === "paid" || c.status === "rejected");
@@ -83,12 +75,8 @@ export function SchedulePanel({
             <NewTaskForm
               grantProjectId={grantProjectId}
               clientId={clientId}
-              clientName={clientName}
               assignees={assignees}
               claims={claims.map((c) => ({ id: c.id, label: claimLabel(c) }))}
-              parentClient={parentClient}
-              childClients={childClients}
-              suppliers={suppliers}
             />
           </AddCard>
           <AddCard title="+ Ajouter une échéance">
@@ -209,13 +197,8 @@ export function SchedulePanel({
           {tasks.length > 0 ? (
             <TasksManager
               grantProjectId={grantProjectId}
-              clientId={clientId}
-              clientName={clientName}
               tasks={tasks}
               assignees={assignees}
-              parentClient={parentClient}
-              childClients={childClients}
-              suppliers={suppliers}
             />
           ) : (
             <p className="text-sm text-neutral-400">Aucune tâche pour ce dossier. Utilise « + Ajouter une tâche » ci-dessus.</p>

@@ -71,7 +71,9 @@ function Modal({ onClose, header, children }: { onClose: () => void; header: Rea
   );
 }
 
-function DocumentRequestItem({ request }: { request: PortalDocumentRequestView }) {
+// 0070 -- exporté pour être réutilisé tel quel par SupplierDossierCard.tsx (demandes attribuées à
+// un fournisseur inscrit, même rendu que côté client).
+export function DocumentRequestItem({ request }: { request: PortalDocumentRequestView }) {
   return (
     <div className="rounded-md border border-neutral-100 p-3 text-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">

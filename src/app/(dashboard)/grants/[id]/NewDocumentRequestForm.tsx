@@ -1,7 +1,9 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { createDocumentRequestAction, type DocumentRequestFormState } from "./documentRequestActions";
+import { buildDocumentRequestTargetOptions, documentRequestTargetOptionKey } from "./documentRequestTargetOptions";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -16,18 +18,37 @@ function SubmitButton() {
   );
 }
 
+// 0070 -- Jade : l'attribution (client du dossier / parent / enfant / fournisseur inscrit),
+// déménagée depuis les tâches internes (NewTaskForm.tsx) -- voir documentRequestTargetOptions.ts.
+// Toujours visible dans le portail de la cible choisie (pas de case à cocher, contrairement aux
+// tâches internes : visible_in_client_portal reste toujours true ici).
 export function NewDocumentRequestForm({
   grantProjectId,
   clientId,
+  clientName,
   claims,
+  parentClient,
+  childClients,
+  suppliers,
 }: {
   grantProjectId: string;
   clientId: string;
+  clientName: string;
   claims: Array<{ id: string; label: string }>;
+  parentClient: { id: string; name: string } | null;
+  childClients: Array<{ id: string; name: string }>;
+  suppliers: Array<{ id: string; name: string; hasPortalAccess: boolean }>;
 }) {
   const action = createDocumentRequestAction.bind(null, grantProjectId, clientId);
   const initialState: DocumentRequestFormState = { error: null };
   const [state, formAction] = useFormState(action, initialState);
+
+  const targetOptions = useMemo(
+    () => buildDocumentRequestTargetOptions({ clientId, clientName, parentClient, childClients, suppliers }),
+    [clientId, clientName, parentClient, childClients, suppliers]
+  );
+  const defaultTargetKey = documentRequestTargetOptionKey("client", clientId);
+  const [targetKey, setTargetKey] = useState(defaultTargetKey);
 
   return (
     <form action={formAction} className="flex flex-wrap items-end gap-3">
@@ -67,6 +88,21 @@ export function NewDocumentRequestForm({
           </select>
         </div>
       )}
+      <div className="space-y-1">
+        <label className="text-sm font-medium text-neutral-700">Attribuer à</label>
+        <select
+          name="target"
+          value={targetKey}
+          onChange={(e) => setTargetKey(e.target.value)}
+          className="rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
+        >
+          {targetOptions.map((o) => (
+            <option key={documentRequestTargetOptionKey(o.targetKind, o.value)} value={documentRequestTargetOptionKey(o.targetKind, o.value)}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </div>
       <div className="min-w-[240px] flex-1 space-y-1">
         <label className="text-sm font-medium text-neutral-700">Instructions pour le client</label>
         <input

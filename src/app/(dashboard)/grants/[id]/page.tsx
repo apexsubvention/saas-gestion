@@ -40,6 +40,11 @@ import { NewSupplierForm } from "./NewSupplierForm";
 import { DeleteGrantProjectButton } from "../DeleteGrantProjectButton";
 import { NewDocumentRequestForm } from "./NewDocumentRequestForm";
 import { DocumentRequestsList, type DocumentRequestListItem } from "./DocumentRequestsList";
+import {
+  buildDocumentRequestTargetOptions,
+  documentRequestTargetOptionKey,
+  DOCUMENT_REQUEST_TARGET_KIND_LABELS,
+} from "./documentRequestTargetOptions";
 import { dossierNotesService } from "@/server/services/dossierNotes.service";
 import { DossierNotes } from "./DossierNotes";
 import { HideFromParentPortalToggle } from "./HideFromParentPortalToggle";
@@ -156,14 +161,16 @@ export default async function GrantProjectPage({ params, searchParams }: { param
     excludedAmount: excludedFromItems,
   });
   const otherClients = allClients.filter((c) => c.id !== project.client_id);
-  // 0069 -- Jade : attribuer une tâche au client parent/enfant du dossier ou à un fournisseur
-  // inscrit (plutôt qu'au seul client du dossier, comportement historique). parentClient/
-  // childClients viennent de allClients déjà chargé (aucune requête de plus) ; suppliersForTasks
-  // = tous les fournisseurs du dossier, avec leur lien portail (supplier_client_id) s'il existe --
-  // NewTaskForm n'active « Visible dans son portail » que pour ceux qui en ont un.
+  // 0070 -- Jade : attribuer une demande (« Tâches à faire pour le client ») au client parent/
+  // enfant du dossier ou à un fournisseur inscrit (plutôt qu'au seul client du dossier,
+  // comportement historique) -- déménagé depuis les tâches internes (0069, retiré). parentClient/
+  // childClients viennent de allClients déjà chargé (aucune requête de plus) ;
+  // suppliersForAttribution = tous les fournisseurs du dossier, avec leur lien portail
+  // (supplier_client_id) s'il existe -- seuls ceux qui en ont un sont proposables (voir
+  // documentRequestTargetOptions.ts, une demande est toujours visible dans le portail).
   const parentClient = project.clients?.parent_client_id ? (allClients.find((c) => c.id === project.clients?.parent_client_id) ?? null) : null;
   const childClients = allClients.filter((c) => c.parent_client_id === project.client_id);
-  const suppliersForTasks = projectSuppliers.map((s) => ({ id: s.id, name: s.name, hasPortalAccess: Boolean(s.supplier_client_id) }));
+  const suppliersForAttribution = projectSuppliers.map((s) => ({ id: s.id, name: s.name, hasPortalAccess: Boolean(s.supplier_client_id) }));
 
   const pendingMilestones = milestones.filter((m) => m.status === "pending" || m.status === "at_risk");
   const nextMilestone = pendingMilestones[0] ?? null;
@@ -219,8 +226,23 @@ export default async function GrantProjectPage({ params, searchParams }: { param
   const requestLinks = await documentsRepository(supabase).listDocumentRequestLinks(documentRequests.map((r) => r.id));
   const linkByRequestId = new Map(requestLinks.map((l) => [l.request_id, l]));
   const claimLabelById = new Map(claims.map((c) => [c.id, c.claim_number || `Réclamation (${c.period_start ?? "—"})`]));
+  // 0070 -- même construction que targetOptions côté formulaire (NewDocumentRequestForm), pour
+  // afficher « Pour : … » sur chaque demande déjà créée -- voir documentRequestTargetOptions.ts.
+  const documentRequestTargetOptions = buildDocumentRequestTargetOptions({
+    clientId: project.client_id,
+    clientName,
+    parentClient: parentClient ? { id: parentClient.id, name: parentClient.name } : null,
+    childClients: childClients.map((c) => ({ id: c.id, name: c.name })),
+    suppliers: suppliersForAttribution,
+  });
   const documentRequestItems: DocumentRequestListItem[] = documentRequests.map((r) => {
     const file = linkByRequestId.get(r.id);
+    const targetValue = r.target_kind === "supplier" ? r.supplier_id : r.client_id;
+    const targetLabel =
+      targetValue != null
+        ? (documentRequestTargetOptions.find((o) => documentRequestTargetOptionKey(o.targetKind, o.value) === documentRequestTargetOptionKey(r.target_kind, targetValue))?.label ??
+          `${DOCUMENT_REQUEST_TARGET_KIND_LABELS[r.target_kind]} (retiré du dossier)`)
+        : DOCUMENT_REQUEST_TARGET_KIND_LABELS[r.target_kind];
     return {
       id: r.id,
       title: r.title,
@@ -231,6 +253,7 @@ export default async function GrantProjectPage({ params, searchParams }: { param
       claimLabel: r.claim_id ? (claimLabelById.get(r.claim_id) ?? null) : null,
       file: file ? { filename: file.filename, storagePath: file.storage_path } : null,
       requiresUpload: r.requires_upload,
+      targetLabel,
     };
   });
   const scheduleEntries = buildScheduleRows({
@@ -333,15 +356,11 @@ export default async function GrantProjectPage({ params, searchParams }: { param
         <SchedulePanel
           grantProjectId={project.id}
           clientId={project.client_id}
-          clientName={clientName}
           entries={scheduleEntries}
           tasks={tasks}
           milestones={milestones}
           claims={claims}
           assignees={assignees}
-          parentClient={parentClient ? { id: parentClient.id, name: parentClient.name } : null}
-          childClients={childClients.map((c) => ({ id: c.id, name: c.name }))}
-          suppliers={suppliersForTasks}
         />
       ) : (
         <>
@@ -388,16 +407,21 @@ export default async function GrantProjectPage({ params, searchParams }: { param
 
           <CollapsibleSection title="Tâches à faire pour le client" badge={`(${documentRequestItems.length})`}>
             <p className="text-xs text-neutral-500">
-              Demande une tâche au client (fournir un document précis, ou simplement une action à confirmer) —
-              visible depuis son portail, pour un dépôt de programme ou pour une réclamation précise. Décoche
-              « Téléversement d&apos;un document requis » si le client n&apos;a qu&apos;à cocher la tâche
+              Demande une tâche (fournir un document précis, ou simplement une action à confirmer) — attribuable
+              au client du dossier, à son client parent, à un de ses clients enfants, ou à un fournisseur inscrit
+              (avec compte portail), toujours visible dans le portail de la cible choisie. Décoche
+              « Téléversement d&apos;un document requis » si elle n&apos;a qu&apos;à cocher la tâche
               comme faite, sans fichier à fournir.
             </p>
             <div className="rounded-lg border border-neutral-200 bg-white p-4">
               <NewDocumentRequestForm
                 grantProjectId={project.id}
                 clientId={project.client_id}
+                clientName={clientName}
                 claims={claims.map((c) => ({ id: c.id, label: c.claim_number || `Réclamation (${c.period_start ?? "—"})` }))}
+                parentClient={parentClient ? { id: parentClient.id, name: parentClient.name } : null}
+                childClients={childClients.map((c) => ({ id: c.id, name: c.name }))}
+                suppliers={suppliersForAttribution}
               />
             </div>
             <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">

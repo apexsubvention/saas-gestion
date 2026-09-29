@@ -6,10 +6,19 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 // voir 0016) déjà portail-compatible sans changement : aucune migration nécessaire pour
 // cette fonctionnalité.
 
+// 0070 -- structurellement identique au DocumentRequestTargetKind de
+// documentRequestTargetOptions.ts (route grants/[id], jamais importé ici pour ne pas faire
+// dépendre ce fichier serveur partagé d'un dossier de route) -- TypeScript les unifie par
+// structure, même principe que TaskTargetKind (tasks.repository.ts).
+export type DocumentRequestTargetKind = "client" | "parent_client" | "child_client" | "supplier";
+
 export type DocumentRequestRow = {
   id: string;
   organization_id: string;
-  client_id: string;
+  // 0070 -- Jade : une demande peut être attribuée au client du dossier (comportement
+  // historique, seul cas avant 0070), à son client parent, à un de ses clients enfants, ou à un
+  // fournisseur inscrit sur ce dossier -- client_id est alors null (voir supplier_id).
+  client_id: string | null;
   grant_project_id: string | null;
   claim_id: string | null;
   document_type: string;
@@ -22,6 +31,8 @@ export type DocumentRequestRow = {
   // avoir un document à téléverser. true (défaut, comportement inchangé pour l'existant) = le
   // client doit fournir un fichier ; false = une simple case à cocher suffit côté portail.
   requires_upload: boolean;
+  target_kind: DocumentRequestTargetKind;
+  supplier_id: string | null;
   requested_at: string | null;
   received_at: string | null;
   validated_at: string | null;
@@ -48,7 +59,7 @@ export function documentRequestsRepository(supabase: SupabaseClient) {
 
     async create(input: {
       organization_id: string;
-      client_id: string;
+      client_id: string | null;
       grant_project_id?: string | null;
       claim_id?: string | null;
       document_type: string;
@@ -58,6 +69,8 @@ export function documentRequestsRepository(supabase: SupabaseClient) {
       status?: string;
       visible_in_client_portal?: boolean;
       requires_upload?: boolean;
+      target_kind?: DocumentRequestTargetKind;
+      supplier_id?: string | null;
       requested_at?: string | null;
     }): Promise<DocumentRequestRow> {
       const { data, error } = await supabase.from("document_requests").insert(input).select().single();

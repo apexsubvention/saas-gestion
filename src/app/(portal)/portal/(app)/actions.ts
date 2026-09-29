@@ -75,18 +75,42 @@ export async function uploadRequestedDocumentAction(
   }
 
   const supabase = await createClient();
-  const { data: request, error: findError } = await supabase
+  const { data: requestRaw, error: findError } = await supabase
     .from("document_requests")
-    .select("id, organization_id, client_id, grant_project_id, title")
+    .select("id, organization_id, client_id, grant_project_id, title, supplier_id")
     .eq("id", requestId)
     .maybeSingle();
-  if (findError || !request) {
+  if (findError || !requestRaw) {
     return { error: "Demande introuvable ou accès refusé." };
   }
+  // client_id/supplier_id (0070) sont absentes/désynchronisées de database.types.ts (généré, non
+  // régénérable dans cet environnement -- même limitation documentée sur payment_status, 0057) :
+  // passage par `unknown` avant le cast, sinon TypeScript refuse la conversion directe (build
+  // cassé chez Jade -- 0067/0069).
+  const request = requestRaw as unknown as {
+    id: string;
+    organization_id: string;
+    client_id: string | null;
+    grant_project_id: string | null;
+    title: string;
+    supplier_id: string | null;
+  };
 
   const admin = createAdminClient();
   try {
-    const path = `${request.organization_id}/${request.client_id}/${Date.now()}-${file.name}`;
+    // 0070 -- une demande attribuée à un fournisseur n'a pas de client_id (voir migration 0070) :
+    // on retombe sur le client Apex lié à ce fournisseur (project_suppliers.supplier_client_id) --
+    // toujours renseigné ici, resolveDocumentRequestTarget refuse un fournisseur sans compte
+    // portail (donc sans supplier_client_id) à la création.
+    let effectiveClientId = request.client_id;
+    if (!effectiveClientId && request.supplier_id) {
+      const { data: supplierRow } = await admin.from("project_suppliers").select("supplier_client_id").eq("id", request.supplier_id).maybeSingle();
+      effectiveClientId = (supplierRow as { supplier_client_id: string | null } | null)?.supplier_client_id ?? null;
+    }
+    if (!effectiveClientId) {
+      return { error: "Impossible de déterminer le client pour ce document." };
+    }
+    const path = `${request.organization_id}/${effectiveClientId}/${Date.now()}-${file.name}`;
     const { error: uploadError } = await admin.storage.from(BUCKET).upload(path, file, {
       contentType: file.type || undefined,
       upsert: false,
@@ -109,7 +133,7 @@ export async function uploadRequestedDocumentAction(
         mime_type: file.type || null,
         size: file.size || null,
         category: "other",
-        client_id: request.client_id,
+        client_id: effectiveClientId,
         grant_project_id: request.grant_project_id,
         uploaded_by: orgUserRow?.id ?? null,
         source: "client_portal",
@@ -137,7 +161,7 @@ export async function uploadRequestedDocumentAction(
     if (request.grant_project_id) {
       await logDossierEvent(admin, { organizationId: request.organization_id, organizationUserId: orgUserRow?.id ?? "" }, {
         grant_project_id: request.grant_project_id,
-        client_id: request.client_id,
+        client_id: effectiveClientId,
         kind: "document_received_portal",
         title: `Document reçu du client : ${request.title}`,
         source: "portal",
