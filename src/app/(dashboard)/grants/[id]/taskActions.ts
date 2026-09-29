@@ -9,6 +9,7 @@ import { tasksService } from "@/server/services/tasks.service";
 import { logDossierEvent } from "@/server/services/audit";
 import { notifyUser } from "@/server/services/notifications.service";
 import { TASK_STATUS_LABELS } from "@/features/grants/constants";
+import { resolveTaskTarget } from "./taskTargetResolve";
 
 export type TaskActionResult = { error: string | null };
 
@@ -21,15 +22,21 @@ const taskSchema = z.object({
   priority: z.enum(["low", "normal", "high", "urgent"], { errorMap: () => ({ message: "Priorité invalide." }) }),
   status: z.string().refine((s) => s in TASK_STATUS_LABELS, "Statut invalide."),
   assigned_to: z.string().uuid().nullable(),
+  // 0069 -- clé "target_kind:valeur" (voir taskTargetOptions.ts) + visibilité portail.
+  // Facultatifs : une tâche modifiée depuis un contexte qui ne les expose pas (ex. anciens
+  // appels) garde son attribution actuelle inchangée.
+  target: z.string().optional(),
+  visible_in_portal: z.boolean().optional(),
 });
 export type TaskEditInput = z.input<typeof taskSchema>;
 
-// Modifier une tâche : titre, description, échéance, priorité, statut, responsable (réassignation).
+// Modifier une tâche : titre, description, échéance, priorité, statut, responsable (réassignation),
+// attribution (0069).
 export async function updateTaskDetailsAction(grantProjectId: string, input: TaskEditInput): Promise<TaskActionResult> {
   const ctx = await requireOrgContext();
   const parsed = taskSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Formulaire invalide" };
-  const { id, ...fields } = parsed.data;
+  const { id, target: targetRaw, visible_in_portal: visiblePortalRaw, ...fields } = parsed.data;
 
   const supabase = await createClient();
   const service = tasksService(supabase);
@@ -40,13 +47,40 @@ export async function updateTaskDetailsAction(grantProjectId: string, input: Tas
       const { data: member } = await supabase.from("organization_users").select("id").eq("id", fields.assigned_to).eq("organization_id", ctx.organizationId).eq("active", true).in("role", ["admin", "employee"]).maybeSingle();
       if (!member) return { error: "Responsable invalide." };
     }
-    await service.update(id, fields);
+    // 0069 -- resolveTaskTarget vérifie la cible choisie contre le VRAI client du DOSSIER (pour
+    // que "client parent"/"client enfant" restent relatifs au bon client), pas contre le client
+    // déjà attribué à cette tâche (qui peut déjà être un parent/enfant/fournisseur différent).
+    let targetPatch: { client_id: string | null; target_kind: string; supplier_id: string | null; visible_in_portal: boolean } = {
+      client_id: before.client_id,
+      target_kind: before.target_kind,
+      supplier_id: before.supplier_id,
+      visible_in_portal: before.visible_in_portal,
+    };
+    if (targetRaw) {
+      const { data: project } = await supabase.from("grant_projects").select("client_id").eq("id", grantProjectId).maybeSingle();
+      if (!project) return { error: "Dossier introuvable." };
+      const target = await resolveTaskTarget(supabase, { grantProjectId, dossierClientId: project.client_id, targetRaw });
+      if ("error" in target) return { error: target.error };
+      targetPatch = {
+        client_id: target.client_id,
+        target_kind: target.target_kind,
+        supplier_id: target.supplier_id,
+        visible_in_portal: Boolean(visiblePortalRaw) && target.hasPortalAccess,
+      };
+    } else if (visiblePortalRaw !== undefined) {
+      targetPatch.visible_in_portal = Boolean(visiblePortalRaw) && targetPatch.target_kind !== "supplier";
+    }
+
+    await service.update(id, { ...fields, ...targetPatch });
 
     const changes: string[] = [];
     if (before.assigned_to !== fields.assigned_to) changes.push("réassignée");
     if (before.status !== fields.status) changes.push(`statut : ${TASK_STATUS_LABELS[fields.status] ?? fields.status}`);
     if ((before.due_date ?? null) !== fields.due_date) changes.push("échéance modifiée");
     if (before.priority !== fields.priority) changes.push("priorité modifiée");
+    if (before.target_kind !== targetPatch.target_kind || before.client_id !== targetPatch.client_id || before.supplier_id !== targetPatch.supplier_id) {
+      changes.push("attribution modifiée");
+    }
     if (before.assigned_to !== fields.assigned_to) {
       await notifyUser(supabase, ctx, { userId: fields.assigned_to, type: "task_assigned", message: `Une tâche t'a été assignée : ${fields.title}`, href: `/grants/${grantProjectId}?tab=echeancier`, entity_type: "task", entity_id: id });
     }

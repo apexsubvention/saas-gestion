@@ -486,3 +486,56 @@ export async function uploadInvoicePaymentProofAction(
   revalidatePath("/portal");
   return { error: null };
 }
+
+// Marquer une tâche (table tasks, 0069) comme faite depuis le portail -- client visé OU
+// fournisseur inscrit visé, même bouton (PortalTaskCard.tsx) des deux côtés. Même schéma que
+// markDocumentRequestDoneAction ci-dessus : le select initial (client RLS normal) sert à
+// vérifier l'accès via tasks_portal_select (0069) -- il échoue silencieusement (row = null) si
+// ce compte n'est pas la cible visible de cette tâche -- puis l'écriture passe par le service
+// role (une tâche n'a pas de policy update portail, exactement comme document_requests).
+export async function markTaskDoneAction(taskId: string): Promise<PortalUploadFormState> {
+  const ctx = await requirePortalContext();
+
+  const supabase = await createClient();
+  const { data: task, error: findError } = await supabase
+    .from("tasks")
+    .select("id, organization_id, client_id, grant_project_id, title, status")
+    .eq("id", taskId)
+    .maybeSingle();
+  if (findError || !task) {
+    return { error: "Tâche introuvable ou accès refusé." };
+  }
+  if (task.status === "done") {
+    return { error: null };
+  }
+
+  const admin = createAdminClient();
+  try {
+    const { data: orgUserRow } = await admin
+      .from("organization_users")
+      .select("id")
+      .eq("user_id", ctx.userId)
+      .eq("organization_id", ctx.organizationId)
+      .maybeSingle();
+
+    const { error: statusError } = await admin.from("tasks").update({ status: "done", updated_at: new Date().toISOString() }).eq("id", taskId);
+    if (statusError) throw statusError;
+
+    if (task.grant_project_id) {
+      await logDossierEvent(admin, { organizationId: task.organization_id, organizationUserId: orgUserRow?.id ?? "" }, {
+        grant_project_id: task.grant_project_id,
+        client_id: task.client_id,
+        kind: "task_done_portal",
+        title: `Tâche marquée faite par le client : ${task.title}`,
+        source: "portal",
+        ref_type: "task",
+        ref_id: taskId,
+      });
+    }
+  } catch (e) {
+    return { error: formatCaughtError(e) };
+  }
+
+  revalidatePath("/portal");
+  return { error: null };
+}

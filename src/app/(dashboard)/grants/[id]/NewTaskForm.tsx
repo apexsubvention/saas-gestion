@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { createTaskAction, type CreateTaskFormState } from "./actions";
+import { buildTaskTargetOptions, taskTargetOptionKey } from "./taskTargetOptions";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -20,13 +21,21 @@ function SubmitButton() {
 export function NewTaskForm({
   grantProjectId,
   clientId,
+  clientName,
   assignees,
   claims,
+  parentClient,
+  childClients,
+  suppliers,
 }: {
   grantProjectId: string;
   clientId: string;
+  clientName: string;
   assignees: Array<{ id: string; name: string }>;
   claims: Array<{ id: string; label: string }>;
+  parentClient: { id: string; name: string } | null;
+  childClients: Array<{ id: string; name: string }>;
+  suppliers: Array<{ id: string; name: string; hasPortalAccess: boolean }>;
 }) {
   const action = createTaskAction.bind(null, grantProjectId, clientId);
   const initialState: CreateTaskFormState = { error: null };
@@ -36,6 +45,20 @@ export function NewTaskForm({
   useEffect(() => {
     if (state.savedAt) formRef.current?.reset();
   }, [state.savedAt]);
+
+  // 0069 -- à qui attribuer la tâche (client du dossier par défaut, comme avant), et si elle doit
+  // apparaître dans son portail -- désactivé tant que la cible choisie n'a pas de portail
+  // possible (fournisseur non inscrit).
+  const targetOptions = useMemo(
+    () => buildTaskTargetOptions({ clientId, clientName, parentClient, childClients, suppliers }),
+    [clientId, clientName, parentClient, childClients, suppliers]
+  );
+  const defaultTargetKey = taskTargetOptionKey("client", clientId);
+  const [targetKey, setTargetKey] = useState(defaultTargetKey);
+  const selectedTarget = targetOptions.find((o) => taskTargetOptionKey(o.targetKind, o.value) === targetKey);
+  useEffect(() => {
+    if (state.savedAt) setTargetKey(defaultTargetKey);
+  }, [state.savedAt, defaultTargetKey]);
 
   return (
     <form ref={formRef} action={formAction} className="flex flex-wrap items-end gap-3">
@@ -78,6 +101,28 @@ export function NewTaskForm({
           </select>
         </div>
       )}
+      <div className="space-y-1">
+        <label className="text-sm font-medium text-neutral-700">Attribuer à</label>
+        <select
+          name="target"
+          value={targetKey}
+          onChange={(e) => setTargetKey(e.target.value)}
+          className="rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
+        >
+          {targetOptions.map((o) => (
+            <option key={taskTargetOptionKey(o.targetKind, o.value)} value={taskTargetOptionKey(o.targetKind, o.value)}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="space-y-1">
+        <label className={`flex items-center gap-2 text-sm ${selectedTarget?.hasPortalAccess ? "text-neutral-700" : "text-neutral-400"}`}>
+          <input type="checkbox" name="visible_in_portal" value="1" disabled={!selectedTarget?.hasPortalAccess} className="h-4 w-4 rounded border-neutral-300" />
+          Visible dans son portail
+        </label>
+        {!selectedTarget?.hasPortalAccess && <p className="text-xs text-neutral-400">Ce fournisseur n&apos;a pas de compte portail.</p>}
+      </div>
       <div className="w-full space-y-1">
         <label className="text-sm font-medium text-neutral-700">Description (facultatif)</label>
         <textarea name="description" rows={2} className="w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm" />

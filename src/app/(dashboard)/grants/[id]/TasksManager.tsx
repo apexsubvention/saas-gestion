@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { deleteTaskAction, updateTaskDetailsAction } from "./taskActions";
 import { TASK_PRIORITY_LABELS, TASK_STATUS_LABELS, taskStatusBadgeClass } from "@/features/grants/constants";
 import type { TaskRow } from "@/server/repositories/tasks.repository";
+import { buildTaskTargetOptions, taskTargetOptionKey, TASK_TARGET_KIND_LABELS } from "./taskTargetOptions";
 
 type Assignee = { id: string; name: string };
+type SupplierOption = { id: string; name: string; hasPortalAccess: boolean };
 
 const input = "w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm";
 const btn = "rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50";
@@ -18,7 +20,25 @@ const ORIGIN_LABELS: Record<string, string> = {
   manual: "Manuelle", email: "Courriel", meeting: "Réunion", claim: "Réclamation", agreement: "Extraite d'une entente", ai: "Générée par Apex", document: "Demande de document client",
 };
 
-function TaskItem({ grantProjectId, task, assignees }: { grantProjectId: string; task: TaskRow; assignees: Assignee[] }) {
+function TaskItem({
+  grantProjectId,
+  task,
+  assignees,
+  clientId,
+  clientName,
+  parentClient,
+  childClients,
+  suppliers,
+}: {
+  grantProjectId: string;
+  task: TaskRow;
+  assignees: Assignee[];
+  clientId: string;
+  clientName: string;
+  parentClient: { id: string; name: string } | null;
+  childClients: Array<{ id: string; name: string }>;
+  suppliers: SupplierOption[];
+}) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? "");
@@ -29,14 +49,38 @@ function TaskItem({ grantProjectId, task, assignees }: { grantProjectId: string;
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
+  // 0069 -- attribution (client du dossier / parent / enfant / fournisseur) + visibilité portail.
+  const targetOptions = useMemo(
+    () => buildTaskTargetOptions({ clientId, clientName, parentClient, childClients, suppliers }),
+    [clientId, clientName, parentClient, childClients, suppliers]
+  );
+  const currentTargetValue = task.target_kind === "supplier" ? task.supplier_id : task.client_id;
+  const currentTargetKey = currentTargetValue ? taskTargetOptionKey(task.target_kind, currentTargetValue) : null;
+  const currentTargetOption = targetOptions.find((o) => taskTargetOptionKey(o.targetKind, o.value) === currentTargetKey);
+  const currentTargetLabel = currentTargetOption?.label ?? `${TASK_TARGET_KIND_LABELS[task.target_kind]} (retiré du dossier)`;
+  const [targetKey, setTargetKey] = useState(currentTargetKey ?? taskTargetOptionKey("client", clientId));
+  const [visibleInPortal, setVisibleInPortal] = useState(task.visible_in_portal);
+  const selectedTarget = targetOptions.find((o) => taskTargetOptionKey(o.targetKind, o.value) === targetKey);
+
   const statusOptions = MAIN_STATUSES.some(([v]) => v === task.status) ? MAIN_STATUSES : [...MAIN_STATUSES, [task.status, TASK_STATUS_LABELS[task.status] ?? task.status] as [string, string]];
   const assigneeName = assignees.find((a) => a.id === task.assigned_to)?.name ?? "Non assignée";
 
-  function save(overrides: Partial<{ status: string }> = {}) {
+  // includeTarget = false pour le bouton rapide « Marquer terminé » (hors mode édition) : on
+  // ne renvoie surtout pas target/visible_in_portal dans ce cas, pour ne jamais réinitialiser
+  // silencieusement l'attribution d'une tâche dont la cible a depuis été retirée du dossier
+  // (currentTargetKey alors null -> targetKey serait retombé sur "client du dossier").
+  function save(overrides: Partial<{ status: string }> = {}, includeTarget = editing) {
     setError(null);
     startTransition(async () => {
       const r = await updateTaskDetailsAction(grantProjectId, {
-        id: task.id, title, description: description || null, due_date: due || null, priority: priority as "low" | "normal" | "high" | "urgent", status: overrides.status ?? status, assigned_to: assignee || null,
+        id: task.id,
+        title,
+        description: description || null,
+        due_date: due || null,
+        priority: priority as "low" | "normal" | "high" | "urgent",
+        status: overrides.status ?? status,
+        assigned_to: assignee || null,
+        ...(includeTarget ? { target: targetKey, visible_in_portal: visibleInPortal } : {}),
       });
       if (r.error) setError(r.error);
       else setEditing(false);
@@ -62,6 +106,7 @@ function TaskItem({ grantProjectId, task, assignees }: { grantProjectId: string;
             <span>{task.due_date ? `Échéance ${task.due_date}` : "Sans échéance"}</span>
             <span>Priorité {TASK_PRIORITY_LABELS[task.priority] ?? task.priority}</span>
             <span>{assigneeName}</span>
+            <span>Pour : {currentTargetLabel}{task.visible_in_portal && <span className="ml-1 rounded-full bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700">Portail</span>}</span>
             <span className="text-neutral-400">Origine : {ORIGIN_LABELS[task.source] ?? task.source}</span>
           </p>
           {task.description && !editing && <p className="mt-1 text-xs text-neutral-600">{task.description}</p>}
@@ -93,6 +138,24 @@ function TaskItem({ grantProjectId, task, assignees }: { grantProjectId: string;
               {assignees.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
             </select>
           </label>
+          <label className="space-y-1 text-xs text-neutral-600">Attribuer à
+            <select value={targetKey} onChange={(e) => setTargetKey(e.target.value)} className={input}>
+              {!currentTargetOption && currentTargetKey && <option value={currentTargetKey}>{currentTargetLabel}</option>}
+              {targetOptions.map((o) => (
+                <option key={taskTargetOptionKey(o.targetKind, o.value)} value={taskTargetOptionKey(o.targetKind, o.value)}>{o.label}</option>
+              ))}
+            </select>
+          </label>
+          <label className={`flex items-center gap-2 text-xs sm:col-span-2 ${selectedTarget?.hasPortalAccess ?? true ? "text-neutral-600" : "text-neutral-400"}`}>
+            <input
+              type="checkbox"
+              checked={visibleInPortal}
+              disabled={selectedTarget ? !selectedTarget.hasPortalAccess : false}
+              onChange={(e) => setVisibleInPortal(e.target.checked)}
+              className="h-4 w-4 rounded border-neutral-300"
+            />
+            Visible dans son portail
+          </label>
           <div className="sm:col-span-2">
             <button className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50" disabled={pending} onClick={() => save()}>{pending ? "Enregistrement…" : "Enregistrer"}</button>
           </div>
@@ -105,21 +168,41 @@ function TaskItem({ grantProjectId, task, assignees }: { grantProjectId: string;
 
 // Toutes les tâches du dossier (manuelles ET automatiques) : modifier, réassigner, terminer, supprimer.
 // Une tâche automatique reste modifiable sans perdre son origine.
-export function TasksManager({ grantProjectId, tasks, assignees }: { grantProjectId: string; tasks: TaskRow[]; assignees: Assignee[] }) {
+export function TasksManager({
+  grantProjectId,
+  clientId,
+  clientName,
+  tasks,
+  assignees,
+  parentClient,
+  childClients,
+  suppliers,
+}: {
+  grantProjectId: string;
+  clientId: string;
+  clientName: string;
+  tasks: TaskRow[];
+  assignees: Assignee[];
+  parentClient: { id: string; name: string } | null;
+  childClients: Array<{ id: string; name: string }>;
+  suppliers: SupplierOption[];
+}) {
   const [showDone, setShowDone] = useState(false);
   const open = tasks.filter((t) => t.status !== "done" && t.status !== "cancelled");
   const closed = tasks.filter((t) => t.status === "done" || t.status === "cancelled");
   if (tasks.length === 0) return null;
 
+  const targetProps = { clientId, clientName, parentClient, childClients, suppliers };
+
   return (
     <div className="space-y-2">
       <h3 className="text-sm font-semibold text-neutral-900">Tâches du dossier ({open.length} en cours)</h3>
-      <ul className="space-y-2">{open.map((t) => <TaskItem key={`${t.id}-${t.status}-${t.assigned_to}`} grantProjectId={grantProjectId} task={t} assignees={assignees} />)}</ul>
+      <ul className="space-y-2">{open.map((t) => <TaskItem key={`${t.id}-${t.status}-${t.assigned_to}`} grantProjectId={grantProjectId} task={t} assignees={assignees} {...targetProps} />)}</ul>
       {open.length === 0 && <p className="text-sm text-neutral-400">Aucune tâche en cours.</p>}
       {closed.length > 0 && (
         <>
           <button onClick={() => setShowDone((v) => !v)} className="text-xs text-neutral-500 underline">{showDone ? "Masquer" : "Afficher"} les tâches terminées ou annulées ({closed.length}) — conservées pour l&apos;historique</button>
-          {showDone && <ul className="space-y-2">{closed.map((t) => <TaskItem key={`${t.id}-${t.status}`} grantProjectId={grantProjectId} task={t} assignees={assignees} />)}</ul>}
+          {showDone && <ul className="space-y-2">{closed.map((t) => <TaskItem key={`${t.id}-${t.status}`} grantProjectId={grantProjectId} task={t} assignees={assignees} {...targetProps} />)}</ul>}
         </>
       )}
     </div>

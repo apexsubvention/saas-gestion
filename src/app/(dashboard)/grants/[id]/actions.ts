@@ -10,6 +10,7 @@ import { scheduleDismissalsService } from "@/server/services/scheduleDismissals.
 import { tasksService } from "@/server/services/tasks.service";
 import { milestonesService } from "@/server/services/milestones.service";
 import { projectSuppliersService } from "@/server/services/projectSuppliers.service";
+import { resolveTaskTarget } from "./taskTargetResolve";
 import { grantAgreementsRepository } from "@/server/repositories/grantAgreements.repository";
 import { requireOrgContext } from "@/lib/permissions";
 import { grantAgreementsService } from "@/server/services/grantAgreements.service";
@@ -422,6 +423,8 @@ export async function createTaskAction(
   if (!["low", "normal", "high", "urgent"].includes(priority)) return { error: "Priorité invalide." };
   const assigneeRaw = String(formData.get("assigned_to") ?? "").trim();
   const claimRaw = String(formData.get("claim_id") ?? "").trim();
+  const targetRaw = String(formData.get("target") ?? "").trim();
+  const visiblePortalRaw = formData.get("visible_in_portal");
 
   const supabase = await createClient();
   try {
@@ -438,14 +441,23 @@ export async function createTaskAction(
       if (!owned) return { error: "Réclamation introuvable dans ce dossier." };
       claim_id = claimRaw;
     }
+    // 0069 -- à qui attribuer la tâche (client du dossier par défaut) et si elle doit apparaître
+    // dans son portail -- revalidé côté serveur, jamais seulement le <select> du formulaire.
+    const target = await resolveTaskTarget(supabase, { grantProjectId, dossierClientId: clientId, targetRaw: targetRaw || `client:${clientId}` });
+    if ("error" in target) return { error: target.error };
+    const visible_in_portal = Boolean(visiblePortalRaw) && target.hasPortalAccess;
+
     await tasksService(supabase).create(ctx.organizationId, {
       title,
       description,
-      client_id: clientId,
+      client_id: target.client_id,
       grant_project_id: grantProjectId,
       due_date,
       priority,
       assigned_to,
+      target_kind: target.target_kind,
+      supplier_id: target.supplier_id,
+      visible_in_portal,
       ...(claim_id ? { claim_id } : {}),
     });
     await logDossierEvent(supabase, ctx, { grant_project_id: grantProjectId, client_id: clientId, kind: "task_created", title: `Tâche créée : ${title}`, source: "manual" });

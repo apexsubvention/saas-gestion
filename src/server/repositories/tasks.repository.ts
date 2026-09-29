@@ -16,6 +16,14 @@ export type TaskRow = {
   status: string;
   source: string;
   created_at: string;
+  // 0069 -- Jade : attribuer la tâche à quelqu'un d'autre que le client du dossier. target_kind
+  // n'est qu'une étiquette d'affichage/filtre ('client' = comportement historique, seule valeur
+  // possible avant 0069) ; l'accès réel (RLS) dépend uniquement de client_id/supplier_id.
+  target_kind: "client" | "parent_client" | "child_client" | "supplier";
+  supplier_id: string | null;
+  // Défaut false : une tâche n'apparaît dans le portail (client ou fournisseur visé) que si
+  // explicitement cochée « Visible dans son portail » -- voir tasks_portal_select (0069).
+  visible_in_portal: boolean;
 };
 
 export function tasksRepository(supabase: SupabaseClient) {
@@ -32,7 +40,9 @@ export function tasksRepository(supabase: SupabaseClient) {
 
     async update(
       id: string,
-      patch: Partial<Pick<TaskRow, "title" | "description" | "due_date" | "priority" | "status" | "assigned_to">> & { claim_id?: string | null }
+      patch: Partial<
+        Pick<TaskRow, "title" | "description" | "due_date" | "priority" | "status" | "assigned_to" | "client_id" | "target_kind" | "supplier_id" | "visible_in_portal">
+      > & { claim_id?: string | null }
     ): Promise<TaskRow> {
       const { data, error } = await supabase.from("tasks").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", id).select().single();
       if (error) throw error;
@@ -57,6 +67,9 @@ export function tasksRepository(supabase: SupabaseClient) {
       due_date?: string | null;
       priority?: string;
       status?: string;
+      target_kind?: string;
+      supplier_id?: string | null;
+      visible_in_portal?: boolean;
     }): Promise<TaskRow> {
       const { data, error } = await supabase
         .from("tasks")

@@ -88,13 +88,14 @@ export default async function GrantProjectPage({ params, searchParams }: { param
   // subvention juste en dessous) -- la même source de vérité partout sur cette page, jamais
   // recalculée séparément.
 
-  const [documents, claims, tasks, milestones, allClients, agreements] = await Promise.all([
+  const [documents, claims, tasks, milestones, allClients, agreements, projectSuppliers] = await Promise.all([
     documentsService(supabase).listByProject(params.id),
     claimsService(supabase).listByProject(params.id),
     tasksService(supabase).listByProject(params.id),
     milestonesService(supabase).listByProject(params.id),
     clientsService(supabase).list(),
     grantAgreementsService(supabase).listByProject(params.id),
+    projectSuppliersService(supabase).listByProject(params.id),
   ]);
   const agreement = agreements[0] ?? null;
   const rateForLedger = Number(project.grant_rate ?? agreement?.grant_rate ?? 0) || null;
@@ -155,6 +156,14 @@ export default async function GrantProjectPage({ params, searchParams }: { param
     excludedAmount: excludedFromItems,
   });
   const otherClients = allClients.filter((c) => c.id !== project.client_id);
+  // 0069 -- Jade : attribuer une tâche au client parent/enfant du dossier ou à un fournisseur
+  // inscrit (plutôt qu'au seul client du dossier, comportement historique). parentClient/
+  // childClients viennent de allClients déjà chargé (aucune requête de plus) ; suppliersForTasks
+  // = tous les fournisseurs du dossier, avec leur lien portail (supplier_client_id) s'il existe --
+  // NewTaskForm n'active « Visible dans son portail » que pour ceux qui en ont un.
+  const parentClient = project.clients?.parent_client_id ? (allClients.find((c) => c.id === project.clients?.parent_client_id) ?? null) : null;
+  const childClients = allClients.filter((c) => c.parent_client_id === project.client_id);
+  const suppliersForTasks = projectSuppliers.map((s) => ({ id: s.id, name: s.name, hasPortalAccess: Boolean(s.supplier_client_id) }));
 
   const pendingMilestones = milestones.filter((m) => m.status === "pending" || m.status === "at_risk");
   const nextMilestone = pendingMilestones[0] ?? null;
@@ -324,11 +333,15 @@ export default async function GrantProjectPage({ params, searchParams }: { param
         <SchedulePanel
           grantProjectId={project.id}
           clientId={project.client_id}
+          clientName={clientName}
           entries={scheduleEntries}
           tasks={tasks}
           milestones={milestones}
           claims={claims}
           assignees={assignees}
+          parentClient={parentClient ? { id: parentClient.id, name: parentClient.name } : null}
+          childClients={childClients.map((c) => ({ id: c.id, name: c.name }))}
+          suppliers={suppliersForTasks}
         />
       ) : (
         <>

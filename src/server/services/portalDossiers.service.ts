@@ -17,7 +17,8 @@ import { supplierLedgerService } from "@/server/services/supplierLedger.service"
 import { billingLineItemsService } from "@/server/services/billingLineItems.service";
 import { billingInstallmentsService } from "@/server/services/billingInstallments.service";
 import { grantAgreementsService } from "@/server/services/grantAgreements.service";
-import { GRANT_PROJECT_STATUS_LABELS, DOCUMENT_REQUEST_STATUS_LABELS } from "@/features/grants/constants";
+import { tasksService } from "@/server/services/tasks.service";
+import { GRANT_PROJECT_STATUS_LABELS, DOCUMENT_REQUEST_STATUS_LABELS, TASK_PRIORITY_LABELS } from "@/features/grants/constants";
 import { isPariCnrcProgram } from "@/server/scheduling/monthlyClaims";
 
 // Assemble, pour le portail client, tout ce qui est associé à un dossier -- statut/dates,
@@ -51,6 +52,20 @@ export type PortalDocumentRequestView = {
   // 0067 -- Jade : « Tâches à faire pour le client » -- false = une simple case à cocher suffit
   // (pas de fichier à fournir), voir markDocumentRequestDoneAction dans le portail.
   requiresUpload: boolean;
+};
+
+// 0069 -- Jade : attribuer une tâche (table tasks, distincte de document_requests ci-dessus) au
+// client/parent/enfant/fournisseur et la rendre visible dans son portail. Montrée dans la même
+// section « Tâches à faire » que documentRequests (voir DossierCard.tsx) -- pas de fichier à
+// fournir ici, juste une case à cocher (markTaskDoneAction).
+export type PortalTaskView = {
+  id: string;
+  title: string;
+  description: string | null;
+  dueDate: string | null;
+  priority: string;
+  priorityLabel: string;
+  status: string;
 };
 
 export type PortalClaimView = ClaimRow & {
@@ -201,6 +216,10 @@ export type PortalDossier = {
   // Documents demandés au niveau du dossier (claim_id vide -- ex. en vue d'un dépôt),
   // par opposition à ceux rattachés à une réclamation précise (déjà dans claims[].documentRequests).
   documentRequests: PortalDocumentRequestView[];
+  // 0069 -- tâches (table tasks) attribuées à CE compte portail précis (client visé, ou
+  // fournisseur inscrit visé -- voir tasks_portal_select) ET explicitement rendues visibles
+  // (visible_in_portal). Déjà filtré : jamais les tâches purement internes.
+  tasks: PortalTaskView[];
   notes: DossierNoteView[];
   billingLineItems: PortalBillingLineItem[];
   billingInstallments: PortalBillingInstallment[];
@@ -228,6 +247,7 @@ export function portalDossiersService(supabase: SupabaseClient) {
   const billingLineItems = billingLineItemsService(supabase);
   const billingInstallments = billingInstallmentsService(supabase);
   const grantAgreements = grantAgreementsService(supabase);
+  const tasks = tasksService(supabase);
 
   return {
     // viewerClientId : le client du compte portail CONNECTÉ (requirePortalContext -> ctx.clientId)
@@ -275,7 +295,7 @@ export function portalDossiersService(supabase: SupabaseClient) {
           // commentaire sur load() dans supplierLedger.service.ts) pour calculer `remaining`
           // correctement par fournisseur, même si le portail n'affiche pas encore ce champ.
           const isPariProgram = isPariCnrcProgram(programNameById.get(p.program_id) ?? p.grant_programs?.name ?? null);
-          const [claimRows, questionnaireData, requestRows, noteRows, lineItemRows, agreements, installmentRows, projectDocuments, snapshotRows, ledger, milestoneRows] = await Promise.all([
+          const [claimRows, questionnaireData, requestRows, noteRows, lineItemRows, agreements, installmentRows, projectDocuments, snapshotRows, ledger, milestoneRows, taskRows] = await Promise.all([
             claims.listByProject(p.id),
             questionnaire.get(p.id),
             documentRequests.listByProject(p.id),
@@ -296,6 +316,10 @@ export function portalDossiersService(supabase: SupabaseClient) {
             // Réclamations à venir (0063, Jade) -- milestones_select (0016) est déjà
             // portail-compatible (can_access_grant_project).
             milestones.listByProject(p.id),
+            // Tâches (0069) -- tasks_portal_select (RLS) filtre déjà à visible_in_portal = true
+            // et à ce compte portail précis (client visé ou fournisseur inscrit visé) ; le filtre
+            // ci-dessous (visibleTasks) ne fait que retirer les tâches annulées, en défense.
+            tasks.listByProject(p.id),
           ]);
           // Documents rattachés à une réclamation précise -- dépend des claimRows ci-dessus,
           // donc un aller-retour séparé (une seule requête groupée pour tout le dossier).
@@ -393,6 +417,21 @@ export function portalDossiersService(supabase: SupabaseClient) {
 
           const projectLevelRequests = visibleRequests.filter((r) => !r.claim_id).map(toView);
 
+          // 0069 -- déjà filtré par tasks_portal_select (visible_in_portal = true, cible = ce
+          // compte) ; on retire seulement "cancelled" ici (jamais montré, comme les tâches
+          // annulées côté personnel), "done" reste montré (coché) le temps que le client le voie.
+          const visibleTasks: PortalTaskView[] = taskRows
+            .filter((t) => t.status !== "cancelled")
+            .map((t) => ({
+              id: t.id,
+              title: t.title,
+              description: t.description,
+              dueDate: t.due_date,
+              priority: t.priority,
+              priorityLabel: TASK_PRIORITY_LABELS[t.priority] ?? t.priority,
+              status: t.status,
+            }));
+
           const redaction: PortalRedactionItem[] = questionnaireData.items
             .map((q): PortalRedactionItem | null => {
               const text = q.answer.final_text || q.answer.user_draft || q.answer.ai_draft;
@@ -435,6 +474,7 @@ export function portalDossiersService(supabase: SupabaseClient) {
             billingBySupplier,
             redaction,
             documentRequests: projectLevelRequests,
+            tasks: visibleTasks,
             notes: noteRows,
             billingLineItems: lineItemRows.map((it) => ({ id: it.id, label: it.label, description: it.description, amount: Number(it.amount), hours: it.hours != null ? Number(it.hours) : null, includedInBilling: it.included_in_billing })),
             billingInstallments: installmentRows.map((r) => ({

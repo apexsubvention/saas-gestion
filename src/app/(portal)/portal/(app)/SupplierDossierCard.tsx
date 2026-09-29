@@ -13,6 +13,7 @@ import { useState, useTransition } from "react";
 import { DOCUMENT_CATEGORY_LABELS, grantProjectStatusBadgeClass, GRANT_PROJECT_STATUS_LABELS } from "@/features/grants/constants";
 import { getSupplierDossierDetailsAction, type SupplierDossierDetails } from "./supplierActions";
 import { PortalOpenDocumentButton } from "./PortalOpenDocumentButton";
+import { PortalTaskCard } from "./PortalTaskCard";
 import { InstallmentInvoiceUpload } from "./InstallmentInvoiceUpload";
 import { computeSubsidy } from "@/features/grants/subsidyMath";
 import { buildBillingNarrative } from "@/features/billing/billingSummary";
@@ -127,6 +128,21 @@ export function SupplierDossierCard({ row, clientName }: { row: SupplierBillingR
                   </div>
                 ) : null;
               })()}
+
+              {/* 0069 -- tâches attribuées explicitement à ce compte fournisseur sur ce dossier,
+                  même carte que côté client (PortalTaskCard.tsx), juste après le délai de
+                  paiement -- même emplacement/priorité que DossierCard.tsx. */}
+              {details.tasks.length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Tâches à faire</h3>
+                  <div className="space-y-2">
+                    {details.tasks.map((t) => (
+                      <PortalTaskCard key={t.id} task={t} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div>
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Dossier</h3>
                 <div className="mt-2 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">

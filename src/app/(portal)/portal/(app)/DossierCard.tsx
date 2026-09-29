@@ -21,6 +21,7 @@ import {
 } from "@/features/grants/constants";
 import { DocumentRequestUpload } from "./DocumentRequestUpload";
 import { PortalTaskDoneButton } from "./PortalTaskDoneButton";
+import { PortalTaskCard } from "./PortalTaskCard";
 import { InstallmentInvoiceUpload } from "./InstallmentInvoiceUpload";
 import { PortalNotes } from "./PortalNotes";
 import { PortalSupplierInvoices } from "./PortalSupplierInvoices";
@@ -362,14 +363,22 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
           {/* Tâches à faire pour le client (0067, Jade) -- juste sous le délai de paiement, avant
               le reste des détails du dossier : c'est la première chose actionnable qu'il doit voir
               en ouvrant un dossier. Anciennement « Documents demandés » -- pas chaque tâche
-              n'a besoin d'un fichier, voir requiresUpload sur DocumentRequestItem plus haut. */}
-          {dossier.documentRequests.length > 0 && (
+              n'a besoin d'un fichier, voir requiresUpload sur DocumentRequestItem plus haut.
+              0069 -- les vraies tâches (table tasks) explicitement attribuées à ce client et
+              rendues visibles dans son portail rejoignent la même liste, triée par échéance
+              (sans échéance en dernier) plutôt que deux sections « Tâches » qui se ressembleraient. */}
+          {(dossier.documentRequests.length > 0 || dossier.tasks.length > 0) && (
             <div className="space-y-2">
               <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Tâches à faire</h3>
               <div className="space-y-2">
-                {dossier.documentRequests.map((r) => (
-                  <DocumentRequestItem key={r.id} request={r} />
-                ))}
+                {[
+                  ...dossier.documentRequests.map((r) => ({ kind: "request" as const, dueDate: r.dueDate, r })),
+                  ...dossier.tasks.map((t) => ({ kind: "task" as const, dueDate: t.dueDate, t })),
+                ]
+                  .sort((a, b) => (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999"))
+                  .map((item) =>
+                    item.kind === "request" ? <DocumentRequestItem key={`r-${item.r.id}`} request={item.r} /> : <PortalTaskCard key={`t-${item.t.id}`} task={item.t} />
+                  )}
               </div>
             </div>
           )}
