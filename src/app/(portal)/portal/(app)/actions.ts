@@ -9,6 +9,7 @@ import { logDossierEvent } from "@/server/services/audit";
 import { billingInstallmentsService } from "@/server/services/billingInstallments.service";
 import { supplierLedgerService } from "@/server/services/supplierLedger.service";
 import { notifyUser } from "@/server/services/notifications.service";
+import { grantProjectsService } from "@/server/services/grantProjects.service";
 
 const BUCKET = "apex-documents";
 
@@ -555,6 +556,72 @@ export async function markTaskDoneAction(taskId: string): Promise<PortalUploadFo
         ref_type: "task",
         ref_id: taskId,
       });
+    }
+  } catch (e) {
+    return { error: formatCaughtError(e) };
+  }
+
+  revalidatePath("/portal");
+  return { error: null };
+}
+
+// ---- Opportunité à confirmer (0071, Jade, chantier 2) ---------------------------
+// Le client répond intéressé / ne convient pas à une opportunité posée sur SON dossier
+// (grant_projects.status === "opportunity_to_confirm") -- même principe que le reste de ce
+// fichier : vérifie l'accès avec le client normal (RLS -- grant_projects_select, déjà portail-
+// compatible), puis écrit avec le client admin (pas de policy UPDATE portail sur grant_projects).
+async function notifyOpportunityResponse(
+  admin: ReturnType<typeof createAdminClient>,
+  ctx: { organizationId: string; organizationUserId: string | null; clientName: string },
+  project: { id: string; name: string; owner_id: string | null },
+  response: "interested" | "not_interested"
+): Promise<void> {
+  await notifyUser(admin, { organizationId: ctx.organizationId, organizationUserId: ctx.organizationUserId }, {
+    userId: project.owner_id,
+    type: "opportunity_response",
+    message: `${ctx.clientName} a répondu à propos d'une opportunité : ${response === "interested" ? "intéressé" : "ne convient pas"} — ${project.name}.`,
+    href: `/grants/${project.id}`,
+    entity_type: "grant_project",
+    entity_id: project.id,
+  });
+}
+
+export async function respondToOpportunityAction(grantProjectId: string, response: "interested" | "not_interested"): Promise<{ error: string | null }> {
+  const ctx = await requirePortalContext();
+  if (response !== "interested" && response !== "not_interested") return { error: "Réponse invalide." };
+
+  const supabase = await createClient();
+  const { data: project, error: findError } = await supabase
+    .from("grant_projects")
+    .select("id, name, owner_id, status, client_opportunity_response")
+    .eq("id", grantProjectId)
+    .maybeSingle();
+  if (findError || !project) {
+    return { error: "Dossier introuvable ou accès refusé." };
+  }
+  // client_opportunity_response (0071) est absente de database.types.ts (généré, non
+  // régénérable ici) -- même contournement que payment_status/uploadRequestedDocumentAction
+  // (build cassé chez Jade -- 0067) : passage par `unknown` avant le cast.
+  const projectRow = project as unknown as { id: string; name: string; owner_id: string | null; status: string; client_opportunity_response: "interested" | "not_interested" | null };
+  if (projectRow.status !== "opportunity_to_confirm") {
+    return { error: "Ce dossier n'est plus à l'étape « Opportunité à confirmer »." };
+  }
+
+  const admin = createAdminClient();
+  try {
+    await grantProjectsService(admin).updateClientOpportunityResponse(grantProjectId, response);
+    await logDossierEvent(admin, { organizationId: ctx.organizationId, organizationUserId: ctx.organizationUserId ?? "" }, {
+      grant_project_id: grantProjectId,
+      client_id: ctx.clientId,
+      kind: "opportunity_response_submitted",
+      title: response === "interested" ? "Client : l'opportunité l'intéresse" : "Client : l'opportunité ne convient pas",
+      source: "portal",
+      ref_type: "grant_project",
+      ref_id: grantProjectId,
+    });
+    // Notif seulement sur une vraie transition -- pas si le client re-choisit la même réponse.
+    if (projectRow.client_opportunity_response !== response) {
+      await notifyOpportunityResponse(admin, { organizationId: ctx.organizationId, organizationUserId: ctx.organizationUserId, clientName: ctx.clientName }, projectRow, response);
     }
   } catch (e) {
     return { error: formatCaughtError(e) };

@@ -69,5 +69,20 @@ export function grantProjectsService(supabase: SupabaseClient) {
       if (trimmed.length > 200) throw new Error("Le titre du dossier est trop long (200 caractères maximum).");
       return repo.updateName(id, trimmed);
     },
+
+    // Jade (0071, chantier 2) : « angles possibles pour vous » -- texte libre du personnel.
+    async updateOpportunityAngleNotes(id: string, notes: string) {
+      const trimmed = notes.trim();
+      if (trimmed.length > 4000) throw new Error("Texte trop long (4000 caractères maximum).");
+      return repo.updateOpportunityAngleNotes(id, trimmed || null);
+    },
+
+    // Réponse du client (portail) -- voir respondToOpportunityAction.
+    async updateClientOpportunityResponse(id: string, response: "interested" | "not_interested" | null) {
+      if (response !== null && response !== "interested" && response !== "not_interested") {
+        throw new Error("Réponse invalide.");
+      }
+      return repo.updateClientOpportunityResponse(id, response);
+    },
   };
 }

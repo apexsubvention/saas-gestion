@@ -32,6 +32,13 @@ export type GrantProjectRow = {
   pari_balance_remaining: number | null;
   pari_balance_label: string | null;
   pari_balance_updated_at: string | null;
+  // Jade (0071, chantier 2) : texte libre montré au client pendant que le statut du dossier est
+  // "opportunity_to_confirm" -- voir updateOpportunityAngleNotes ci-dessous.
+  opportunity_angle_notes: string | null;
+  // Réponse du client à cette opportunité (portail) -- voir grants/(portal)/(app)/actions.ts,
+  // respondToOpportunityAction.
+  client_opportunity_response: "interested" | "not_interested" | null;
+  client_opportunity_response_at: string | null;
 };
 
 export function grantProjectsRepository(supabase: SupabaseClient) {
@@ -164,6 +171,35 @@ export function grantProjectsRepository(supabase: SupabaseClient) {
       const { data, error } = await supabase
         .from("grant_projects")
         .update({ pari_balance_remaining: remaining, pari_balance_label: label, pari_balance_updated_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as GrantProjectRow;
+    },
+
+    // Jade (0071, chantier 2) : « angles possibles pour vous » -- texte libre du personnel,
+    // montré au client dans son portail tant que le dossier est "opportunity_to_confirm".
+    // Toujours modifiable (pas un program_snapshots figé) -- voir OpportunityAngleNotes.tsx.
+    async updateOpportunityAngleNotes(id: string, notes: string | null): Promise<GrantProjectRow> {
+      const { data, error } = await supabase
+        .from("grant_projects")
+        .update({ opportunity_angle_notes: notes, updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as GrantProjectRow;
+    },
+
+    // Réponse du client (portail) -- écrite par respondToOpportunityAction (admin/service role,
+    // même raison que pour les autres écritures portail : pas de policy UPDATE portail sur
+    // grant_projects, une policy RLS ne peut pas restreindre l'écriture à seulement ces 2
+    // colonnes -- voir actions.ts du portail).
+    async updateClientOpportunityResponse(id: string, response: "interested" | "not_interested" | null): Promise<GrantProjectRow> {
+      const { data, error } = await supabase
+        .from("grant_projects")
+        .update({ client_opportunity_response: response, client_opportunity_response_at: response ? new Date().toISOString() : null, updated_at: new Date().toISOString() })
         .eq("id", id)
         .select()
         .single();

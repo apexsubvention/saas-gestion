@@ -204,7 +204,9 @@ export async function updateGrantProjectStatusAction(
   // à partir de ce qui existe déjà (pas de nouvelle lecture IA à chaque changement de statut,
   // décision prise avec Jade). On réutilise le dernier figé s'il y en a un ; sinon on en fige un
   // maintenant (best-effort, comme takeOnCreation -- ne bloque jamais le changement de statut).
-  if (status === "draft" && project) {
+  // 0071 (Jade, chantier 2) : même résumé montré pour « Opportunité à confirmer » -- même logique
+  // de figeage.
+  if ((status === "draft" || status === "opportunity_to_confirm") && project) {
     const existing = await programSnapshotService(supabase).list(grantProjectId);
     if (existing.length === 0) {
       await programSnapshotService(supabase).takeOnCreation(
@@ -758,6 +760,28 @@ export async function updatePariBalanceAction(grantProjectId: string, remaining:
     grant_project_id: grantProjectId,
     kind: "pari_balance_updated",
     title: remaining != null ? `Solde restant PARI modifié à la main : ${remaining}` : "Solde restant PARI effacé",
+    source: "manual",
+  });
+  revalidatePath(`/grants/${grantProjectId}`);
+  return { error: null };
+}
+
+// ---- Opportunité à confirmer (0071, Jade, chantier 2) ---------------------------
+// « Angles possibles pour vous » : texte libre du personnel, montré au client dans son portail
+// tant que le dossier est au statut "opportunity_to_confirm" -- toujours modifiable ici, même
+// idiome que updatePariBalanceAction ci-dessus (clic pour éditer).
+export async function updateOpportunityAngleNotesAction(grantProjectId: string, notes: string): Promise<{ error: string | null }> {
+  const ctx = await requireOrgContext();
+  const supabase = await createClient();
+  try {
+    await grantProjectsService(supabase).updateOpportunityAngleNotes(grantProjectId, notes);
+  } catch (e) {
+    return { error: formatCaughtError(e) };
+  }
+  await logDossierEvent(supabase, ctx, {
+    grant_project_id: grantProjectId,
+    kind: "opportunity_angle_notes_updated",
+    title: "« Angles possibles » modifiés",
     source: "manual",
   });
   revalidatePath(`/grants/${grantProjectId}`);

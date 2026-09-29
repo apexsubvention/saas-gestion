@@ -7,6 +7,9 @@ export const GRANT_PROJECT_STATUS_LABELS: Record<string, string> = {
   pending_approval: "En attente d'approbation",
   approved: "Approuvé",
   awaiting_claim: "Approuvé — en attente de réclamation",
+  // 0071 (Jade, chantier 2) : posé quand une opportunité de programme reste à valider avec le
+  // client -- voir portalDossiers.service.ts pour ce que ce statut déclenche côté portail.
+  opportunity_to_confirm: "Opportunité à confirmer",
   rejected: "Refusé",
   completed: "Complété",
 };
@@ -16,12 +19,13 @@ export const GRANT_PROJECT_STATUS_OPTIONS: Array<{ value: string; label: string 
   "pending_approval",
   "approved",
   "awaiting_claim",
+  "opportunity_to_confirm",
   "rejected",
   "completed",
 ].map((value) => ({ value, label: GRANT_PROJECT_STATUS_LABELS[value] ?? value }));
 
 // Dossiers « en cours » (tableau de bord) : tout sauf refusé / complété.
-export const ACTIVE_GRANT_PROJECT_STATUSES = ["draft", "pending_approval", "approved", "awaiting_claim"];
+export const ACTIVE_GRANT_PROJECT_STATUSES = ["draft", "pending_approval", "approved", "awaiting_claim", "opportunity_to_confirm"];
 
 // Anciens statuts (11 valeurs, avant 0034) -> nouveaux. Même règle que la migration : un dossier
 // approuvé/actif avec une entente est « en attente de réclamation », sans entente « approuvé ».
@@ -54,6 +58,8 @@ export function grantProjectStatusBadgeClass(status: string): string {
       return "bg-indigo-50 text-indigo-700";
     case "awaiting_claim":
       return "bg-amber-50 text-amber-800";
+    case "opportunity_to_confirm":
+      return "bg-purple-50 text-purple-700";
     case "rejected":
       return "bg-red-50 text-red-700";
     case "pending_approval":

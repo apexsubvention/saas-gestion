@@ -19,6 +19,7 @@ const TYPE_LABELS: Record<string, string> = {
   meeting_task: "Réunion",
   opportunity_interest: "Intérêt client",
   invoice_paid: "Facture payée",
+  opportunity_response: "Réponse à une opportunité",
 };
 
 export default async function NotificationsPage() {

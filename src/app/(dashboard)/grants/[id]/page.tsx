@@ -53,6 +53,7 @@ import { EditableGrantProjectName } from "./EditableGrantProjectName";
 import { DocumentCategorySelect } from "./DocumentCategorySelect";
 import { DeleteDocumentButton } from "./DeleteDocumentButton";
 import { PariBalance } from "./PariBalance";
+import { OpportunityAngleNotes } from "./OpportunityAngleNotes";
 import { isPariCnrcProgram } from "@/server/scheduling/monthlyClaims";
 
 // Le téléversement d'une facture déclenche sa lecture automatique (jusqu'à ~1 min).
@@ -530,6 +531,18 @@ export default async function GrantProjectPage({ params, searchParams }: { param
 
           <CollapsibleSection title="Règles du programme figées pour ce dossier" badge={snapshots.length > 0 ? `(${snapshots.length})` : "· Aucune"}>
             <ProgramRulesSnapshot grantProjectId={project.id} program={currentProgram} snapshots={snapshots} />
+          </CollapsibleSection>
+
+          {/* 0071 (Jade, chantier 2) : visible en tout temps (pas seulement pendant le statut
+              "opportunity_to_confirm") -- permet de préparer le texte avant même de poser le
+              statut, et de revoir la réponse du client après coup si le statut a changé depuis. */}
+          <CollapsibleSection title="Opportunité à confirmer" badge={project.client_opportunity_response ? "· Réponse reçue" : undefined}>
+            <OpportunityAngleNotes
+              grantProjectId={project.id}
+              initialNotes={project.opportunity_angle_notes ?? null}
+              clientResponse={project.client_opportunity_response ?? null}
+              clientResponseAt={project.client_opportunity_response_at ?? null}
+            />
           </CollapsibleSection>
 
           <CollapsibleSection title="Journal du dossier" badge={`(${dossierEvents.length})`}>

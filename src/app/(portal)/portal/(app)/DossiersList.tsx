@@ -47,7 +47,9 @@ function normalize(s: string): string {
 // dossier resté malgré tout au statut "approved" (cas limite) continue d'apparaître, regroupé
 // dans la colonne "Approuvé — en attente de réclamation", au lieu de disparaître silencieusement
 // du portail -- voir columnKeyFor ci-dessous.
-const STATUS_COLUMNS = ["awaiting_claim", "draft", "pending_approval", "completed"] as const;
+// 0071 (Jade, chantier 2) : « Opportunité à confirmer » ajoutée À CÔTÉ de « Approuvé — en
+// attente de réclamation », comme demandé -- avant même "À rédiger".
+const STATUS_COLUMNS = ["awaiting_claim", "opportunity_to_confirm", "draft", "pending_approval", "completed"] as const;
 
 function columnKeyFor(status: string): string {
   return status === "approved" ? "awaiting_claim" : status;

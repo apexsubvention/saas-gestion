@@ -9,8 +9,9 @@
 // dates, réclamations (documents manquants ET déjà déposés, réclamations à venir), résumé de
 // facturation, convention, texte rédigé du questionnaire, etc. -- au lieu de déplier la carte
 // sur place.
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, useTransition, type ReactNode } from "react";
 import type { PortalDossier, PortalDocumentRequestView } from "@/server/services/portalDossiers.service";
+import { respondToOpportunityAction } from "./actions";
 import {
   CLAIM_STATUS_LABELS,
   claimStatusBadgeClass,
@@ -131,8 +132,12 @@ function formatAmount(amount: number | null): string {
 // program_snapshots figé (voir PortalProgramSummary, portalDossiers.service.ts). Chaque champ
 // ne s'affiche que s'il est renseigné -- jamais de "—" qui donnerait l'impression d'un vide
 // confirmé alors qu'Apex n'a simplement pas cette information.
+function formatPercent(rate: number): string {
+  return `${Math.round(rate * 10000) / 100} %`;
+}
+
 function ProgramSummarySection({ summary }: { summary: NonNullable<PortalDossier["programSummary"]> }) {
-  const hasAmounts = summary.minEligibleSpend != null || summary.maxAidAmount != null;
+  const hasAmounts = summary.minEligibleSpend != null || summary.maxAidAmount != null || summary.typicalAidRate != null;
   return (
     <div className="space-y-3 rounded-lg border border-indigo-100 bg-indigo-50/40 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -159,6 +164,12 @@ function ProgramSummarySection({ summary }: { summary: NonNullable<PortalDossier
             <div>
               <p className="text-xs text-neutral-500">Montant maximal</p>
               <p className="text-neutral-800">{formatAmount(summary.maxAidAmount)}</p>
+            </div>
+          )}
+          {summary.typicalAidRate != null && (
+            <div>
+              <p className="text-xs text-neutral-500">% de subvention</p>
+              <p className="text-neutral-800">{formatPercent(summary.typicalAidRate)}</p>
             </div>
           )}
         </div>
@@ -202,6 +213,61 @@ function ProgramSummarySection({ summary }: { summary: NonNullable<PortalDossier
           </ul>
         </div>
       )}
+    </div>
+  );
+}
+
+// 0071 (Jade, chantier 2) : montré uniquement pendant que le dossier est « Opportunité à
+// confirmer » -- texte libre du personnel (angles possibles) + réponse du client (intéressé /
+// ne convient pas), qui notifie le personnel (respondToOpportunityAction).
+function OpportunitySection({ dossier }: { dossier: PortalDossier }) {
+  const [isPending, startTransition] = useTransition();
+  const [response, setResponse] = useState(dossier.clientOpportunityResponse);
+  const [error, setError] = useState<string | null>(null);
+
+  function submit(value: "interested" | "not_interested") {
+    setError(null);
+    startTransition(async () => {
+      const result = await respondToOpportunityAction(dossier.id, value);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      setResponse(value);
+    });
+  }
+
+  return (
+    <div className="space-y-3 rounded-lg border border-purple-100 bg-purple-50/40 p-4">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-purple-700">Opportunité à confirmer</h3>
+      {dossier.opportunityAngleNotes && (
+        <div>
+          <p className="text-xs font-medium text-neutral-500">Angles possibles pour vous</p>
+          <p className="mt-0.5 whitespace-pre-wrap text-sm text-neutral-800">{dossier.opportunityAngleNotes}</p>
+        </div>
+      )}
+      <div>
+        <p className="text-xs font-medium text-neutral-500">Ce programme t&apos;intéresse-t-il ?</p>
+        <div className="mt-1.5 flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={() => submit("interested")}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50 ${response === "interested" ? "bg-emerald-600 text-white" : "border border-emerald-300 text-emerald-700 hover:bg-emerald-50"}`}
+          >
+            Ce programme m&apos;intéresse
+          </button>
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={() => submit("not_interested")}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50 ${response === "not_interested" ? "bg-red-600 text-white" : "border border-red-300 text-red-700 hover:bg-red-50"}`}
+          >
+            Ne convient pas pour mes projets
+          </button>
+        </div>
+        {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+      </div>
     </div>
   );
 }
@@ -411,6 +477,8 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
 
           {dossier.programSummary && <ProgramSummarySection summary={dossier.programSummary} />}
 
+          {dossier.status === "opportunity_to_confirm" && <OpportunitySection dossier={dossier} />}
+
           {(billingNarrative || supplierBillingSentences.length > 0) && (
             <div className="space-y-1.5 rounded-md bg-indigo-50 px-3 py-2 text-sm text-indigo-900">
               {billingNarrative && <p>{billingNarrative}</p>}
@@ -613,7 +681,13 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
             clientId={dossier.clientId}
             notes={dossier.notes}
             currentOrgUserId={currentOrgUserId}
-            hint={dossier.status === "draft" ? "Décris les grandes lignes de ton projet, ou commente les dépenses prévues -- ton équipe chez Apex le lira ici." : undefined}
+            hint={
+              dossier.status === "draft"
+                ? "Décris les grandes lignes de ton projet, ou commente les dépenses prévues -- ton équipe chez Apex le lira ici."
+                : dossier.status === "opportunity_to_confirm"
+                  ? "Des questions sur cette opportunité ? Écris-les ici -- ton équipe chez Apex le lira."
+                  : undefined
+            }
           />
         </Modal>
       )}

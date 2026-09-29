@@ -145,6 +145,9 @@ export type PortalProgramSummary = {
   minEligibleSpend: number | null;
   maxAidAmount: number | null;
   aidNotes: string | null;
+  // 0071 (Jade, chantier 2) : « % de sub » -- déjà présent sur le snapshot (typical_aid_rate,
+  // fraction 0-1, voir programSnapshot.ts) mais jamais mappé jusqu'ici vers le portail.
+  typicalAidRate: number | null;
   takenAt: string;
 };
 
@@ -223,13 +226,20 @@ export type PortalDossier = {
   notes: DossierNoteView[];
   billingLineItems: PortalBillingLineItem[];
   billingInstallments: PortalBillingInstallment[];
-  // Null hors statut "draft" (à rédiger), ou si aucun snapshot n'a encore été figé pour ce
-  // dossier (ex. migration pas encore appliquée côté programme, ou dossier créé avant 0038).
+  // Null hors statut "draft" (à rédiger) / "opportunity_to_confirm" (0071), ou si aucun snapshot
+  // n'a encore été figé pour ce dossier (ex. migration pas encore appliquée côté programme, ou
+  // dossier créé avant 0038).
   programSummary: PortalProgramSummary | null;
   supplierInvoices: PortalSupplierInvoice[];
   // Jade (0064) : certaines subventions ne demandent jamais de preuve de paiement -- quand
   // false, PortalSupplierInvoices.tsx n'affiche plus le bloc "Preuve de paiement" au client.
   requiresPaymentProof: boolean;
+  // 0071 (Jade, chantier 2) : texte libre du personnel + réponse du client, montrés/actifs
+  // seulement pendant que status === "opportunity_to_confirm" (voir DossierCard.tsx), mais
+  // toujours renvoyés tels quels (la réponse reste visible même si le statut change ensuite).
+  opportunityAngleNotes: string | null;
+  clientOpportunityResponse: "interested" | "not_interested" | null;
+  clientOpportunityRespondedAt: string | null;
 };
 
 export function portalDossiersService(supabase: SupabaseClient) {
@@ -270,6 +280,9 @@ export function portalDossiersService(supabase: SupabaseClient) {
         hidden_from_parent_portal: boolean;
         requires_payment_proof: boolean;
         pari_balance_remaining: number | null;
+        opportunity_angle_notes: string | null;
+        client_opportunity_response: "interested" | "not_interested" | null;
+        client_opportunity_response_at: string | null;
         clients: { name: string } | null;
         grant_programs: { name: string } | null;
       }>;
@@ -304,10 +317,10 @@ export function portalDossiersService(supabase: SupabaseClient) {
             grantAgreements.listByProject(p.id),
             billingInstallments.listByProject(p.id),
             documents.listByProject(p.id),
-            // Uniquement utile pour un dossier « à rédiger » (Jade) -- interrogé pour tous les
-            // statuts par simplicité (programSnapshotService.list() est déjà tolérant aux
-            // erreurs/table absente), mais seul un dossier "draft" l'expose plus bas.
-            p.status === "draft" ? snapshots.list(p.id) : Promise.resolve([]),
+            // Uniquement utile pour un dossier « à rédiger » ou « opportunité à confirmer » (0071)
+            // -- interrogé pour tous les statuts par simplicité (programSnapshotService.list() est
+            // déjà tolérant aux erreurs/table absente), mais seuls ces deux statuts l'exposent plus bas.
+            p.status === "draft" || p.status === "opportunity_to_confirm" ? snapshots.list(p.id) : Promise.resolve([]),
             // Factures fournisseurs (0057) -- expenses_select/project_suppliers_select/
             // document_links_select (0016) et documents_select_portal_full (0045) sont déjà
             // portail- et hiérarchie-compatibles (can_access_grant_project/can_access_client),
@@ -363,7 +376,7 @@ export function portalDossiersService(supabase: SupabaseClient) {
           );
           const latestSnapshot = snapshotRows[0] ?? null;
           const programSummary: PortalProgramSummary | null =
-            p.status === "draft" && latestSnapshot
+            (p.status === "draft" || p.status === "opportunity_to_confirm") && latestSnapshot
               ? {
                   description: latestSnapshot.snapshot.description,
                   eligibleExpenses: latestSnapshot.snapshot.eligible_expenses,
@@ -373,6 +386,7 @@ export function portalDossiersService(supabase: SupabaseClient) {
                   minEligibleSpend: latestSnapshot.snapshot.min_eligible_spend,
                   maxAidAmount: latestSnapshot.snapshot.max_aid_amount,
                   aidNotes: latestSnapshot.snapshot.aid_notes,
+                  typicalAidRate: latestSnapshot.snapshot.typical_aid_rate,
                   takenAt: latestSnapshot.taken_at,
                 }
               : null;
@@ -491,6 +505,9 @@ export function portalDossiersService(supabase: SupabaseClient) {
             programSummary,
             supplierInvoices,
             requiresPaymentProof: p.requires_payment_proof,
+            opportunityAngleNotes: p.opportunity_angle_notes ?? null,
+            clientOpportunityResponse: p.client_opportunity_response ?? null,
+            clientOpportunityRespondedAt: p.client_opportunity_response_at ?? null,
           };
         })
       );

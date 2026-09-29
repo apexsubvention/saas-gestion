@@ -10,7 +10,18 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 type Ctx = { organizationId: string; organizationUserId: string | null };
 
-export type NotificationType = "task_assigned" | "ai_review" | "general" | "deadline" | "claim_due" | "opportunity_interest" | "invoice_paid";
+export type NotificationType =
+  | "task_assigned"
+  | "ai_review"
+  | "general"
+  | "deadline"
+  | "claim_due"
+  | "opportunity_interest"
+  | "invoice_paid"
+  // 0071 (Jade, chantier 2) : le client a répondu (intéressé / ne convient pas) à une opportunité
+  // sur SON dossier (grant_projects.client_opportunity_response) -- distinct de
+  // "opportunity_interest" qui concerne le catalogue de veille (funding_opportunities, 0052).
+  | "opportunity_response";
 
 export type NotificationRow = {
   id: string;
