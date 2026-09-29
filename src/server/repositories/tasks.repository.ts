@@ -3,6 +3,13 @@
 // client_id -- une tâche peut être rattachée à l'un, l'autre, ou les deux).
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+// 0069 -- structurellement identique au TaskTargetKind de taskTargetOptions.ts (route
+// grants/[id], jamais importé ici pour ne pas faire dépendre ce fichier serveur partagé d'un
+// dossier de route) -- TypeScript les unifie par structure. Corrige le bug de build du 29/09 :
+// tasks.service.ts utilisait "string" là où TaskRow.target_kind exige ce type précis
+// (Partial<Pick<TaskRow, ...>> refuse un "string" trop large).
+export type TaskTargetKind = "client" | "parent_client" | "child_client" | "supplier";
+
 export type TaskRow = {
   id: string;
   organization_id: string;
@@ -19,7 +26,7 @@ export type TaskRow = {
   // 0069 -- Jade : attribuer la tâche à quelqu'un d'autre que le client du dossier. target_kind
   // n'est qu'une étiquette d'affichage/filtre ('client' = comportement historique, seule valeur
   // possible avant 0069) ; l'accès réel (RLS) dépend uniquement de client_id/supplier_id.
-  target_kind: "client" | "parent_client" | "child_client" | "supplier";
+  target_kind: TaskTargetKind;
   supplier_id: string | null;
   // Défaut false : une tâche n'apparaît dans le portail (client ou fournisseur visé) que si
   // explicitement cochée « Visible dans son portail » -- voir tasks_portal_select (0069).
@@ -67,7 +74,7 @@ export function tasksRepository(supabase: SupabaseClient) {
       due_date?: string | null;
       priority?: string;
       status?: string;
-      target_kind?: string;
+      target_kind?: TaskTargetKind;
       supplier_id?: string | null;
       visible_in_portal?: boolean;
     }): Promise<TaskRow> {

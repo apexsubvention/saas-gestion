@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { tasksRepository } from "@/server/repositories/tasks.repository";
+import { tasksRepository, type TaskTargetKind } from "@/server/repositories/tasks.repository";
 import { TASK_STATUS_LABELS } from "@/features/grants/constants";
+
+const TASK_TARGET_KINDS: TaskTargetKind[] = ["client", "parent_client", "child_client", "supplier"];
 
 export function tasksService(supabase: SupabaseClient) {
   const repo = tasksRepository(supabase);
@@ -20,7 +22,7 @@ export function tasksService(supabase: SupabaseClient) {
         // 0069 -- à qui la tâche est attribuée (client du dossier / parent / enfant / fournisseur
         // inscrit) et si elle doit apparaître dans son portail. target_kind par défaut 'client' :
         // comportement identique à avant 0069 quand on ne les précise pas.
-        target_kind?: string;
+        target_kind?: TaskTargetKind;
         supplier_id?: string | null;
         visible_in_portal?: boolean;
       }
@@ -31,8 +33,8 @@ export function tasksService(supabase: SupabaseClient) {
       if (!input.client_id && !input.grant_project_id) {
         throw new Error("Une tâche doit être rattachée à un client ou à un dossier.");
       }
-      const targetKind = input.target_kind ?? "client";
-      if (!["client", "parent_client", "child_client", "supplier"].includes(targetKind)) {
+      const targetKind: TaskTargetKind = input.target_kind ?? "client";
+      if (!TASK_TARGET_KINDS.includes(targetKind)) {
         throw new Error("Attribution de tâche invalide.");
       }
       if (targetKind === "supplier" && !input.supplier_id) {
@@ -56,7 +58,7 @@ export function tasksService(supabase: SupabaseClient) {
         status?: string;
         assigned_to?: string | null;
         client_id?: string | null;
-        target_kind?: string;
+        target_kind?: TaskTargetKind;
         supplier_id?: string | null;
         visible_in_portal?: boolean;
       }
@@ -64,7 +66,7 @@ export function tasksService(supabase: SupabaseClient) {
       if (patch.title !== undefined && patch.title.trim().length === 0) throw new Error("Le titre de la tâche est requis.");
       if (patch.status !== undefined && !(patch.status in TASK_STATUS_LABELS)) throw new Error(`Statut de tâche invalide : ${patch.status}`);
       if (patch.priority !== undefined && !["low", "normal", "high", "urgent"].includes(patch.priority)) throw new Error("Priorité invalide.");
-      if (patch.target_kind !== undefined && !["client", "parent_client", "child_client", "supplier"].includes(patch.target_kind)) {
+      if (patch.target_kind !== undefined && !TASK_TARGET_KINDS.includes(patch.target_kind)) {
         throw new Error("Attribution de tâche invalide.");
       }
       if (patch.target_kind === "supplier" && !patch.supplier_id) {

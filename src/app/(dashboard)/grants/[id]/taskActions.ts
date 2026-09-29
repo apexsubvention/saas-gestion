@@ -10,6 +10,7 @@ import { logDossierEvent } from "@/server/services/audit";
 import { notifyUser } from "@/server/services/notifications.service";
 import { TASK_STATUS_LABELS } from "@/features/grants/constants";
 import { resolveTaskTarget } from "./taskTargetResolve";
+import type { TaskTargetKind } from "./taskTargetOptions";
 
 export type TaskActionResult = { error: string | null };
 
@@ -50,7 +51,7 @@ export async function updateTaskDetailsAction(grantProjectId: string, input: Tas
     // 0069 -- resolveTaskTarget vérifie la cible choisie contre le VRAI client du DOSSIER (pour
     // que "client parent"/"client enfant" restent relatifs au bon client), pas contre le client
     // déjà attribué à cette tâche (qui peut déjà être un parent/enfant/fournisseur différent).
-    let targetPatch: { client_id: string | null; target_kind: string; supplier_id: string | null; visible_in_portal: boolean } = {
+    let targetPatch: { client_id: string | null; target_kind: TaskTargetKind; supplier_id: string | null; visible_in_portal: boolean } = {
       client_id: before.client_id,
       target_kind: before.target_kind,
       supplier_id: before.supplier_id,
