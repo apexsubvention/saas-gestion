@@ -234,12 +234,20 @@ export type PortalDossier = {
   // Jade (0064) : certaines subventions ne demandent jamais de preuve de paiement -- quand
   // false, PortalSupplierInvoices.tsx n'affiche plus le bloc "Preuve de paiement" au client.
   requiresPaymentProof: boolean;
-  // 0071 (Jade, chantier 2) : texte libre du personnel + réponse du client, montrés/actifs
-  // seulement pendant que status === "opportunity_to_confirm" (voir DossierCard.tsx), mais
-  // toujours renvoyés tels quels (la réponse reste visible même si le statut change ensuite).
+  // 0071/0072 (Jade, chantier 2) : texte libre + estimation ($ potentiel, % de remboursement) du
+  // personnel + réponse du client, montrés/actifs seulement pendant que
+  // status === "opportunity_to_confirm" (voir DossierCard.tsx), mais toujours renvoyés tels
+  // quels (la réponse reste visible même si le statut change ensuite).
   opportunityAngleNotes: string | null;
+  opportunityPotentialAmount: number | null;
+  opportunityReimbursementRate: number | null;
   clientOpportunityResponse: "interested" | "not_interested" | null;
   clientOpportunityRespondedAt: string | null;
+  // 0072 (Jade) : documents déjà téléversés sur ce dossier, visibles au client pendant que le
+  // statut est "opportunity_to_confirm" seulement (documents_select_portal_full, 0045, donne
+  // déjà l'accès -- ceci ne fait qu'exposer la liste dans cette section précise). Vide hors de ce
+  // statut.
+  opportunityDocuments: Array<{ id: string; filename: string; category: string }>;
 };
 
 export function portalDossiersService(supabase: SupabaseClient) {
@@ -281,6 +289,8 @@ export function portalDossiersService(supabase: SupabaseClient) {
         requires_payment_proof: boolean;
         pari_balance_remaining: number | null;
         opportunity_angle_notes: string | null;
+        opportunity_potential_amount: number | null;
+        opportunity_reimbursement_rate: number | null;
         client_opportunity_response: "interested" | "not_interested" | null;
         client_opportunity_response_at: string | null;
         clients: { name: string } | null;
@@ -506,8 +516,14 @@ export function portalDossiersService(supabase: SupabaseClient) {
             supplierInvoices,
             requiresPaymentProof: p.requires_payment_proof,
             opportunityAngleNotes: p.opportunity_angle_notes ?? null,
+            opportunityPotentialAmount: p.opportunity_potential_amount ?? null,
+            opportunityReimbursementRate: p.opportunity_reimbursement_rate ?? null,
             clientOpportunityResponse: p.client_opportunity_response ?? null,
             clientOpportunityRespondedAt: p.client_opportunity_response_at ?? null,
+            opportunityDocuments:
+              p.status === "opportunity_to_confirm"
+                ? projectDocuments.map((d) => ({ id: d.id, filename: d.filename, category: d.category }))
+                : [],
           };
         })
       );

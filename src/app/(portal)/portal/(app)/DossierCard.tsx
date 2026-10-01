@@ -19,6 +19,7 @@ import {
   claimRequirementStatusBadgeClass,
   documentRequestStatusBadgeClass,
   grantProjectStatusBadgeClass,
+  DOCUMENT_CATEGORY_LABELS,
 } from "@/features/grants/constants";
 import { DocumentRequestUpload } from "./DocumentRequestUpload";
 import { PortalTaskDoneButton } from "./PortalTaskDoneButton";
@@ -237,15 +238,53 @@ function OpportunitySection({ dossier }: { dossier: PortalDossier }) {
     });
   }
 
+  const hasPotential = dossier.opportunityPotentialAmount != null || dossier.opportunityReimbursementRate != null;
+
   return (
     <div className="space-y-3 rounded-lg border border-purple-100 bg-purple-50/40 p-4">
       <h3 className="text-xs font-semibold uppercase tracking-wide text-purple-700">Opportunité à confirmer</h3>
+
+      {hasPotential && (
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          {dossier.opportunityPotentialAmount != null && (
+            <div>
+              <p className="text-xs text-neutral-500">Potentiel $ à aller chercher</p>
+              <p className="font-medium text-neutral-800">{formatAmount(dossier.opportunityPotentialAmount)}</p>
+            </div>
+          )}
+          {dossier.opportunityReimbursementRate != null && (
+            <div>
+              <p className="text-xs text-neutral-500">% de remboursement</p>
+              <p className="font-medium text-neutral-800">{formatPercent(dossier.opportunityReimbursementRate)}</p>
+            </div>
+          )}
+        </div>
+      )}
+
       {dossier.opportunityAngleNotes && (
         <div>
           <p className="text-xs font-medium text-neutral-500">Angles possibles pour vous</p>
           <p className="mt-0.5 whitespace-pre-wrap text-sm text-neutral-800">{dossier.opportunityAngleNotes}</p>
         </div>
       )}
+
+      {dossier.opportunityDocuments.length > 0 && (
+        <div>
+          <p className="text-xs font-medium text-neutral-500">Documents</p>
+          <ul className="mt-1 space-y-1">
+            {dossier.opportunityDocuments.map((d) => (
+              <li key={d.id} className="flex items-center justify-between gap-2 rounded-md border border-neutral-100 bg-white px-2.5 py-1.5 text-sm">
+                <span className="min-w-0 truncate text-neutral-700" title={d.filename}>
+                  {d.filename}
+                  <span className="ml-1.5 text-xs text-neutral-400">({DOCUMENT_CATEGORY_LABELS[d.category] ?? d.category})</span>
+                </span>
+                <PortalOpenDocumentButton documentId={d.id} filename={d.filename} className="shrink-0 text-xs text-blue-600 hover:underline" />
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div>
         <p className="text-xs font-medium text-neutral-500">Ce programme t&apos;intéresse-t-il ?</p>
         <div className="mt-1.5 flex flex-wrap gap-2">

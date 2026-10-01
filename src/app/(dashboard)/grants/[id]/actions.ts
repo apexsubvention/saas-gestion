@@ -766,22 +766,26 @@ export async function updatePariBalanceAction(grantProjectId: string, remaining:
   return { error: null };
 }
 
-// ---- Opportunité à confirmer (0071, Jade, chantier 2) ---------------------------
-// « Angles possibles pour vous » : texte libre du personnel, montré au client dans son portail
-// tant que le dossier est au statut "opportunity_to_confirm" -- toujours modifiable ici, même
-// idiome que updatePariBalanceAction ci-dessus (clic pour éditer).
-export async function updateOpportunityAngleNotesAction(grantProjectId: string, notes: string): Promise<{ error: string | null }> {
+// ---- Opportunité à confirmer (0071/0072, Jade, chantier 2) ---------------------
+// « Angles possibles pour vous » + « potentiel $ qu'on peut aller chercher » / « % de
+// remboursement » : montrés au client dans son portail tant que le dossier est au statut
+// "opportunity_to_confirm" -- toujours modifiables ici, même idiome que updatePariBalanceAction
+// ci-dessus (clic pour éditer).
+export async function updateOpportunityDetailsAction(
+  grantProjectId: string,
+  input: { notes: string; potentialAmount: number | null; reimbursementRatePercent: number | null }
+): Promise<{ error: string | null }> {
   const ctx = await requireOrgContext();
   const supabase = await createClient();
   try {
-    await grantProjectsService(supabase).updateOpportunityAngleNotes(grantProjectId, notes);
+    await grantProjectsService(supabase).updateOpportunityDetails(grantProjectId, input);
   } catch (e) {
     return { error: formatCaughtError(e) };
   }
   await logDossierEvent(supabase, ctx, {
     grant_project_id: grantProjectId,
-    kind: "opportunity_angle_notes_updated",
-    title: "« Angles possibles » modifiés",
+    kind: "opportunity_details_updated",
+    title: "Détails de l'opportunité modifiés (angles possibles, potentiel $)",
     source: "manual",
   });
   revalidatePath(`/grants/${grantProjectId}`);

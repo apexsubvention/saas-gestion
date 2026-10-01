@@ -540,6 +540,8 @@ export default async function GrantProjectPage({ params, searchParams }: { param
             <OpportunityAngleNotes
               grantProjectId={project.id}
               initialNotes={project.opportunity_angle_notes ?? null}
+              initialPotentialAmount={project.opportunity_potential_amount ?? null}
+              initialReimbursementRate={project.opportunity_reimbursement_rate ?? null}
               clientResponse={project.client_opportunity_response ?? null}
               clientResponseAt={project.client_opportunity_response_at ?? null}
             />

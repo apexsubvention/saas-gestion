@@ -70,11 +70,23 @@ export function grantProjectsService(supabase: SupabaseClient) {
       return repo.updateName(id, trimmed);
     },
 
-    // Jade (0071, chantier 2) : « angles possibles pour vous » -- texte libre du personnel.
-    async updateOpportunityAngleNotes(id: string, notes: string) {
-      const trimmed = notes.trim();
-      if (trimmed.length > 4000) throw new Error("Texte trop long (4000 caractères maximum).");
-      return repo.updateOpportunityAngleNotes(id, trimmed || null);
+    // Jade (0071/0072, chantier 2) : « angles possibles pour vous » + « potentiel $ qu'on peut
+    // aller chercher » / « % de remboursement » -- mêmes bornes que updateFinancials pour les
+    // 2 champs numériques (montant, puis taux converti de % vers fraction 0-1).
+    async updateOpportunityDetails(id: string, input: { notes: string; potentialAmount: number | null; reimbursementRatePercent: number | null }) {
+      const trimmedNotes = input.notes.trim();
+      if (trimmedNotes.length > 4000) throw new Error("Texte trop long (4000 caractères maximum).");
+      if (input.potentialAmount != null && (!Number.isFinite(input.potentialAmount) || input.potentialAmount < 0 || input.potentialAmount > 100_000_000)) {
+        throw new Error("Montant invalide.");
+      }
+      if (input.reimbursementRatePercent != null && (!Number.isFinite(input.reimbursementRatePercent) || input.reimbursementRatePercent < 0 || input.reimbursementRatePercent > 100)) {
+        throw new Error("Taux de remboursement invalide (0 à 100).");
+      }
+      return repo.updateOpportunityDetails(id, {
+        notes: trimmedNotes || null,
+        potentialAmount: input.potentialAmount,
+        reimbursementRate: input.reimbursementRatePercent != null ? Math.round((input.reimbursementRatePercent / 100) * 10000) / 10000 : null,
+      });
     },
 
     // Réponse du client (portail) -- voir respondToOpportunityAction.

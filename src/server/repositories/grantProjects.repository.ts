@@ -33,8 +33,13 @@ export type GrantProjectRow = {
   pari_balance_label: string | null;
   pari_balance_updated_at: string | null;
   // Jade (0071, chantier 2) : texte libre montré au client pendant que le statut du dossier est
-  // "opportunity_to_confirm" -- voir updateOpportunityAngleNotes ci-dessous.
+  // "opportunity_to_confirm" -- voir updateOpportunityDetails ci-dessous.
   opportunity_angle_notes: string | null;
+  // Jade (0072, chantier 2 suite) : estimation du personnel PROPRE à ce dossier (distincte du
+  // montant max / % générique du programme, déjà montrés via program_snapshots) -- « potentiel $
+  // qu'on peut aller chercher » et son taux de remboursement, modifiables en tout temps.
+  opportunity_potential_amount: number | null;
+  opportunity_reimbursement_rate: number | null;
   // Réponse du client à cette opportunité (portail) -- voir grants/(portal)/(app)/actions.ts,
   // respondToOpportunityAction.
   client_opportunity_response: "interested" | "not_interested" | null;
@@ -178,13 +183,22 @@ export function grantProjectsRepository(supabase: SupabaseClient) {
       return data as GrantProjectRow;
     },
 
-    // Jade (0071, chantier 2) : « angles possibles pour vous » -- texte libre du personnel,
-    // montré au client dans son portail tant que le dossier est "opportunity_to_confirm".
-    // Toujours modifiable (pas un program_snapshots figé) -- voir OpportunityAngleNotes.tsx.
-    async updateOpportunityAngleNotes(id: string, notes: string | null): Promise<GrantProjectRow> {
+    // Jade (0071/0072, chantier 2) : « angles possibles pour vous » (texte libre) + « potentiel $
+    // qu'on peut aller chercher » / « % de remboursement » (estimation du personnel propre à ce
+    // dossier) -- montrés au client tant que le dossier est "opportunity_to_confirm". Toujours
+    // modifiables (pas un program_snapshots figé) -- voir OpportunityAngleNotes.tsx.
+    async updateOpportunityDetails(
+      id: string,
+      input: { notes: string | null; potentialAmount: number | null; reimbursementRate: number | null }
+    ): Promise<GrantProjectRow> {
       const { data, error } = await supabase
         .from("grant_projects")
-        .update({ opportunity_angle_notes: notes, updated_at: new Date().toISOString() })
+        .update({
+          opportunity_angle_notes: input.notes,
+          opportunity_potential_amount: input.potentialAmount,
+          opportunity_reimbursement_rate: input.reimbursementRate,
+          updated_at: new Date().toISOString(),
+        })
         .eq("id", id)
         .select()
         .single();
