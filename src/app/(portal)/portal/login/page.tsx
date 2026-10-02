@@ -94,8 +94,8 @@ function PortalLoginForm() {
 export default function PortalLoginPage() {
   return (
     <div
-      className="flex min-h-screen items-center justify-center bg-neutral-950 bg-cover bg-center"
-      style={{ backgroundImage: "url(/images/login-background.jpg)" }}
+      className="flex min-h-screen items-center justify-center bg-slate-50 bg-cover bg-bottom"
+      style={{ backgroundImage: "url(/images/portal-login-background.jpg)" }}
     >
       <Suspense fallback={null}>
         <PortalLoginForm />
