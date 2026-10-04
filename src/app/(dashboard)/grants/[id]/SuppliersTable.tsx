@@ -27,6 +27,9 @@ import { OpenDocumentButton } from "./OpenDocumentButton";
 import {
   confirmInvoiceAction,
   deleteInvoiceAction,
+  dismissInvoiceReviewAction,
+  processPortalInvoicesAction,
+  sendInvoiceReviewNoteAction,
   deleteSupplierAction,
   getSupplierHistoryAction,
   linkInvoiceClaimAction,
@@ -415,6 +418,97 @@ function InvoicePaymentRow({ grantProjectId, invoice, documents }: { grantProjec
   );
 }
 
+// Jade (0073) : facture reçue du portail pour un versement -- rappel du versement prévu, résultat
+// du contrôle automatique et, s'il y a une incohérence, la note au client (modifiable) à envoyer
+// directement dans le fil de notes du dossier côté portail.
+function InvoiceReviewRow({ grantProjectId, invoice }: { grantProjectId: string; invoice: LedgerInvoice }) {
+  const [note, setNote] = useState(invoice.reviewNote ?? "");
+  const [justSent, setJustSent] = useState(false);
+  const { pending, error, run } = useLedgerAction();
+  const issues = invoice.reviewIssues;
+  const inst = invoice.installment;
+  const toReview = invoice.status === "to_review";
+  if (!inst && issues.length === 0) return null;
+
+  return (
+    <tr className="border-b border-neutral-100 bg-white">
+      <td className="px-3 py-2 align-top text-xs text-neutral-400"><span className="pl-3">↳ contrôle</span></td>
+      <td className="px-3 py-2" colSpan={5}>
+        {inst && (
+          <p className="text-xs text-neutral-500">
+            Reçue du portail pour le <span className="font-medium text-neutral-700">versement {inst.number}</span> ({inst.periodStart} → {inst.periodEnd}) · prévu{" "}
+            {money(inst.amount)}
+          </p>
+        )}
+        {issues.length === 0 ? (
+          toReview && <p className="mt-1 text-xs text-emerald-700">✓ Cohérente avec le versement prévu — il ne reste qu&apos;à confirmer.</p>
+        ) : (
+          <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-3">
+            <p className="text-xs font-semibold text-amber-900">
+              {issues.length} incohérence{issues.length > 1 ? "s" : ""} détectée{issues.length > 1 ? "s" : ""}
+            </p>
+            <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs text-amber-900">
+              {issues.map((i) => <li key={i.code}>{i.message}</li>)}
+            </ul>
+            {invoice.reviewNoteSentAt || justSent ? (
+              <p className="mt-2 text-xs text-emerald-700">
+                ✓ Note envoyée au client{invoice.reviewNoteSentAt ? ` le ${new Date(invoice.reviewNoteSentAt).toLocaleDateString("fr-CA")}` : ""} (fil de notes du dossier, visible dans son portail).
+              </p>
+            ) : (
+              <label className="mt-2 block text-[11px] font-medium text-amber-900">
+                Note au client (modifiable)
+                <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={7} className={`${input} mt-1 bg-white font-normal`} />
+              </label>
+            )}
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              {!invoice.reviewNoteSentAt && !justSent && (
+                <button
+                  onClick={() => run(() => sendInvoiceReviewNoteAction(grantProjectId, invoice.id, note), () => setJustSent(true))}
+                  disabled={pending || !note.trim()}
+                  className={`${smallBtn} bg-neutral-900 text-white hover:bg-neutral-800`}
+                >
+                  {pending ? "…" : "Envoyer en note au client"}
+                </button>
+              )}
+              <button
+                onClick={() => run(() => dismissInvoiceReviewAction(grantProjectId, invoice.id))}
+                disabled={pending}
+                className={smallBtn}
+                title="C'est voulu ou réglé : retire ces incohérences (la facture reste telle quelle)"
+              >
+                Ignorer
+              </button>
+            </div>
+            {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+          </div>
+        )}
+      </td>
+    </tr>
+  );
+}
+
+// Factures reçues du portail pas encore au tableau (reçues avant la lecture automatique, ou
+// lecture échouée) : un bouton pour les lire et les pré-remplir maintenant.
+function PendingPortalInvoices({ grantProjectId, count }: { grantProjectId: string; count: number }) {
+  const [message, setMessage] = useState<string | null>(null);
+  const { pending, error, run } = useLedgerAction();
+  if (count === 0 && !message) return null;
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2">
+      <p className="text-sm text-indigo-900">
+        {message ??
+          `${count} facture${count > 1 ? "s" : ""} reçue${count > 1 ? "s" : ""} du portail client pas encore lue${count > 1 ? "s" : ""} : Apex peut lire le numéro, la date et le montant avant taxes, les ranger sous le bon fournisseur et vérifier qu'ils correspondent au versement.`}
+      </p>
+      {!message && (
+        <button onClick={() => run(() => processPortalInvoicesAction(grantProjectId), (r) => setMessage(r.message ?? "Terminé."))} disabled={pending} className={`${smallBtn} bg-indigo-700 text-white hover:bg-indigo-800`}>
+          {pending ? "Lecture en cours…" : "Lire et pré-remplir"}
+        </button>
+      )}
+      {error && <p className="w-full text-xs text-red-600">{error}</p>}
+    </div>
+  );
+}
+
 function DocumentSelect({ value, onChange, documents }: { value: string; onChange: (v: string) => void; documents: DocOption[] }) {
   const sorted = [...documents].sort((a, b) => Number(b.category === "invoice") - Number(a.category === "invoice") || a.filename.localeCompare(b.filename));
   return (
@@ -749,6 +843,7 @@ function SupplierGroup({ grantProjectId, supplier, documents, clients, claims, l
         <Fragment key={inv.id}>
           <InvoiceRow key={`${inv.id}-${inv.status}`} grantProjectId={grantProjectId} invoice={inv} supplierId={supplier.id} documents={documents} claims={claims} isEmployee={isEmployee} />
           <InvoicePaymentRow key={`${inv.id}-payment`} grantProjectId={grantProjectId} invoice={inv} documents={documents} />
+          <InvoiceReviewRow key={`${inv.id}-review-${inv.reviewIssues.length}-${inv.reviewNoteSentAt ?? ""}`} grantProjectId={grantProjectId} invoice={inv} />
         </Fragment>
       ))}
       {addingInvoice && <InvoiceRow grantProjectId={grantProjectId} invoice={null} supplierId={supplier.id} documents={documents} claims={claims} isEmployee={isEmployee} onCancel={() => setAddingInvoice(false)} />}
@@ -792,6 +887,7 @@ export function SuppliersTable({
   lineItems,
   totals,
   billingContext,
+  pendingPortalInvoices = 0,
 }: {
   grantProjectId: string;
   suppliers: LedgerSupplier[];
@@ -804,10 +900,13 @@ export function SuppliersTable({
   lineItems: BillingLineItemRow[];
   totals: { budget: number; accepted: number; claimed: number; remaining: number };
   billingContext?: SupplierBillingContext;
+  // Jade (0073) : versements dont la facture reçue du portail n'est pas encore au tableau.
+  pendingPortalInvoices?: number;
 }) {
   const choices = suppliers.map((s) => ({ id: s.id, name: s.name }));
   return (
     <div className="space-y-2">
+      <PendingPortalInvoices grantProjectId={grantProjectId} count={pendingPortalInvoices} />
       <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
         <table className="w-full min-w-[1180px] text-sm">
           <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
@@ -842,6 +941,7 @@ export function SuppliersTable({
                   <Fragment key={inv.id}>
                     <InvoiceRow key={`${inv.id}-${inv.status}`} grantProjectId={grantProjectId} invoice={inv} supplierId={null} documents={documents} claims={claims} supplierChoices={choices} />
                     <InvoicePaymentRow key={`${inv.id}-payment`} grantProjectId={grantProjectId} invoice={inv} documents={documents} />
+                    <InvoiceReviewRow key={`${inv.id}-review-${inv.reviewIssues.length}-${inv.reviewNoteSentAt ?? ""}`} grantProjectId={grantProjectId} invoice={inv} />
                   </Fragment>
                 ))}
               </>

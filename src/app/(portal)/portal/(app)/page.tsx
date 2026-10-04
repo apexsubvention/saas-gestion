@@ -51,6 +51,11 @@ function dossierLabel(dossier: { clientId: string; clientName: string | null; na
   return `${dossier.clientName ?? dossier.name} (${dossier.programName ?? dossier.name})`;
 }
 
+// Jade (0073) : téléverser la facture d'un versement la fait aussi lire automatiquement (Claude,
+// jusqu'à ~50 s) pour pré-remplir le tableau Fournisseurs côté personnel -- l'action serveur
+// hérite de la durée maximale de cette page.
+export const maxDuration = 90;
+
 export default async function PortalHomePage() {
   const ctx = await requirePortalContext();
   const supabase = await createClient();

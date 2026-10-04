@@ -29,6 +29,7 @@ import { programsRepository } from "@/server/repositories/programs.repository";
 import { aiSuggestionsService } from "@/server/services/aiSuggestions.service";
 import { listDossierEvents } from "@/server/services/audit";
 import { supplierLedgerService } from "@/server/services/supplierLedger.service";
+import { portalInvoiceIntakeService } from "@/server/services/portalInvoiceIntake.service";
 import { billingLineItemsService } from "@/server/services/billingLineItems.service";
 import { budgetLinesService } from "@/server/services/budgetLines.service";
 import { BudgetDeposeSection } from "./BudgetDeposeSection";
@@ -112,6 +113,11 @@ export default async function GrantProjectPage({ params, searchParams }: { param
   // netOfRate (isPariProgram) : voir le commentaire sur load() dans supplierLedger.service.ts --
   // pour ces dossiers, claimed vient du DDR et est déjà net, jamais retraduit par le taux.
   const ledger = await supplierLedgerService(supabase).load(params.id, rateForLedger, isPariProgram);
+  // Jade (0073) : factures reçues du portail pas encore lues/ajoutées au tableau Fournisseurs.
+  const pendingPortalInvoices = await portalInvoiceIntakeService(supabase)
+    .pendingInstallments(params.id)
+    .then((list) => list.length)
+    .catch(() => 0);
   const lineItems = await billingLineItemsService(supabase).listByProject(params.id);
   const budgetLines = await budgetLinesService(supabase).load(params.id);
   // Résumé seulement dans le Dossier (Jade : trop de tableaux qui se ressemblent) -- le détail
@@ -509,6 +515,7 @@ export default async function GrantProjectPage({ params, searchParams }: { param
                 lineItems={lineItems}
                 totals={ledger.totals}
                 billingContext={{ clientName, subsidy, deadline: projectDeadline }}
+                pendingPortalInvoices={pendingPortalInvoices}
               />
               <details className="rounded-lg border border-neutral-200 bg-white p-4">
                 <summary className="cursor-pointer text-sm font-medium text-neutral-800">{isPariProgram ? "Ajouter un salarié ou un fournisseur" : "Ajouter un fournisseur avec ses détails de facturation"}</summary>

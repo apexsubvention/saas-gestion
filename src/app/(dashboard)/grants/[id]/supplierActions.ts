@@ -12,6 +12,8 @@ import { expensesRepository } from "@/server/repositories/expenses.repository";
 import { logAudit, logDossierEvent, listDossierEventsByRef, type DossierEventRow } from "@/server/services/audit";
 import { claimsService } from "@/server/services/claims.service";
 import { billingLineItemsService } from "@/server/services/billingLineItems.service";
+import { portalInvoiceIntakeService } from "@/server/services/portalInvoiceIntake.service";
+import { dossierNotesService } from "@/server/services/dossierNotes.service";
 
 const fmtMoney = (n: number) => new Intl.NumberFormat("fr-CA", { style: "currency", currency: "CAD", minimumFractionDigits: 2 }).format(n);
 const OVERRIDE_FIELD_LABELS = { accepted: "Subvention acceptée", claimed: "Réclamé à ce jour", budget: "Budget prévu" } as const;
@@ -19,7 +21,7 @@ const OVERRIDE_FIELD_LABELS = { accepted: "Subvention acceptée", claimed: "Réc
 // Actions du tableau fournisseurs / factures d'un dossier. Chaque action revérifie que les
 // identifiants reçus appartiennent bien à CE dossier (la RLS protège l'accès, pas la cohérence).
 
-export type LedgerActionResult = { error: string | null; id?: string };
+export type LedgerActionResult = { error: string | null; id?: string; message?: string };
 
 const optionalText = (max: number) => z.string().trim().max(max).nullable().transform((v) => (v ? v : null));
 const money = z.number({ invalid_type_error: "Montant invalide" }).min(0, "Montant invalide").max(100_000_000).nullable();
@@ -361,6 +363,95 @@ export async function linkInvoiceClaimAction(grantProjectId: string, invoiceId: 
     });
     revalidatePath(`/grants/${grantProjectId}`);
     revalidatePath("/echeancier");
+    return { error: null };
+  } catch (e) {
+    return { error: formatCaughtError(e) };
+  }
+}
+
+// ---- Factures reçues du portail (0073, Jade) ---------------------------------------------------
+
+// Lire les factures reçues du portail qui ne sont pas encore au tableau (reçues avant cette
+// fonctionnalité, ou lecture échouée au moment du téléversement). Une à une, best-effort : une
+// facture illisible n'empêche pas les autres.
+export async function processPortalInvoicesAction(grantProjectId: string): Promise<LedgerActionResult> {
+  const ctx = await requireOrgContext();
+  const supabase = await createClient();
+  try {
+    const intake = portalInvoiceIntakeService(supabase);
+    const pending = await intake.pendingInstallments(grantProjectId);
+    if (pending.length === 0) return { error: null, message: "Aucune facture du portail en attente de lecture." };
+    const done: string[] = [];
+    const skipped: string[] = [];
+    for (const inst of pending) {
+      try {
+        const r = await intake.processInstallment({ organizationId: ctx.organizationId }, inst);
+        if (r.status === "skipped") skipped.push(`versement ${inst.installment_number} : ${r.reason}`);
+        else {
+          done.push(`versement ${inst.installment_number}${r.issues > 0 ? ` (${r.issues} incohérence${r.issues > 1 ? "s" : ""})` : ""}`);
+          await logDossierEvent(supabase, ctx, {
+            grant_project_id: grantProjectId,
+            kind: "installment_invoice_read",
+            title: `Facture du versement n°${inst.installment_number} lue et ajoutée au tableau Fournisseurs${r.issues > 0 ? ` -- ${r.issues} incohérence(s) à vérifier` : " -- à approuver"}`,
+            source: "ai",
+            ref_type: "expense",
+            ref_id: r.expenseId,
+          });
+        }
+      } catch (e) {
+        skipped.push(`versement ${inst.installment_number} : ${formatCaughtError(e)}`);
+      }
+    }
+    revalidatePath(`/grants/${grantProjectId}`);
+    revalidatePath(`/grants/${grantProjectId}/facturation`);
+    const parts = [];
+    if (done.length) parts.push(`Lue(s) et pré-remplie(s) : ${done.join(", ")}.`);
+    if (skipped.length) parts.push(`Non lue(s) : ${skipped.join(" ; ")}.`);
+    return { error: null, message: parts.join(" ") };
+  } catch (e) {
+    return { error: formatCaughtError(e) };
+  }
+}
+
+// Envoyer la note d'incohérence au client : publiée dans le fil de notes du dossier, visible dans
+// son portail (dossier_notes, 0046). Le texte envoyé est celui affiché (modifiable avant envoi).
+export async function sendInvoiceReviewNoteAction(grantProjectId: string, invoiceId: string, body: string): Promise<LedgerActionResult> {
+  const ctx = await requireOrgContext();
+  const supabase = await createClient();
+  try {
+    if (!(await ownedInvoice(supabase, grantProjectId, invoiceId))) return { error: "Facture introuvable dans ce dossier." };
+    const { data: project, error } = await supabase.from("grant_projects").select("client_id").eq("id", grantProjectId).maybeSingle();
+    if (error || !project) return { error: "Dossier introuvable." };
+    const clientId = (project as { client_id: string }).client_id;
+    const note = await dossierNotesService(supabase).add({
+      organizationId: ctx.organizationId,
+      grantProjectId,
+      clientId,
+      authorOrgUserId: ctx.organizationUserId,
+      authorRole: "staff",
+      authorName: ctx.fullName || "Membre de l'équipe",
+      body,
+      visibleToClient: true,
+    });
+    await supplierLedgerService(supabase).markReviewNoteSent(invoiceId, note.id, body.trim());
+    await logDossierEvent(supabase, ctx, { grant_project_id: grantProjectId, client_id: clientId, kind: "invoice_review_note_sent", title: "Note d'incohérence de facture envoyée au client", source: "manual", ref_type: "expense", ref_id: invoiceId });
+    revalidatePath(`/grants/${grantProjectId}`);
+    return { error: null };
+  } catch (e) {
+    return { error: formatCaughtError(e) };
+  }
+}
+
+// « Ignorer » : les incohérences ne concernent plus (vérifié, c'est voulu) -- la facture reste
+// telle quelle, toujours à confirmer séparément si elle est encore « à vérifier ».
+export async function dismissInvoiceReviewAction(grantProjectId: string, invoiceId: string): Promise<LedgerActionResult> {
+  const ctx = await requireOrgContext();
+  const supabase = await createClient();
+  try {
+    if (!(await ownedInvoice(supabase, grantProjectId, invoiceId))) return { error: "Facture introuvable dans ce dossier." };
+    await supplierLedgerService(supabase).dismissReviewIssues(invoiceId);
+    await logDossierEvent(supabase, ctx, { grant_project_id: grantProjectId, kind: "invoice_review_dismissed", title: "Incohérences de facture ignorées", source: "manual", ref_type: "expense", ref_id: invoiceId });
+    revalidatePath(`/grants/${grantProjectId}`);
     return { error: null };
   } catch (e) {
     return { error: formatCaughtError(e) };

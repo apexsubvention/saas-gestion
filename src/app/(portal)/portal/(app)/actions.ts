@@ -7,6 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { formatCaughtError } from "@/lib/errors";
 import { logDossierEvent } from "@/server/services/audit";
 import { billingInstallmentsService } from "@/server/services/billingInstallments.service";
+import { portalInvoiceIntakeService } from "@/server/services/portalInvoiceIntake.service";
 import { supplierLedgerService } from "@/server/services/supplierLedger.service";
 import { notifyUser } from "@/server/services/notifications.service";
 import { grantProjectsService } from "@/server/services/grantProjects.service";
@@ -345,7 +346,7 @@ export async function uploadInstallmentInvoiceAction(
     // (`Database`) : les 3 colonnes client_invoice_* sont nouvelles (0054) et n'existent pas dans
     // database.types.ts (généré, non régénérable dans cet environnement) -- même principe que les
     // autres accès à de nouvelles colonnes/tables dans ce projet.
-    await billingInstallmentsService(admin).update(installmentId, {
+    const updatedInstallment = await billingInstallmentsService(admin).update(installmentId, {
       client_invoice_document_id: (doc as { id: string }).id,
       client_invoice_uploaded_at: new Date().toISOString(),
       client_invoice_uploaded_by: orgUserRow?.id ?? null,
@@ -360,6 +361,38 @@ export async function uploadInstallmentInvoiceAction(
       ref_type: "billing_installment",
       ref_id: installmentId,
     });
+
+    // Jade (0073) : lecture automatique de la facture -> ligne pré-remplie (n°, document, date,
+    // montant avant taxes) sous le bon fournisseur dans le tableau du dossier, à approuver ; les
+    // incohérences avec le versement prévu sont notées avec un brouillon de note au client.
+    // Best-effort : la facture du client est déjà enregistrée -- un échec ici ne le concerne pas
+    // (le personnel peut relancer la lecture depuis le dossier).
+    try {
+      const r = await portalInvoiceIntakeService(admin).processInstallment({ organizationId: installment.organization_id }, updatedInstallment);
+      if (r.status !== "skipped") {
+        await logDossierEvent(admin, { organizationId: installment.organization_id, organizationUserId: orgUserRow?.id ?? "" }, {
+          grant_project_id: installment.grant_project_id,
+          client_id: clientId,
+          kind: "installment_invoice_read",
+          title: `Facture du versement n°${installment.installment_number} lue et ajoutée au tableau Fournisseurs${r.issues > 0 ? ` -- ${r.issues} incohérence(s) à vérifier` : " -- à approuver"}`,
+          source: "ai",
+          ref_type: "expense",
+          ref_id: r.expenseId,
+        });
+        const { data: owner } = await admin.from("grant_projects").select("owner_id, name").eq("id", installment.grant_project_id).maybeSingle();
+        const o = owner as { owner_id: string | null; name: string } | null;
+        await notifyUser(admin, { organizationId: installment.organization_id, organizationUserId: orgUserRow?.id ?? null }, {
+          userId: o?.owner_id ?? null,
+          type: "ai_review",
+          message: `Facture reçue du portail (versement n°${installment.installment_number}, ${o?.name ?? "dossier"}) : ${r.issues > 0 ? `${r.issues} incohérence(s), note au client prête` : "pré-remplie, à approuver"}`,
+          href: `/grants/${installment.grant_project_id}`,
+          entity_type: "grant_project",
+          entity_id: installment.grant_project_id,
+        });
+      }
+    } catch {
+      // Best-effort -- voir plus haut.
+    }
   } catch (e) {
     return { error: formatCaughtError(e) };
   }

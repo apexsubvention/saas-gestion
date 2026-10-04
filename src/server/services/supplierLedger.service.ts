@@ -5,6 +5,7 @@ import { documentsRepository } from "@/server/repositories/documents.repository"
 import { billingLineItemsRepository } from "@/server/repositories/billingLineItems.repository";
 import { budgetLinesRepository } from "@/server/repositories/budgetLines.repository";
 import { claimsRepository } from "@/server/repositories/claims.repository";
+import { billingInstallmentsRepository } from "@/server/repositories/billingInstallments.repository";
 import { matchSupplier } from "@/features/invoices/matchSupplier";
 import { amountBeforeTax, type InvoiceExtraction } from "@/features/invoices/analyzeInvoice";
 import { apportionCorrectedAmounts, type DdrExtraction } from "@/features/ddr/analyzeDdrReport";
@@ -30,6 +31,12 @@ export type LedgerInvoice = {
   // facture de fournisseur externe ordinaire.
   hours: number | null;
   hourlyRate: number | null;
+  // Jade (0073) : facture reçue du portail pour un versement précis -- le versement (pour
+  // comparer), les incohérences détectées à la lecture et la note au client (brouillon/envoyée).
+  installment: { id: string; number: number; periodStart: string; periodEnd: string; amount: number } | null;
+  reviewIssues: Array<{ code: string; message: string }>;
+  reviewNote: string | null;
+  reviewNoteSentAt: string | null;
 };
 
 // Valeur effective = override manuel ?? valeur automatique ?? calcul de repli.
@@ -116,6 +123,7 @@ export function supplierLedgerService(supabase: SupabaseClient) {
   const lineItemsRepo = billingLineItemsRepository(supabase);
   const budgetLinesRepo = budgetLinesRepository(supabase);
   const claimsRepo = claimsRepository(supabase);
+  const installmentsRepo = billingInstallmentsRepository(supabase);
 
   return {
     // `projectRate` (fraction) sert au calcul de repli de la subvention acceptée : budget x taux.
@@ -126,12 +134,14 @@ export function supplierLedgerService(supabase: SupabaseClient) {
     // claimed.effective tel quel), exactement comme subsidyMath.ts#netOfRate ne réapplique jamais
     // le taux sur un montant déjà net. Même flag qu'isPariProgram côté page.tsx.
     async load(grantProjectId: string, projectRate: number | null = null, netOfRate = false): Promise<Ledger> {
-      const [suppliers, expenses, lineItems, budgetLines] = await Promise.all([
+      const [suppliers, expenses, lineItems, budgetLines, installments] = await Promise.all([
         suppliersRepo.listByProject(grantProjectId),
         expensesRepo.listByProject(grantProjectId),
         lineItemsRepo.listByProject(grantProjectId),
         budgetLinesRepo.listByProject(grantProjectId),
+        installmentsRepo.listByProject(grantProjectId),
       ]);
+      const installmentById = new Map(installments.map((i) => [i.id, i]));
       // Jade (0069) : « Ce qui a été déposé » (budget_lines) devient la source de Budget prévu/
       // Subvention acceptée d'un fournisseur dès qu'un poste lui est associé -- prioritaire sur
       // l'ancien calcul par postes de facturation juste en dessous, qui ne sert plus que de repli
@@ -199,6 +209,13 @@ export function supplierLedgerService(supabase: SupabaseClient) {
         paymentProof: proofByExpense.get(e.id) ?? null,
         hours: num(e.hours),
         hourlyRate: num(e.hourly_rate),
+        installment: (() => {
+          const i = e.billing_installment_id ? installmentById.get(e.billing_installment_id) : undefined;
+          return i ? { id: i.id, number: i.installment_number, periodStart: i.period_start, periodEnd: i.period_end, amount: Number(i.amount) } : null;
+        })(),
+        reviewIssues: Array.isArray(e.review_issues) ? e.review_issues : [],
+        reviewNote: e.review_note ?? null,
+        reviewNoteSentAt: e.review_note_sent_at ?? null,
       }));
 
       const bySupplier = new Map<string, LedgerInvoice[]>();
@@ -420,6 +437,12 @@ export function supplierLedgerService(supabase: SupabaseClient) {
       await documentsRepo.setInvoiceDocument(organizationId, id, input.document_id);
       return id;
     },
+
+    // Incohérences d'une facture reçue du portail (0073) : « Ignorer » les efface (la facture reste
+    // telle quelle) ; la note envoyée au client est tracée (id de la note du dossier + date).
+    dismissReviewIssues: (id: string) => expensesRepo.updateReview(id, { review_issues: [] }),
+    markReviewNoteSent: (id: string, noteId: string, body: string) =>
+      expensesRepo.updateReview(id, { review_note: body, review_note_id: noteId, review_note_sent_at: new Date().toISOString() }),
 
     // Confirmer une facture lue automatiquement (enlève la mention « à vérifier »).
     confirmInvoice: (id: string) => expensesRepo.update(id, { status: "compliant" }),

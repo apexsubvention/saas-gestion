@@ -25,7 +25,16 @@ export type ExpenseRow = {
   // de fournisseur externe ordinaire.
   hours: number | null;
   hourly_rate: number | null;
+  // Jade (0073) : facture reçue du portail pour un versement précis (Aide à la facturation) --
+  // incohérences détectées à la lecture et brouillon/envoi de la note au client.
+  billing_installment_id: string | null;
+  review_issues: Array<{ code: string; message: string }> | null;
+  review_note: string | null;
+  review_note_sent_at: string | null;
+  review_note_id: string | null;
 };
+
+export type ExpenseReviewPatch = Partial<Pick<ExpenseRow, "billing_installment_id" | "review_issues" | "review_note" | "review_note_sent_at" | "review_note_id">>;
 
 export function expensesRepository(supabase: SupabaseClient) {
   return {
@@ -53,6 +62,9 @@ export function expensesRepository(supabase: SupabaseClient) {
       source?: "manual" | "ai";
       hours?: number | null;
       hourly_rate?: number | null;
+      billing_installment_id?: string | null;
+      review_issues?: Array<{ code: string; message: string }>;
+      review_note?: string | null;
     }): Promise<ExpenseRow> {
       const { data, error } = await supabase.from("expenses").insert(input).select().single();
       if (error) throw error;
@@ -63,6 +75,14 @@ export function expensesRepository(supabase: SupabaseClient) {
       id: string,
       patch: Partial<Pick<ExpenseRow, "supplier_id" | "invoice_number" | "invoice_date" | "subtotal" | "tax" | "total" | "eligible_amount" | "status" | "hours" | "hourly_rate">>
     ): Promise<ExpenseRow> {
+      const { data, error } = await supabase.from("expenses").update(patch).eq("id", id).select().single();
+      if (error) throw error;
+      return data as ExpenseRow;
+    },
+
+    // Lien versement / incohérences / note au client (0073) -- séparé de update() pour ne jamais
+    // toucher aux montants d'une facture déjà saisie à la main en ajoutant seulement son contrôle.
+    async updateReview(id: string, patch: ExpenseReviewPatch): Promise<ExpenseRow> {
       const { data, error } = await supabase.from("expenses").update(patch).eq("id", id).select().single();
       if (error) throw error;
       return data as ExpenseRow;
