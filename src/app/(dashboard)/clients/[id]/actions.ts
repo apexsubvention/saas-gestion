@@ -196,7 +196,13 @@ export async function createPortalAccountAction(
     });
     if (portalError) throw portalError;
   } catch (e) {
-    return { error: formatCaughtError(e), createdEmail: null, tempPassword: null };
+    const message = formatCaughtError(e);
+    // Courriel déjà utilisé (un autre accès portail, ou un membre du personnel) : message clair
+    // plutôt que l'erreur technique de Supabase Auth.
+    if (/already (been )?registered|already exists|duplicate/i.test(message)) {
+      return { error: "Ce courriel a déjà un compte dans Apex (portail ou personnel) : utilise un autre courriel pour cette personne.", createdEmail: null, tempPassword: null };
+    }
+    return { error: message, createdEmail: null, tempPassword: null };
   }
 
   revalidatePath(`/clients/${clientId}`);

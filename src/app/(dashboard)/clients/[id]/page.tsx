@@ -35,22 +35,23 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
   const parentCandidates = allClients.filter((c) => c.id !== client.id);
   const currentParent = client.parent_client_id ? allClients.find((c) => c.id === client.parent_client_id) : null;
 
-  const { data: portalAccount } = await supabase
+  // Jade (0074) : plusieurs accès portail par client -- un par personne (courriel), chacun
+  // avec son mot de passe, activable/supprimable séparément.
+  const { data: portalRows } = await supabase
     .from("client_portal_users")
-    .select("id, active, user_id, current_password")
+    .select("id, active, user_id, current_password, created_at")
     .eq("client_id", client.id)
-    .maybeSingle();
-
-  let portalAccountEmail: string | null = null;
-  if (portalAccount) {
-    const { data: ou } = await supabase
-      .from("organization_users")
-      .select("email")
-      .eq("user_id", portalAccount.user_id)
-      .eq("organization_id", client.organization_id)
-      .maybeSingle();
-    portalAccountEmail = ou?.email ?? null;
-  }
+    .order("created_at", { ascending: true });
+  const portalAccountsRaw = (portalRows ?? []) as Array<{ id: string; active: boolean; user_id: string; current_password: string | null; created_at: string }>;
+  const { data: portalOrgUsers } = portalAccountsRaw.length
+    ? await supabase
+        .from("organization_users")
+        .select("user_id, email, full_name")
+        .in("user_id", portalAccountsRaw.map((a) => a.user_id))
+        .eq("organization_id", client.organization_id)
+    : { data: [] };
+  const orgUserByAuthId = new Map(((portalOrgUsers ?? []) as Array<{ user_id: string; email: string | null; full_name: string | null }>).map((u) => [u.user_id, u]));
+  const portalAccounts = portalAccountsRaw.map((a) => ({ ...a, email: orgUserByAuthId.get(a.user_id)?.email ?? null, fullName: orgUserByAuthId.get(a.user_id)?.full_name ?? null }));
 
   const overview = (
     <>
@@ -101,30 +102,38 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
           dossiers, échéances et informations de facturation à fournir — voir aussi les sections Fournisseurs
           des dossiers concernés.
         </p>
-        <div className="rounded-lg border border-neutral-200 bg-white p-4">
-          {portalAccount ? (
-            <div className="space-y-3">
+        <div className="divide-y divide-neutral-100 rounded-lg border border-neutral-200 bg-white">
+          {portalAccounts.map((account) => (
+            <div key={account.id} className="space-y-3 p-4">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-neutral-900">
-                  {portalAccountEmail ?? "Compte portail"}{" "}
+                  {account.fullName && <span className="font-medium">{account.fullName} · </span>}
+                  {account.email ?? "Compte portail"}{" "}
                   <span
                     className={`ml-2 rounded-full px-2 py-0.5 text-xs font-medium ${
-                      portalAccount.active ? "bg-emerald-50 text-emerald-700" : "bg-neutral-100 text-neutral-500"
+                      account.active ? "bg-emerald-50 text-emerald-700" : "bg-neutral-100 text-neutral-500"
                     }`}
                   >
-                    {portalAccount.active ? "Actif" : "Désactivé"}
+                    {account.active ? "Actif" : "Désactivé"}
                   </span>
                 </p>
-                <PortalAccountToggle clientId={client.id} portalUserRowId={portalAccount.id} active={portalAccount.active} />
+                <PortalAccountToggle clientId={client.id} portalUserRowId={account.id} active={account.active} />
               </div>
-              <PortalPasswordBox clientId={client.id} portalUserRowId={portalAccount.id} initialPassword={portalAccount.current_password} />
+              <PortalPasswordBox clientId={client.id} portalUserRowId={account.id} initialPassword={account.current_password} />
               <div className="border-t border-neutral-100 pt-3">
-                <DeletePortalAccountButton clientId={client.id} portalUserRowId={portalAccount.id} email={portalAccountEmail} />
+                <DeletePortalAccountButton clientId={client.id} portalUserRowId={account.id} email={account.email} />
               </div>
             </div>
-          ) : (
+          ))}
+          <div className="p-4">
+            {portalAccounts.length > 0 && (
+              <p className="mb-2 text-xs font-medium text-neutral-600">
+                Ajouter un autre accès (ex. comptable, gestionnaire de projet) — chaque personne a son propre courriel et mot de passe et voit les
+                mêmes dossiers.
+              </p>
+            )}
             <CreatePortalAccountForm clientId={client.id} />
-          )}
+          </div>
         </div>
       </section>
 

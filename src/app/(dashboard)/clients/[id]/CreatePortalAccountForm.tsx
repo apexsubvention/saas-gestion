@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { createPortalAccountAction, type CreatePortalAccountFormState } from "./actions";
 
@@ -20,9 +21,15 @@ export function CreatePortalAccountForm({ clientId }: { clientId: string }) {
   const action = createPortalAccountAction.bind(null, clientId);
   const initialState: CreatePortalAccountFormState = { error: null, createdEmail: null, tempPassword: null };
   const [state, formAction] = useFormState(action, initialState);
+  // Plusieurs accès par client (0074) : le formulaire reste affiché après une création -- on le
+  // vide pour pouvoir ajouter tout de suite la personne suivante.
+  const formRef = useRef<HTMLFormElement>(null);
+  useEffect(() => {
+    if (state.createdEmail) formRef.current?.reset();
+  }, [state.createdEmail]);
 
   return (
-    <form action={formAction} className="flex flex-wrap items-end gap-3">
+    <form ref={formRef} action={formAction} className="flex flex-wrap items-end gap-3">
       <div className="space-y-1">
         <label className="text-sm font-medium text-neutral-700">Nom du contact</label>
         <input name="full_name" type="text" className="rounded-md border border-neutral-300 px-2 py-1.5 text-sm" />
