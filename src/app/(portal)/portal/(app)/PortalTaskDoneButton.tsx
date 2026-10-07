@@ -6,15 +6,19 @@
 // requiresUpload est resté à true).
 import { useTransition } from "react";
 import { markDocumentRequestDoneAction } from "./actions";
+import { usePortalAccess } from "./PortalAccessContext";
 
 export function PortalTaskDoneButton({ requestId }: { requestId: string }) {
   const [pending, startTransition] = useTransition();
+  const { canEdit } = usePortalAccess();
 
   function markDone() {
     startTransition(async () => {
       await markDocumentRequestDoneAction(requestId);
     });
   }
+
+  if (!canEdit) return null;
 
   return (
     <div className="mt-2 flex items-center gap-2">

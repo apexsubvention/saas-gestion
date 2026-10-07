@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { Send, CheckCircle2 } from "lucide-react";
 import { sendOpportunityInterestAction, type SendOpportunityInterestFormState } from "./actions";
+import { usePortalAccess } from "../PortalAccessContext";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -42,10 +43,13 @@ export function SendInterestForm({ opportunityId, alreadySentStatus }: { opportu
   const initialState: SendOpportunityInterestFormState = { error: null };
   const [state, formAction] = useFormState(sendOpportunityInterestAction, initialState);
   const [expanded, setExpanded] = useState(false);
+  const { canEdit } = usePortalAccess();
 
   if (alreadySentStatus || state.ok) {
     return <AlreadySentBadge statusLabel={STATUS_LABELS[alreadySentStatus ?? "new"] ?? "en attente de retour"} />;
   }
+
+  if (!canEdit) return null;
 
   if (!expanded) {
     return (

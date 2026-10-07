@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requirePortalContext } from "@/lib/portal/auth";
+import { requirePortalContext, portalEditRefusal } from "@/lib/portal/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatCaughtError } from "@/lib/errors";
@@ -71,6 +71,8 @@ export async function uploadRequestedDocumentAction(
   formData: FormData
 ): Promise<PortalUploadFormState> {
   const ctx = await requirePortalContext();
+  const refusal = portalEditRefusal(ctx);
+  if (refusal) return { error: refusal };
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) {
     return { error: "Choisis un fichier." };
@@ -187,6 +189,8 @@ export async function uploadRequestedDocumentAction(
 // mêmes contrôles de statut déjà en place, DOCUMENT_REQUEST_STATUS_OPTIONS inchangé).
 export async function markDocumentRequestDoneAction(requestId: string): Promise<PortalUploadFormState> {
   const ctx = await requirePortalContext();
+  const refusal = portalEditRefusal(ctx);
+  if (refusal) return { error: refusal };
 
   const supabase = await createClient();
   const { data: request, error: findError } = await supabase
@@ -284,6 +288,8 @@ export async function uploadInstallmentInvoiceAction(
   formData: FormData
 ): Promise<PortalUploadFormState> {
   const ctx = await requirePortalContext();
+  const refusal = portalEditRefusal(ctx);
+  if (refusal) return { error: refusal };
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) {
     return { error: "Choisis un fichier." };
@@ -411,6 +417,8 @@ export async function uploadInstallmentInvoiceAction(
 // strictement sur l'id déjà vérifié. Même principe que uploadInstallmentInvoiceAction ci-dessus.
 export async function updatePortalInvoicePaymentStatusAction(expenseId: string, status: string): Promise<{ error: string | null }> {
   const ctx = await requirePortalContext();
+  const refusal = portalEditRefusal(ctx);
+  if (refusal) return { error: refusal };
   if (status !== "sent_unpaid" && status !== "paid") return { error: "Statut de paiement invalide." };
 
   const supabase = await createClient();
@@ -463,6 +471,8 @@ export async function uploadInvoicePaymentProofAction(
   formData: FormData
 ): Promise<PortalUploadFormState> {
   const ctx = await requirePortalContext();
+  const refusal = portalEditRefusal(ctx);
+  if (refusal) return { error: refusal };
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) {
     return { error: "Choisis un fichier." };
@@ -553,6 +563,8 @@ export async function uploadInvoicePaymentProofAction(
 // role (une tâche n'a pas de policy update portail, exactement comme document_requests).
 export async function markTaskDoneAction(taskId: string): Promise<PortalUploadFormState> {
   const ctx = await requirePortalContext();
+  const refusal = portalEditRefusal(ctx);
+  if (refusal) return { error: refusal };
 
   const supabase = await createClient();
   const { data: task, error: findError } = await supabase
@@ -621,6 +633,8 @@ async function notifyOpportunityResponse(
 
 export async function respondToOpportunityAction(grantProjectId: string, response: "interested" | "not_interested"): Promise<{ error: string | null }> {
   const ctx = await requirePortalContext();
+  const refusal = portalEditRefusal(ctx);
+  if (refusal) return { error: refusal };
   if (response !== "interested" && response !== "not_interested") return { error: "Réponse invalide." };
 
   const supabase = await createClient();

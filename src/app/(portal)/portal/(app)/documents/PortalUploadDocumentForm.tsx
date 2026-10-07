@@ -7,6 +7,7 @@
 import { useFormState, useFormStatus } from "react-dom";
 import { DOCUMENT_CATEGORY_OPTIONS } from "@/features/grants/constants";
 import { uploadSharedDocumentAction, type PortalUploadDocumentFormState } from "./uploadActions";
+import { usePortalAccess } from "../PortalAccessContext";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -20,6 +21,8 @@ function SubmitButton() {
 export function PortalUploadDocumentForm({ dossiers }: { dossiers: Array<{ id: string; name: string }> }) {
   const initialState: PortalUploadDocumentFormState = { error: null };
   const [state, formAction] = useFormState(uploadSharedDocumentAction, initialState);
+  const { canEdit } = usePortalAccess();
+  if (!canEdit) return <p className="text-xs italic text-neutral-400">Consultation seulement : tu ne peux pas déposer de document.</p>;
 
   return (
     <form action={formAction} className="flex flex-wrap items-end gap-3 rounded-lg border border-neutral-200 bg-white p-4">

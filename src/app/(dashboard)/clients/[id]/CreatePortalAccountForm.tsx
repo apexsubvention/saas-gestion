@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { createPortalAccountAction, type CreatePortalAccountFormState } from "./actions";
+import { PORTAL_ACCESS_LEVELS, PORTAL_ACCESS_LEVEL_HINTS, PORTAL_ACCESS_LEVEL_LABELS } from "@/lib/portal/accessLevels";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -20,9 +22,15 @@ export function CreatePortalAccountForm({ clientId }: { clientId: string }) {
   const action = createPortalAccountAction.bind(null, clientId);
   const initialState: CreatePortalAccountFormState = { error: null, createdEmail: null, tempPassword: null };
   const [state, formAction] = useFormState(action, initialState);
+  // Plusieurs accès par client (0074) : le formulaire reste affiché après une création -- on le
+  // vide pour pouvoir ajouter tout de suite la personne suivante.
+  const formRef = useRef<HTMLFormElement>(null);
+  useEffect(() => {
+    if (state.createdEmail) formRef.current?.reset();
+  }, [state.createdEmail]);
 
   return (
-    <form action={formAction} className="flex flex-wrap items-end gap-3">
+    <form ref={formRef} action={formAction} className="flex flex-wrap items-end gap-3">
       <div className="space-y-1">
         <label className="text-sm font-medium text-neutral-700">Nom du contact</label>
         <input name="full_name" type="text" className="rounded-md border border-neutral-300 px-2 py-1.5 text-sm" />
@@ -30,6 +38,14 @@ export function CreatePortalAccountForm({ clientId }: { clientId: string }) {
       <div className="space-y-1">
         <label className="text-sm font-medium text-neutral-700">Courriel</label>
         <input name="email" type="email" required className="rounded-md border border-neutral-300 px-2 py-1.5 text-sm" />
+      </div>
+      <div className="space-y-1">
+        <label className="text-sm font-medium text-neutral-700">Accès</label>
+        <select name="access_level" defaultValue="editor" className="rounded-md border border-neutral-300 px-2 py-1.5 text-sm">
+          {PORTAL_ACCESS_LEVELS.map((l) => (
+            <option key={l} value={l} title={PORTAL_ACCESS_LEVEL_HINTS[l]}>{PORTAL_ACCESS_LEVEL_LABELS[l]}</option>
+          ))}
+        </select>
       </div>
       <SubmitButton />
       {state.error && <p className="w-full text-sm text-red-600">{state.error}</p>}

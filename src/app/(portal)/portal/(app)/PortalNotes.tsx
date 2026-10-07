@@ -7,6 +7,7 @@
 // internes qui n'arrivent tout simplement jamais jusqu'ici.
 import { useTransition } from "react";
 import { useFormState, useFormStatus } from "react-dom";
+import { usePortalAccess } from "./PortalAccessContext";
 import type { DossierNoteView } from "@/server/services/dossierNotes.service";
 import { addPortalNoteAction, deletePortalNoteAction, type AddPortalNoteFormState } from "./notesActions";
 
@@ -60,6 +61,8 @@ export function PortalNotes({
   const action = addPortalNoteAction.bind(null, grantProjectId, clientId);
   const initialState: AddPortalNoteFormState = { error: null };
   const [state, formAction] = useFormState(action, initialState);
+  // 0075 : « Consultation seulement » = lecture du fil, sans écrire ni supprimer.
+  const { canComment } = usePortalAccess();
 
   return (
     <div className="space-y-2">
@@ -75,7 +78,7 @@ export function PortalNotes({
                     {n.authorRole === "staff" ? n.authorName : n.authorOrgUserId === currentOrgUserId ? "Toi" : n.authorName}
                   </span>
                   <time className="text-xs text-neutral-400">{formatDateTime(n.createdAt)}</time>
-                  {n.authorOrgUserId === currentOrgUserId && (
+                  {canComment && n.authorOrgUserId === currentOrgUserId && (
                     <span className="ml-auto">
                       <DeleteNoteButton noteId={n.id} />
                     </span>
@@ -90,7 +93,7 @@ export function PortalNotes({
         )}
       </div>
 
-      <form action={formAction} className="space-y-2">
+      {canComment && <form action={formAction} className="space-y-2">
         <textarea
           name="body"
           required
@@ -102,7 +105,7 @@ export function PortalNotes({
           <SubmitButton />
         </div>
         {state.error && <p className="text-sm text-red-600">{state.error}</p>}
-      </form>
+      </form>}
     </div>
   );
 }

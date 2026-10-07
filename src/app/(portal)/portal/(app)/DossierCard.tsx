@@ -32,6 +32,7 @@ import { buildBillingNarrative, buildBillerSentence } from "@/features/billing/b
 import { computePaymentDeadline, paymentDeadlineAlertText } from "@/features/billing/paymentDeadline";
 import { PortalOpenDocumentButton } from "./PortalOpenDocumentButton";
 import { nextClaimDueSoon, collectToProvideTitles, collectUnpaidSupplierNames, remainingBalanceFor } from "./dossierPriority";
+import { usePortalAccess } from "./PortalAccessContext";
 
 // Un document demandé se réaffiche avec son formulaire de téléversement tant qu'il
 // n'est pas validé par le personnel -- "issue" (problème signalé) permet donc bien de
@@ -225,6 +226,7 @@ function OpportunitySection({ dossier }: { dossier: PortalDossier }) {
   const [isPending, startTransition] = useTransition();
   const [response, setResponse] = useState(dossier.clientOpportunityResponse);
   const [error, setError] = useState<string | null>(null);
+  const { canEdit } = usePortalAccess();
 
   function submit(value: "interested" | "not_interested") {
     setError(null);
@@ -290,7 +292,7 @@ function OpportunitySection({ dossier }: { dossier: PortalDossier }) {
         <div className="mt-1.5 flex flex-wrap gap-2">
           <button
             type="button"
-            disabled={isPending}
+            disabled={isPending || !canEdit}
             onClick={() => submit("interested")}
             className={`rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50 ${response === "interested" ? "bg-emerald-600 text-white" : "border border-emerald-300 text-emerald-700 hover:bg-emerald-50"}`}
           >
@@ -298,7 +300,7 @@ function OpportunitySection({ dossier }: { dossier: PortalDossier }) {
           </button>
           <button
             type="button"
-            disabled={isPending}
+            disabled={isPending || !canEdit}
             onClick={() => submit("not_interested")}
             className={`rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50 ${response === "not_interested" ? "bg-red-600 text-white" : "border border-red-300 text-red-700 hover:bg-red-50"}`}
           >

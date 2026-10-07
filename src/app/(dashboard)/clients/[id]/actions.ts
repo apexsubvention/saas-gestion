@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { parsePortalAccessLevel } from "@/lib/portal/accessLevels";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { randomBytes } from "crypto";
@@ -147,6 +148,8 @@ export async function createPortalAccountAction(
 
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const fullName = String(formData.get("full_name") ?? "").trim() || null;
+  // Niveau d'accès de cette personne (0075) : Peut modifier / Consultation + notes / Consultation seulement.
+  const accessLevel = parsePortalAccessLevel(formData.get("access_level"));
 
   if (!email || !email.includes("@")) {
     return { error: "Courriel valide requis.", createdEmail: null, tempPassword: null };
@@ -193,10 +196,17 @@ export async function createPortalAccountAction(
       active: true,
       current_password: tempPassword,
       must_change_password: true,
+      access_level: accessLevel,
     });
     if (portalError) throw portalError;
   } catch (e) {
-    return { error: formatCaughtError(e), createdEmail: null, tempPassword: null };
+    const message = formatCaughtError(e);
+    // Courriel déjà utilisé (un autre accès portail, ou un membre du personnel) : message clair
+    // plutôt que l'erreur technique de Supabase Auth.
+    if (/already (been )?registered|already exists|duplicate/i.test(message)) {
+      return { error: "Ce courriel a déjà un compte dans Apex (portail ou personnel) : utilise un autre courriel pour cette personne.", createdEmail: null, tempPassword: null };
+    }
+    return { error: message, createdEmail: null, tempPassword: null };
   }
 
   revalidatePath(`/clients/${clientId}`);
@@ -219,6 +229,19 @@ export async function setPortalAccountActiveAction(
 }
 
 export type PortalActionResult = { error: string | null };
+
+// Changer le niveau d'accès d'une personne (0075) -- effet immédiat à sa prochaine action ou
+// navigation dans le portail. Réservé aux admins, comme le reste de la gestion des accès.
+export async function setPortalAccessLevelAction(clientId: string, portalUserRowId: string, level: string): Promise<PortalActionResult> {
+  const ctx = await requireOrgContext();
+  if (ctx.role !== "admin") return { error: "Réservé aux administrateurs." };
+  const accessLevel = parsePortalAccessLevel(level);
+  const admin = createAdminClient();
+  const { error } = await admin.from("client_portal_users").update({ access_level: accessLevel }).eq("id", portalUserRowId).eq("client_id", clientId);
+  if (error) return { error: formatCaughtError(error) };
+  revalidatePath(`/clients/${clientId}`);
+  return { error: null };
+}
 export type RegeneratePortalPasswordResult = { error: string | null; newPassword: string | null };
 
 // Génère un nouveau mot de passe à la demande (ex. le client l'a perdu, ou Jade veut le lui

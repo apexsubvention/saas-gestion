@@ -4,8 +4,9 @@ import { KeyRound, LogOut } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { PORTAL_ACCESS_LEVEL_LABELS, type PortalAccessLevel } from "@/lib/portal/accessLevels";
 
-export function PortalHeader({ clientName, fullName }: { clientName: string; fullName: string | null }) {
+export function PortalHeader({ clientName, fullName, accessLevel = "editor" }: { clientName: string; fullName: string | null; accessLevel?: PortalAccessLevel }) {
   const router = useRouter();
   const supabase = createClient();
 
@@ -22,7 +23,12 @@ export function PortalHeader({ clientName, fullName }: { clientName: string; ful
         <div className="text-xs text-slate-400">Portail Apex</div>
       </div>
       <div className="flex items-center gap-4">
-        <div className="text-right text-sm text-slate-600">{fullName ?? ""}</div>
+        <div className="text-right text-sm text-slate-600">
+          {fullName ?? ""}
+          {accessLevel !== "editor" && (
+            <div className="text-xs text-slate-400">{PORTAL_ACCESS_LEVEL_LABELS[accessLevel]}</div>
+          )}
+        </div>
         <Link
           href="/portal/change-password"
           className="rounded-lg border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
