@@ -7,6 +7,7 @@
 // client_notes_select_portal), donc toujours visibleToClient = true ici.
 import { useTransition } from "react";
 import { useFormState, useFormStatus } from "react-dom";
+import { usePortalAccess } from "./PortalAccessContext";
 import type { ClientNoteView } from "@/server/services/clientNotes.service";
 import { addClientNoteAction, deleteClientNoteAction, type AddClientNoteFormState } from "./notesActions";
 
@@ -58,6 +59,8 @@ export function ClientNotes({
   const action = addClientNoteAction.bind(null, clientId);
   const initialState: AddClientNoteFormState = { error: null };
   const [state, formAction] = useFormState(action, initialState);
+  // 0075 : « Consultation seulement » = lecture du fil, sans écrire ni supprimer.
+  const { canComment } = usePortalAccess();
 
   return (
     <div className="space-y-2 rounded-lg border border-dashed border-neutral-200 bg-neutral-50/60 p-3">
@@ -77,7 +80,7 @@ export function ClientNotes({
                     {n.authorRole === "staff" ? n.authorName : n.authorOrgUserId === currentOrgUserId ? "Toi" : n.authorName}
                   </span>
                   <time className="text-xs text-neutral-400">{formatDateTime(n.createdAt)}</time>
-                  {n.authorOrgUserId === currentOrgUserId && (
+                  {canComment && n.authorOrgUserId === currentOrgUserId && (
                     <span className="ml-auto">
                       <DeleteNoteButton noteId={n.id} />
                     </span>
@@ -92,7 +95,7 @@ export function ClientNotes({
         )}
       </div>
 
-      <form action={formAction} className="space-y-2">
+      {canComment && <form action={formAction} className="space-y-2">
         <textarea
           name="body"
           required
@@ -104,7 +107,7 @@ export function ClientNotes({
           <SubmitButton />
         </div>
         {state.error && <p className="text-sm text-red-600">{state.error}</p>}
-      </form>
+      </form>}
     </div>
   );
 }

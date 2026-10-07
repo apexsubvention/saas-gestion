@@ -7,6 +7,7 @@
 // un fichier corrigé.
 import { useFormState, useFormStatus } from "react-dom";
 import { uploadRequestedDocumentAction, type PortalUploadFormState } from "./actions";
+import { usePortalAccess } from "./PortalAccessContext";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -25,6 +26,8 @@ export function DocumentRequestUpload({ requestId, filename }: { requestId: stri
   const action = uploadRequestedDocumentAction.bind(null, requestId);
   const initialState: PortalUploadFormState = { error: null };
   const [state, formAction] = useFormState(action, initialState);
+  const { canEdit } = usePortalAccess();
+  if (!canEdit) return <p className="mt-2 text-xs italic text-neutral-400">Consultation seulement</p>;
 
   return (
     <form action={formAction} className="mt-2 flex flex-wrap items-center gap-2">

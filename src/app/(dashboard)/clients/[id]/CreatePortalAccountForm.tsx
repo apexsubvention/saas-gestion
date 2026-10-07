@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { createPortalAccountAction, type CreatePortalAccountFormState } from "./actions";
+import { PORTAL_ACCESS_LEVELS, PORTAL_ACCESS_LEVEL_HINTS, PORTAL_ACCESS_LEVEL_LABELS } from "@/lib/portal/accessLevels";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -37,6 +38,14 @@ export function CreatePortalAccountForm({ clientId }: { clientId: string }) {
       <div className="space-y-1">
         <label className="text-sm font-medium text-neutral-700">Courriel</label>
         <input name="email" type="email" required className="rounded-md border border-neutral-300 px-2 py-1.5 text-sm" />
+      </div>
+      <div className="space-y-1">
+        <label className="text-sm font-medium text-neutral-700">Accès</label>
+        <select name="access_level" defaultValue="editor" className="rounded-md border border-neutral-300 px-2 py-1.5 text-sm">
+          {PORTAL_ACCESS_LEVELS.map((l) => (
+            <option key={l} value={l} title={PORTAL_ACCESS_LEVEL_HINTS[l]}>{PORTAL_ACCESS_LEVEL_LABELS[l]}</option>
+          ))}
+        </select>
       </div>
       <SubmitButton />
       {state.error && <p className="w-full text-sm text-red-600">{state.error}</p>}

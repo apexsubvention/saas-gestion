@@ -9,6 +9,7 @@
 // faire réapparaître, si le client doit corriger un mauvais fichier.
 import { useFormState, useFormStatus } from "react-dom";
 import { uploadInstallmentInvoiceAction, type PortalUploadFormState } from "./actions";
+import { usePortalAccess } from "./PortalAccessContext";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -40,6 +41,7 @@ export function InstallmentInvoiceUpload({
   const action = uploadInstallmentInvoiceAction.bind(null, installmentId);
   const initialState: PortalUploadFormState = { error: null };
   const [state, formAction] = useFormState(action, initialState);
+  const { canEdit } = usePortalAccess();
 
   if (uploadedFilename) {
     return (
@@ -48,6 +50,8 @@ export function InstallmentInvoiceUpload({
       </p>
     );
   }
+
+  if (!canEdit) return <p className="mt-1 text-xs italic text-neutral-400">Facture pas encore envoyée</p>;
 
   return (
     <form action={formAction} className="mt-1 flex flex-wrap items-center gap-2">

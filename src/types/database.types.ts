@@ -707,6 +707,7 @@ export type Database = {
       }
       client_portal_users: {
         Row: {
+          access_level: string
           active: boolean
           client_id: string
           created_at: string
@@ -717,6 +718,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          access_level?: string
           active?: boolean
           client_id: string
           created_at?: string
@@ -727,6 +729,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          access_level?: string
           active?: boolean
           client_id?: string
           created_at?: string
@@ -740,7 +743,7 @@ export type Database = {
           {
             foreignKeyName: "client_portal_users_client_id_fkey"
             columns: ["client_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
           },

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requirePortalContext } from "@/lib/portal/auth";
+import { requirePortalContext, portalCommentRefusal } from "@/lib/portal/auth";
 import { createClient } from "@/lib/supabase/server";
 import { dossierNotesService } from "@/server/services/dossierNotes.service";
 import { clientNotesService } from "@/server/services/clientNotes.service";
@@ -21,6 +21,8 @@ export async function addPortalNoteAction(
   formData: FormData
 ): Promise<AddPortalNoteFormState> {
   const ctx = await requirePortalContext();
+  const refusal = portalCommentRefusal(ctx);
+  if (refusal) return { error: refusal };
   if (!ctx.organizationUserId) {
     return { error: "Compte portail incomplet -- contacte ton équipe chez Apex." };
   }
@@ -47,7 +49,9 @@ export async function addPortalNoteAction(
 }
 
 export async function deletePortalNoteAction(noteId: string): Promise<{ error: string | null }> {
-  await requirePortalContext();
+  const ctx = await requirePortalContext();
+  const refusal = portalCommentRefusal(ctx);
+  if (refusal) return { error: refusal };
   const supabase = await createClient();
   try {
     await dossierNotesService(supabase).remove(noteId);
@@ -70,6 +74,8 @@ export async function addClientNoteAction(
   formData: FormData
 ): Promise<AddClientNoteFormState> {
   const ctx = await requirePortalContext();
+  const refusal = portalCommentRefusal(ctx);
+  if (refusal) return { error: refusal };
   if (!ctx.organizationUserId) {
     return { error: "Compte portail incomplet -- contacte ton équipe chez Apex." };
   }
@@ -95,7 +101,9 @@ export async function addClientNoteAction(
 }
 
 export async function deleteClientNoteAction(noteId: string): Promise<{ error: string | null }> {
-  await requirePortalContext();
+  const ctx = await requirePortalContext();
+  const refusal = portalCommentRefusal(ctx);
+  if (refusal) return { error: refusal };
   const supabase = await createClient();
   try {
     await clientNotesService(supabase).remove(noteId);

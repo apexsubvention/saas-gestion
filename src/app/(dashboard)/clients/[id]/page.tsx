@@ -12,6 +12,8 @@ import { CreatePortalAccountForm } from "./CreatePortalAccountForm";
 import { PortalAccountToggle } from "./PortalAccountToggle";
 import { PortalPasswordBox } from "./PortalPasswordBox";
 import { DeletePortalAccountButton } from "./DeletePortalAccountButton";
+import { PortalAccessLevelSelect } from "./PortalAccessLevelSelect";
+import { parsePortalAccessLevel } from "@/lib/portal/accessLevels";
 import { ClientTabs } from "./ClientTabs";
 import { GRANT_PROJECT_STATUS_LABELS, grantProjectStatusBadgeClass } from "@/features/grants/constants";
 import { clientOpportunityInterestsService } from "@/server/services/clientOpportunityInterests.service";
@@ -39,10 +41,10 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
   // avec son mot de passe, activable/supprimable séparément.
   const { data: portalRows } = await supabase
     .from("client_portal_users")
-    .select("id, active, user_id, current_password, created_at")
+    .select("id, active, user_id, current_password, created_at, access_level")
     .eq("client_id", client.id)
     .order("created_at", { ascending: true });
-  const portalAccountsRaw = (portalRows ?? []) as Array<{ id: string; active: boolean; user_id: string; current_password: string | null; created_at: string }>;
+  const portalAccountsRaw = (portalRows ?? []) as Array<{ id: string; active: boolean; user_id: string; current_password: string | null; created_at: string; access_level?: string | null }>;
   const { data: portalOrgUsers } = portalAccountsRaw.length
     ? await supabase
         .from("organization_users")
@@ -51,7 +53,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
         .eq("organization_id", client.organization_id)
     : { data: [] };
   const orgUserByAuthId = new Map(((portalOrgUsers ?? []) as Array<{ user_id: string; email: string | null; full_name: string | null }>).map((u) => [u.user_id, u]));
-  const portalAccounts = portalAccountsRaw.map((a) => ({ ...a, email: orgUserByAuthId.get(a.user_id)?.email ?? null, fullName: orgUserByAuthId.get(a.user_id)?.full_name ?? null }));
+  const portalAccounts = portalAccountsRaw.map((a) => ({ ...a, email: orgUserByAuthId.get(a.user_id)?.email ?? null, fullName: orgUserByAuthId.get(a.user_id)?.full_name ?? null, accessLevel: parsePortalAccessLevel(a.access_level) }));
 
   const overview = (
     <>
@@ -119,6 +121,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
                 </p>
                 <PortalAccountToggle clientId={client.id} portalUserRowId={account.id} active={account.active} />
               </div>
+              <PortalAccessLevelSelect clientId={client.id} portalUserRowId={account.id} level={account.accessLevel} />
               <PortalPasswordBox clientId={client.id} portalUserRowId={account.id} initialPassword={account.current_password} />
               <div className="border-t border-neutral-100 pt-3">
                 <DeletePortalAccountButton clientId={client.id} portalUserRowId={account.id} email={account.email} />
@@ -128,8 +131,8 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
           <div className="p-4">
             {portalAccounts.length > 0 && (
               <p className="mb-2 text-xs font-medium text-neutral-600">
-                Ajouter un autre accès (ex. comptable, gestionnaire de projet) — chaque personne a son propre courriel et mot de passe et voit les
-                mêmes dossiers.
+                Ajouter un autre accès (ex. comptable, gestionnaire de projet) — chaque personne a son propre courriel et mot de passe, voit les
+                mêmes dossiers et a son propre niveau d&apos;accès.
               </p>
             )}
             <CreatePortalAccountForm clientId={client.id} />

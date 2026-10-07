@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requirePortalContext } from "@/lib/portal/auth";
+import { requirePortalContext, portalEditRefusal } from "@/lib/portal/auth";
 import { submitOpportunityInterest } from "@/server/services/clientOpportunityInterests.service";
 import { formatCaughtError } from "@/lib/errors";
 
@@ -14,6 +14,8 @@ export async function sendOpportunityInterestAction(
   formData: FormData
 ): Promise<SendOpportunityInterestFormState> {
   const ctx = await requirePortalContext();
+  const refusal = portalEditRefusal(ctx);
+  if (refusal) return { error: refusal };
   const opportunityId = String(formData.get("opportunity_id") ?? "");
   const note = String(formData.get("note") ?? "");
 

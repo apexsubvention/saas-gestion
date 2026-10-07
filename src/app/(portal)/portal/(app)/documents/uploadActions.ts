@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requirePortalContext } from "@/lib/portal/auth";
+import { requirePortalContext, portalEditRefusal } from "@/lib/portal/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatCaughtError } from "@/lib/errors";
@@ -24,6 +24,8 @@ export async function uploadSharedDocumentAction(
   formData: FormData
 ): Promise<PortalUploadDocumentFormState> {
   const ctx = await requirePortalContext();
+  const refusal = portalEditRefusal(ctx);
+  if (refusal) return { error: refusal };
   const file = formData.get("file");
   const category = String(formData.get("category") ?? "other");
   const grantProjectIdRaw = formData.get("grant_project_id");

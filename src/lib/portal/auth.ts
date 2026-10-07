@@ -4,6 +4,7 @@
 // plutôt qu'un membre du staff. Redirige vers /portal/login, jamais /login.
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { canCommentPortal, canEditPortal, parsePortalAccessLevel, PORTAL_READ_ONLY_MESSAGE, type PortalAccessLevel } from "@/lib/portal/accessLevels";
 
 export type PortalContext = {
   userId: string;
@@ -17,7 +18,21 @@ export type PortalContext = {
   // organization_users en plus de sa ligne client_portal_users -- voir 0028) ; nullable
   // ici par prudence défensive seulement.
   organizationUserId: string | null;
+  // Niveau d'accès de CETTE personne (0075) -- plusieurs accès par client peuvent avoir des
+  // niveaux différents (le client peut modifier, un externe seulement consulter...).
+  accessLevel: PortalAccessLevel;
 };
+
+// Refus à renvoyer par une action portail qui MODIFIE quelque chose (téléverser, répondre,
+// changer un statut...) -- null si la personne connectée a le droit.
+export function portalEditRefusal(ctx: PortalContext): string | null {
+  return canEditPortal(ctx.accessLevel) ? null : PORTAL_READ_ONLY_MESSAGE;
+}
+
+// Idem pour les fils de notes : permis aussi au niveau « Consultation + notes ».
+export function portalCommentRefusal(ctx: PortalContext): string | null {
+  return canCommentPortal(ctx.accessLevel) ? null : PORTAL_READ_ONLY_MESSAGE;
+}
 
 export async function requirePortalContext(): Promise<PortalContext> {
   const supabase = await createClient();
@@ -31,7 +46,7 @@ export async function requirePortalContext(): Promise<PortalContext> {
 
   const { data: portalUser, error } = await supabase
     .from("client_portal_users")
-    .select("client_id, organization_id, active, clients(name)")
+    .select("client_id, organization_id, active, access_level, clients(name)")
     .eq("user_id", user.id)
     .eq("active", true)
     .maybeSingle();
@@ -54,5 +69,8 @@ export async function requirePortalContext(): Promise<PortalContext> {
     clientName: (portalUser as unknown as { clients: { name: string } | null }).clients?.name ?? "",
     fullName: orgUser?.full_name ?? null,
     organizationUserId: orgUser?.id ?? null,
+    // access_level (0075) absente de database.types.ts (généré, non régénérable ici) -- relue
+    // via unknown ; repli « Peut modifier » si la migration n'est pas encore passée.
+    accessLevel: parsePortalAccessLevel((portalUser as unknown as { access_level?: string }).access_level),
   };
 }

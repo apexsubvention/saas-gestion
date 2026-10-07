@@ -10,6 +10,7 @@ import type { PortalSupplierInvoice } from "@/server/services/portalDossiers.ser
 import { updatePortalInvoicePaymentStatusAction } from "./actions";
 import { PortalOpenDocumentButton } from "./PortalOpenDocumentButton";
 import { PaymentProofUpload } from "./PaymentProofUpload";
+import { usePortalAccess } from "./PortalAccessContext";
 
 const PAYMENT_STATUS_LABELS: Record<string, string> = { sent_unpaid: "Envoyée, non payée", paid: "Payée" };
 
@@ -27,6 +28,7 @@ function InvoiceCard({ invoice, requiresPaymentProof }: { invoice: PortalSupplie
   const [status, setStatus] = useState(invoice.paymentStatus);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const { canEdit } = usePortalAccess();
 
   return (
     <div className="rounded-md border border-neutral-100 p-3 text-sm">
@@ -46,7 +48,7 @@ function InvoiceCard({ invoice, requiresPaymentProof }: { invoice: PortalSupplie
           Statut de paiement
           <select
             value={status}
-            disabled={isPending}
+            disabled={isPending || !canEdit}
             onChange={(e) => {
               const next = e.target.value as PortalSupplierInvoice["paymentStatus"];
               setStatus(next);
