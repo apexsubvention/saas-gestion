@@ -12,6 +12,7 @@
 import { useEffect, useState, useTransition, type ReactNode } from "react";
 import type { PortalDossier, PortalDocumentRequestView } from "@/server/services/portalDossiers.service";
 import { respondToOpportunityAction } from "./actions";
+import { SubsidyRecapSection } from "./SubsidyRecapSection";
 import {
   CLAIM_STATUS_LABELS,
   claimStatusBadgeClass,
@@ -515,6 +516,10 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
               </div>
             )}
           </div>
+
+          {/* Résumé de la subvention approuvée (Jade) : ce que le client débourse et ce qu'il
+              récupère, en langage simple -- un clic pour voir le détail. */}
+          {dossier.subsidyRecap && <SubsidyRecapSection recap={dossier.subsidyRecap} />}
 
           {dossier.programSummary && <ProgramSummarySection summary={dossier.programSummary} />}
 

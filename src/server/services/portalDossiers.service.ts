@@ -14,6 +14,7 @@ import { questionnaireService } from "@/server/services/questionnaire.service";
 import { dossierNotesService, type DossierNoteView } from "@/server/services/dossierNotes.service";
 import { programSnapshotService } from "@/server/services/programSnapshot.service";
 import { supplierLedgerService } from "@/server/services/supplierLedger.service";
+import { buildSubsidyRecap, type SubsidyRecap } from "@/features/billing/subsidyRecap";
 import { billingLineItemsService } from "@/server/services/billingLineItems.service";
 import { billingInstallmentsService } from "@/server/services/billingInstallments.service";
 import { grantAgreementsService } from "@/server/services/grantAgreements.service";
@@ -248,6 +249,10 @@ export type PortalDossier = {
   // déjà l'accès -- ceci ne fait qu'exposer la liste dans cette section précise). Vide hors de ce
   // statut.
   opportunityDocuments: Array<{ id: string; filename: string; category: string }>;
+  // Jade : « Résumé de la subvention approuvée » -- ce que le client débourse, ce qu'il reçoit,
+  // et ce que ça lui coûte réellement (voir src/features/billing/subsidyRecap.ts). null tant
+  // qu'aucun fournisseur/poste de salaire n'a à la fois un montant à payer ET un remboursement connus.
+  subsidyRecap: SubsidyRecap | null;
 };
 
 export function portalDossiersService(supabase: SupabaseClient) {
@@ -335,7 +340,9 @@ export function portalDossiersService(supabase: SupabaseClient) {
             // document_links_select (0016) et documents_select_portal_full (0045) sont déjà
             // portail- et hiérarchie-compatibles (can_access_grant_project/can_access_client),
             // donc supplierLedgerService.load() fonctionne tel quel avec ce client RLS.
-            supplierLedger.load(p.id, null, isPariProgram),
+            // Taux du dossier (0061/recap) : même repli que côté admin pour « Subvention acceptée »
+            // calculée -- nécessaire au Résumé de la subvention approuvée.
+            supplierLedger.load(p.id, Number(p.grant_rate ?? 0) || null, isPariProgram),
             // Réclamations à venir (0063, Jade) -- milestones_select (0016) est déjà
             // portail-compatible (can_access_grant_project).
             milestones.listByProject(p.id),
@@ -405,6 +412,28 @@ export function portalDossiersService(supabase: SupabaseClient) {
           // cette lecture pour le portail.
           const documentFilenameById = new Map(projectDocuments.map((d) => [d.id, d.filename]));
           const agreement = agreements[0] ?? null;
+          // Résumé de la subvention approuvée (Jade) : mêmes chiffres que le tableau Fournisseurs
+          // interne -- Budget prévu = à débourser, Subvention acceptée = remboursé. Repli
+          // « budget x taux du dossier » seulement si la subvention acceptée n'est pas encore connue
+          // (même calcul « CALCULÉE » que côté admin, avec le taux de l'entente si le dossier n'en a pas).
+          const recapRate = Number(p.grant_rate ?? agreement?.grant_rate ?? 0) || null;
+          const subsidyRecap = buildSubsidyRecap({
+            suppliers: ledger.suppliers.map((s) => ({
+              name: s.name,
+              isEmployee: Boolean(s.is_employee),
+              toPay: s.budget.effective,
+              reimbursed: s.accepted.effective ?? (s.budget.effective != null && recapRate != null ? Math.round(s.budget.effective * recapRate * 100) / 100 : null),
+            })),
+            lineItems: lineItemRows.map((it) => ({
+              label: it.label,
+              amount: Number(it.amount ?? 0),
+              includedInBilling: it.included_in_billing,
+              exclusionReason: it.exclusion_reason ?? null,
+              supplierId: it.supplier_id ?? null,
+              subsidyRate: it.subsidy_rate != null ? Number(it.subsidy_rate) : null,
+            })),
+            projectRate: recapRate,
+          });
           // isPariProgram calculé plus haut (avant le ledger) -- programName recalculé ici pour
           // l'affichage seulement, même source (programNameById), aucun changement de valeur.
           const programName = programNameById.get(p.program_id) ?? p.grant_programs?.name ?? null;
@@ -486,6 +515,7 @@ export function portalDossiersService(supabase: SupabaseClient) {
             approvedGrantAmount: p.approved_grant_amount ?? agreement?.grant_amount ?? null,
             totalProjectCost: p.total_project_cost,
             grantRate: p.grant_rate ?? agreement?.grant_rate ?? null,
+            subsidyRecap,
             spent: ledger.spent,
             isPariProgram,
             pariBalanceRemaining: p.pari_balance_remaining ?? null,
