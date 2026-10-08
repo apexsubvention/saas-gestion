@@ -27,13 +27,14 @@ export default function LoginPage() {
       className="relative flex min-h-screen items-center justify-center bg-slate-50 bg-cover bg-bottom"
       style={{ backgroundImage: "url(/images/portal-login-background.jpg)" }}
     >
-      {/* Logo Apex en SVG (net à toutes les tailles d'écran), séparé de l'image de fond : intégré
-          à l'image, il était rogné en haut à droite sur les écrans larges (fond calé en bas). */}
+      {/* Logo officiel Apex + slogan (PNG transparent haute résolution, net sur écran Retina),
+          séparé de l'image de fond : intégré à l'image, il était rogné en haut à droite sur les
+          écrans larges (fond calé en bas). */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/images/apex-logo.svg"
-        alt="Apex"
-        className="pointer-events-none absolute right-6 top-8 w-28 select-none sm:right-12 sm:top-14 sm:w-40 lg:right-16 lg:top-20 lg:w-48"
+        src="/images/apex-logo.png"
+        alt="Apex — Simple d’accès, grandes opportunités."
+        className="pointer-events-none absolute right-6 top-8 w-36 select-none sm:right-12 sm:top-12 sm:w-52 lg:right-16 lg:top-16 lg:w-64"
       />
       <form
         action={formAction}
