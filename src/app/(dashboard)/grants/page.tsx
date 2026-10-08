@@ -3,11 +3,17 @@ import { createClient } from "@/lib/supabase/server";
 import { requireOrgContext } from "@/lib/permissions";
 import { grantProjectsService } from "@/server/services/grantProjects.service";
 import { GrantsFilterTable } from "./GrantsFilterTable";
+import { portalActivityService } from "@/server/services/portalActivity.service";
+import { PortalActivityPanel } from "./PortalActivityPanel";
 
 export default async function GrantsPage() {
   const ctx = await requireOrgContext();
   const supabase = await createClient();
-  const projects = await grantProjectsService(supabase).list();
+  // Résumé de l'activité des clients dans le portail (0076) -- jamais bloquant pour la page.
+  const [projects, portalActivity] = await Promise.all([
+    grantProjectsService(supabase).list(),
+    portalActivityService(supabase).listRecent().catch(() => []),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -17,6 +23,8 @@ export default async function GrantsPage() {
           + Nouveau projet
         </Link>
       </div>
+
+      <PortalActivityPanel items={portalActivity} />
 
       <GrantsFilterTable projects={projects ?? []} isAdmin={ctx.role === "admin"} />
     </div>
