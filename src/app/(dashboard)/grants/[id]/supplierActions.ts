@@ -379,10 +379,30 @@ export async function processPortalInvoicesAction(grantProjectId: string): Promi
   const supabase = await createClient();
   try {
     const intake = portalInvoiceIntakeService(supabase);
-    const pending = await intake.pendingInstallments(grantProjectId);
-    if (pending.length === 0) return { error: null, message: "Aucune facture du portail en attente de lecture." };
+    const [pending, pendingDocs] = await Promise.all([intake.pendingInstallments(grantProjectId), intake.pendingDocuments(grantProjectId)]);
+    if (pending.length === 0 && pendingDocs.length === 0) return { error: null, message: "Aucune facture du portail en attente de lecture." };
     const done: string[] = [];
     const skipped: string[] = [];
+    // Documents déposés par le client dans « Documents » du portail (0077), hors versement.
+    for (const doc of pendingDocs) {
+      try {
+        const r = await intake.processDocument({ organizationId: ctx.organizationId }, grantProjectId, doc.id);
+        if (r.status === "skipped") skipped.push(`${doc.filename} : ${r.reason}`);
+        else {
+          done.push(`${doc.filename}${r.issues > 0 ? ` (${r.issues} incohérence${r.issues > 1 ? "s" : ""})` : ""}`);
+          await logDossierEvent(supabase, ctx, {
+            grant_project_id: grantProjectId,
+            kind: "portal_document_invoice_read",
+            title: `Facture ${doc.filename} lue et ajoutée au tableau Fournisseurs${r.issues > 0 ? ` -- ${r.issues} incohérence(s) à vérifier` : " -- à approuver"}`,
+            source: "ai",
+            ref_type: "expense",
+            ref_id: r.expenseId,
+          });
+        }
+      } catch (e) {
+        skipped.push(`${doc.filename} : ${formatCaughtError(e)}`);
+      }
+    }
     for (const inst of pending) {
       try {
         const r = await intake.processInstallment({ organizationId: ctx.organizationId }, inst);
@@ -405,7 +425,7 @@ export async function processPortalInvoicesAction(grantProjectId: string): Promi
     revalidatePath(`/grants/${grantProjectId}`);
     revalidatePath(`/grants/${grantProjectId}/facturation`);
     const parts = [];
-    if (done.length) parts.push(`Lue(s) et pré-remplie(s) : ${done.join(", ")}.`);
+    if (done.length) parts.push(`Lue(s) et ajoutée(s) au tableau, à approuver : ${done.join(", ")}.`);
     if (skipped.length) parts.push(`Non lue(s) : ${skipped.join(" ; ")}.`);
     return { error: null, message: parts.join(" ") };
   } catch (e) {

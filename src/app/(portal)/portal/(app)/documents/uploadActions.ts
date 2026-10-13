@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { requirePortalContext, portalEditRefusal } from "@/lib/portal/auth";
+import { analyzableMime } from "@/features/invoices/analyzeInvoice";
+import { portalInvoiceIntakeService } from "@/server/services/portalInvoiceIntake.service";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatCaughtError } from "@/lib/errors";
@@ -86,6 +88,29 @@ export async function uploadSharedDocumentAction(
         ref_type: "document",
         ref_id: (doc as { id: string }).id,
       });
+    }
+
+    // Jade (0077) : une facture déposée ici (catégorie Facture ou Autre) est lue automatiquement
+    // et ajoutée au tableau Fournisseurs du dossier en « à vérifier » -- elle ne compte dans le
+    // Suivi budgétaire (et ici, dans le portail) qu'une fois approuvée par le personnel.
+    // Best-effort : le document est déjà enregistré, un échec de lecture ne concerne pas le client.
+    if (grantProjectId && (category === "invoice" || category === "other") && analyzableMime(file.name)) {
+      try {
+        const r = await portalInvoiceIntakeService(admin).processDocument({ organizationId: ctx.organizationId }, grantProjectId, (doc as { id: string }).id);
+        if (r.status !== "skipped") {
+          await logDossierEvent(admin, { organizationId: ctx.organizationId, organizationUserId: ctx.organizationUserId ?? "" }, {
+            grant_project_id: grantProjectId,
+            client_id: clientId,
+            kind: "portal_document_invoice_read",
+            title: `Facture ${file.name} lue et ajoutée au tableau Fournisseurs${r.issues > 0 ? ` -- ${r.issues} incohérence(s) à vérifier` : " -- à approuver"}`,
+            source: "ai",
+            ref_type: "expense",
+            ref_id: r.expenseId,
+          });
+        }
+      } catch {
+        // Best-effort -- voir plus haut.
+      }
     }
   } catch (e) {
     return { error: formatCaughtError(e) };

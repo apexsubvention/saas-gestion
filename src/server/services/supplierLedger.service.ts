@@ -90,6 +90,10 @@ export type Ledger = {
   // statut de PAIEMENT (payment_status, 0057) est "paid". Distinct de `totals.claimed`
   // (claim_expenses -- une facture peut être payée sans jamais avoir été formellement réclamée).
   paid: number;
+  // Jade (0077) : factures lues automatiquement (« à vérifier ») pas encore approuvées -- elles
+  // n'entrent dans AUCUN total (Facturé, Payé, Solde, Facturé par fournisseur) tant qu'elles ne
+  // sont pas confirmées ; affichées à part pour savoir ce qui attend une approbation.
+  pendingReview: { count: number; amount: number };
   supplierBudgetTotal: number;
   // Jade : `claimedSubsidyEquivalent` (somme de s.claimedSubsidyEquivalent) sert au Solde restant
   // PAR FOURNISSEUR dans le Tableau 2 (voir `remaining` plus haut) -- approved - claimed brut
@@ -102,6 +106,8 @@ export type Ledger = {
 };
 
 const num = (v: unknown) => (v == null || v === "" ? null : Number(v));
+// Jade (0077) : une facture lue automatiquement ne compte qu'une fois approuvée (« Confirmer »).
+const isCounted = (i: { status: string }) => i.status !== "to_review";
 const invoiceAmount = (e: ExpenseRow) => num(e.eligible_amount) ?? num(e.subtotal) ?? num(e.total);
 
 export type SaveInvoiceInput = {
@@ -297,7 +303,7 @@ export function supplierLedgerService(supabase: SupabaseClient) {
                 ? Math.round(claimed.effective * effectiveRate * 100) / 100
                 : claimed.effective; // aucun taux connu : on ne peut pas traduire, on prend le brut tel quel (repli historique)
         const remaining = accepted.effective != null ? Math.round((accepted.effective - (claimedSubsidyEquivalent ?? 0)) * 100) / 100 : null;
-        const invoicedAmount = list.reduce((sum, i) => sum + (i.amount ?? 0), 0);
+        const invoicedAmount = list.filter(isCounted).reduce((sum, i) => sum + (i.amount ?? 0), 0);
         // Jade : « Solde » en en-tête du dossier (0072) doit bouger dès qu'une facture est ajoutée,
         // SANS attendre une réclamation formelle -- donc basé sur facturé (invoicedAmount), pas sur
         // claimed comme `remaining` ci-dessus. Mais appliquer un seul taux global à tout le dossier
@@ -330,13 +336,17 @@ export function supplierLedgerService(supabase: SupabaseClient) {
       // n'ont aucun poste/taux connu -- comptées au taux global du dossier (projectRate), comme
       // l'était TOUT le dossier avant cette correction. Portion résiduelle seulement : dès qu'une
       // facture est rattachée à un fournisseur, elle rejoint le calcul précis ci-dessus.
-      const unassignedInvoicedTotal = unassigned.reduce((sum, i) => sum + (i.amount ?? 0), 0);
+      const unassignedInvoicedTotal = unassigned.filter(isCounted).reduce((sum, i) => sum + (i.amount ?? 0), 0);
       const earned = Math.round((sumOf((s) => s.earnedFromInvoices) + unassignedInvoicedTotal * (projectRate ?? 0)) * 100) / 100;
       return {
         suppliers: ledgerSuppliers,
         unassigned,
-        spent: invoices.reduce((sum, i) => sum + (i.amount ?? 0), 0),
-        paid: invoices.reduce((sum, i) => sum + (i.paymentStatus === "paid" ? (i.amount ?? 0) : 0), 0),
+        spent: invoices.filter(isCounted).reduce((sum, i) => sum + (i.amount ?? 0), 0),
+        paid: invoices.filter(isCounted).reduce((sum, i) => sum + (i.paymentStatus === "paid" ? (i.amount ?? 0) : 0), 0),
+        pendingReview: {
+          count: invoices.filter((i) => !isCounted(i)).length,
+          amount: Math.round(invoices.filter((i) => !isCounted(i)).reduce((sum, i) => sum + (i.amount ?? 0), 0) * 100) / 100,
+        },
         supplierBudgetTotal: sumOf((s) => s.budget.effective),
         totals: {
           budget: sumOf((s) => s.budget.effective),

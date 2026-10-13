@@ -497,7 +497,7 @@ function PendingPortalInvoices({ grantProjectId, count }: { grantProjectId: stri
     <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2">
       <p className="text-sm text-indigo-900">
         {message ??
-          `${count} facture${count > 1 ? "s" : ""} reçue${count > 1 ? "s" : ""} du portail client pas encore lue${count > 1 ? "s" : ""} : Apex peut lire le numéro, la date et le montant avant taxes, les ranger sous le bon fournisseur et vérifier qu'ils correspondent au versement.`}
+          `${count} facture${count > 1 ? "s" : ""} déposée${count > 1 ? "s" : ""} par le client dans le portail pas encore lue${count > 1 ? "s" : ""} : Apex peut lire le numéro, la date et le montant avant taxes, les ranger sous le bon fournisseur (à approuver) et vérifier qu'ils respectent le versement ou le budget prévu.`}
       </p>
       {!message && (
         <button onClick={() => run(() => processPortalInvoicesAction(grantProjectId), (r) => setMessage(r.message ?? "Terminé."))} disabled={pending} className={`${smallBtn} bg-indigo-700 text-white hover:bg-indigo-800`}>

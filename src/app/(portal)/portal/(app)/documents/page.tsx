@@ -3,6 +3,10 @@ import { portalDocumentsService } from "@/server/services/portalDocuments.servic
 import { DocumentsLibrary } from "../DocumentsLibrary";
 import { PortalUploadDocumentForm } from "./PortalUploadDocumentForm";
 
+// Jade (0077) : une facture déposée ici est lue automatiquement (Claude, jusqu'à ~50 s) -- l'action
+// serveur hérite de la durée maximale de cette page.
+export const maxDuration = 90;
+
 // Bibliothèque de documents du portail (0045) : tous les documents des dossiers
 // accessibles au compte (le sien + ses clients enfants -- hiérarchie, cf. 0028), déposés
 // par le personnel OU par le client, groupés par dossier. Voir portalDocuments.service.ts

@@ -7,6 +7,7 @@ import { projectSuppliersRepository, type ProjectSupplierRow } from "@/server/re
 import { billingLineItemsRepository } from "@/server/repositories/billingLineItems.repository";
 import { billingInstallmentsRepository, type BillingInstallmentRow } from "@/server/repositories/billingInstallments.repository";
 import { documentsRepository } from "@/server/repositories/documents.repository";
+import { supplierLedgerService } from "@/server/services/supplierLedger.service";
 
 // Facture reçue du portail pour un versement (0054) -> ligne pré-remplie dans le tableau
 // Fournisseurs du dossier (0073, Jade) : numéro, document, date, montant AVANT taxes, sous le bon
@@ -60,6 +61,12 @@ export function portalInvoiceIntakeService(supabase: SupabaseClient) {
     return { filename: d.filename, bytes: await blob.arrayBuffer(), mime };
   }
 
+  // Retient qu'un document a été lu (0077) -- évite de relire indéfiniment un document qui n'est
+  // pas une facture. Facultatif : sans la migration 0077, la colonne n'existe pas et on ignore.
+  async function markScanned(documentId: string, result: "invoice" | "not_invoice") {
+    await supabase.from("documents").update({ invoice_scan_at: new Date().toISOString(), invoice_scan_result: result }).eq("id", documentId);
+  }
+
   // Fournisseur de la facture : nom lu reconnu parmi les fournisseurs EXTERNES du dossier ; sinon
   // le seul fournisseur qui a des postes « À facturer » ; sinon le seul fournisseur externe.
   function pickSupplier(supplierName: string | null, suppliers: ProjectSupplierRow[], billableSupplierIds: Set<string>) {
@@ -72,22 +79,26 @@ export function portalInvoiceIntakeService(supabase: SupabaseClient) {
     return { supplier: null, matchedByName: false };
   }
 
-  return {
-    async processInstallment(ctx: Ctx, installment: BillingInstallmentRow): Promise<IntakeResult> {
-      const documentId = installment.client_invoice_document_id;
-      if (!documentId) return { status: "skipped", reason: "aucune facture reçue sur ce versement" };
+  const api = {
+    // Lecture d'une facture déposée dans le portail -- sur un versement (installment) ou dans
+    // « Documents » (installment = null, 0077). Même résultat dans les deux cas : une ligne « à
+    // vérifier » sous le bon fournisseur, liée au document, qui ne compte dans aucun total tant
+    // qu'elle n'est pas approuvée (supplierLedger.service.ts#isCounted).
+    async processDocument(ctx: Ctx, grantProjectId: string, documentId: string, installment: BillingInstallmentRow | null = null): Promise<IntakeResult> {
       if (!invoiceAnalysisAvailable()) return { status: "skipped", reason: "lecture automatique non configurée (ANTHROPIC_API_KEY)" };
 
-      const [expenses, suppliers, lineItems] = await Promise.all([
-        expensesRepo.listByProject(installment.grant_project_id),
-        suppliersRepo.listByProject(installment.grant_project_id),
-        lineItemsRepo.listByProject(installment.grant_project_id),
+      const [expenses, suppliers, lineItems, ledger] = await Promise.all([
+        expensesRepo.listByProject(grantProjectId),
+        suppliersRepo.listByProject(grantProjectId),
+        lineItemsRepo.listByProject(grantProjectId),
+        supplierLedgerService(supabase).load(grantProjectId),
       ]);
 
       const file = await loadFile(documentId);
       if ("error" in file) return { status: "skipped", reason: file.error };
 
       const x = await analyzeInvoiceFile({ bytes: file.bytes, mime: file.mime });
+      await markScanned(documentId, x.is_invoice ? "invoice" : "not_invoice");
       const billableSupplierIds = new Set(lineItems.filter((it) => it.included_in_billing && it.supplier_id).map((it) => it.supplier_id as string));
       const { supplier, matchedByName } = pickSupplier(x.supplier_name, suppliers, billableSupplierIds);
       const amount = amountBeforeTax(x);
@@ -99,13 +110,25 @@ export function portalInvoiceIntakeService(supabase: SupabaseClient) {
 
       const effectiveSupplierId = existing?.supplier_id ?? supplier?.id ?? null;
       const effectiveSupplierName = suppliers.find((s) => s.id === effectiveSupplierId)?.name ?? null;
+      // Budget du fournisseur (0077) : Budget prévu, déjà facturé (approuvé) et en attente
+      // d'approbation -- sans compter la facture elle-même si elle est déjà au tableau.
+      const ledgerSupplier = ledger.suppliers.find((s) => s.id === effectiveSupplierId) ?? null;
+      const pendingOthers = ledgerSupplier
+        ? ledgerSupplier.invoices.filter((i) => i.status === "to_review" && i.id !== existing?.id).reduce((sum, i) => sum + (i.amount ?? 0), 0)
+        : 0;
+      const installmentForCheck = installment
+        ? {
+            installment_number: installment.installment_number,
+            period_start: installment.period_start,
+            period_end: installment.period_end,
+            expected_amount: expectedShareForSupplier(Number(installment.amount), effectiveSupplierId, lineItems),
+          }
+        : null;
       const issues = checkInstallmentInvoice(x, {
-        installment: {
-          installment_number: installment.installment_number,
-          period_start: installment.period_start,
-          period_end: installment.period_end,
-          expected_amount: expectedShareForSupplier(Number(installment.amount), effectiveSupplierId, lineItems),
-        },
+        installment: installmentForCheck,
+        supplierBudget: ledgerSupplier
+          ? { budget: ledgerSupplier.budget.effective, alreadyInvoiced: ledgerSupplier.invoiced - (existing && existing.status !== "to_review" ? Number(existing.eligible_amount ?? existing.subtotal ?? 0) : 0), pendingInvoiced: pendingOthers }
+          : null,
         filename: file.filename,
         supplierName: effectiveSupplierName,
         supplierMatchedByName: matchedByName,
@@ -113,22 +136,22 @@ export function portalInvoiceIntakeService(supabase: SupabaseClient) {
         supplierId: effectiveSupplierId,
         today: todayIso(),
       });
-      const note = draftClientNote(issues, x, { installment: { installment_number: installment.installment_number, period_start: installment.period_start, period_end: installment.period_end, expected_amount: null }, filename: file.filename });
+      const note = draftClientNote(issues, x, { installment: installmentForCheck, filename: file.filename });
 
       if (existing) {
-        await expensesRepo.updateReview(existing.id, { billing_installment_id: installment.id, review_issues: issues, review_note: note });
+        await expensesRepo.updateReview(existing.id, { ...(installment ? { billing_installment_id: installment.id } : {}), review_issues: issues, review_note: note });
         return { status: "linked_existing", expenseId: existing.id, issues: issues.length, supplierName: effectiveSupplierName, amount: Number(existing.eligible_amount ?? existing.subtotal ?? existing.total ?? 0) || null };
       }
 
       if (!x.is_invoice) {
-        // Pas une facture : rien n'est ajouté au tableau, mais le contrôle reste visible côté
-        // facturation (aucune ligne à approuver).
+        // Pas une facture (ex. talon de paie, attestation) : rien n'est ajouté au tableau ; le
+        // document est marqué « lu » pour ne pas être relu à chaque fois.
         return { status: "skipped", reason: "le document ne ressemble pas à une facture" };
       }
 
       const expense = await expensesRepo.create({
         organization_id: ctx.organizationId,
-        grant_project_id: installment.grant_project_id,
+        grant_project_id: grantProjectId,
         supplier_id: supplier?.id ?? null,
         invoice_number: x.invoice_number,
         invoice_date: x.invoice_date,
@@ -138,12 +161,18 @@ export function portalInvoiceIntakeService(supabase: SupabaseClient) {
         eligible_amount: amount,
         status: "to_review",
         source: "ai",
-        billing_installment_id: installment.id,
+        billing_installment_id: installment?.id ?? null,
         review_issues: issues,
         review_note: note,
       });
       await documentsRepo.setInvoiceDocument(ctx.organizationId, expense.id, documentId);
       return { status: "created", expenseId: expense.id, issues: issues.length, supplierName: supplier?.name ?? null, amount };
+    },
+
+    async processInstallment(ctx: Ctx, installment: BillingInstallmentRow): Promise<IntakeResult> {
+      const documentId = installment.client_invoice_document_id;
+      if (!documentId) return { status: "skipped", reason: "aucune facture reçue sur ce versement" };
+      return api.processDocument(ctx, installment.grant_project_id, documentId, installment);
     },
 
     // Versements dont la facture reçue du portail n'est pas encore au tableau (ni liée au
@@ -156,5 +185,28 @@ export function portalInvoiceIntakeService(supabase: SupabaseClient) {
       const linkedInstallments = new Set(expenses.map((e) => e.billing_installment_id).filter(Boolean));
       return withDoc.filter((i) => !linkedInstallments.has(i.id));
     },
+
+    // Documents déposés par le client dans « Documents » du portail (0077), catégorie Facture ou
+    // Autre, lisibles automatiquement (PDF/image), pas encore rattachés à une facture du tableau,
+    // jamais lus -- ni reçus sur un versement (ceux-là passent par pendingInstallments).
+    async pendingDocuments(grantProjectId: string): Promise<Array<{ id: string; filename: string }>> {
+      const query = (columns: string) =>
+        supabase.from("documents").select(columns).eq("grant_project_id", grantProjectId).eq("source", "client_portal").in("category", ["invoice", "other"]);
+      // Sans la migration 0077, invoice_scan_at n'existe pas encore : on relit sans cette colonne.
+      const docsQuery = query("id, filename, invoice_scan_at").then((r) => (r.error ? query("id, filename") : r));
+      const [{ data, error }, installments, expenses] = await Promise.all([
+        docsQuery,
+        installmentsRepo.listByProject(grantProjectId),
+        expensesRepo.listByProject(grantProjectId),
+      ]);
+      if (error) throw error;
+      const docs = ((data ?? []) as Array<{ id: string; filename: string; invoice_scan_at?: string | null }>).filter((d) => !d.invoice_scan_at && analyzableMime(d.filename));
+      if (docs.length === 0) return [];
+      const installmentDocs = new Set(installments.map((i) => i.client_invoice_document_id).filter(Boolean));
+      const links = expenses.length ? await documentsRepo.listInvoiceLinks(expenses.map((e) => e.id)) : [];
+      const linkedDocs = new Set(links.map((l) => l.document_id));
+      return docs.filter((d) => !installmentDocs.has(d.id) && !linkedDocs.has(d.id)).map((d) => ({ id: d.id, filename: d.filename }));
+    },
   };
+  return api;
 }

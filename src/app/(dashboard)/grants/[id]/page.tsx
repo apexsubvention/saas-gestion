@@ -114,10 +114,13 @@ export default async function GrantProjectPage({ params, searchParams }: { param
   // pour ces dossiers, claimed vient du DDR et est déjà net, jamais retraduit par le taux.
   const ledger = await supplierLedgerService(supabase).load(params.id, rateForLedger, isPariProgram);
   // Jade (0073) : factures reçues du portail pas encore lues/ajoutées au tableau Fournisseurs.
-  const pendingPortalInvoices = await portalInvoiceIntakeService(supabase)
-    .pendingInstallments(params.id)
-    .then((list) => list.length)
-    .catch(() => 0);
+  // 0077 : + factures déposées par le client dans « Documents » du portail, pas encore lues.
+  const intake = portalInvoiceIntakeService(supabase);
+  const [pendingInstallmentInvoices, pendingDocumentInvoices] = await Promise.all([
+    intake.pendingInstallments(params.id).then((list) => list.length).catch(() => 0),
+    intake.pendingDocuments(params.id).then((list) => list.length).catch(() => 0),
+  ]);
+  const pendingPortalInvoices = pendingInstallmentInvoices + pendingDocumentInvoices;
   const lineItems = await billingLineItemsService(supabase).listByProject(params.id);
   const budgetLines = await budgetLinesService(supabase).load(params.id);
   // Résumé seulement dans le Dossier (Jade : trop de tableaux qui se ressemblent) -- le détail
@@ -470,6 +473,18 @@ export default async function GrantProjectPage({ params, searchParams }: { param
                 <div className="rounded-lg border-2 border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900">
                   <p className="font-semibold">⏰ Délai de paiement et de facturation</p>
                   <p className="mt-1">{paymentDeadlineText}</p>
+                </div>
+              )}
+              {/* 0077 : factures lues automatiquement, pas encore approuvées -- hors de tous les totaux. */}
+              {ledger.pendingReview.count > 0 && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  <p className="font-semibold">
+                    {ledger.pendingReview.count} facture{ledger.pendingReview.count > 1 ? "s" : ""} à approuver ({money(ledger.pendingReview.amount)} avant taxes)
+                  </p>
+                  <p className="mt-1 text-xs">
+                    Lue{ledger.pendingReview.count > 1 ? "s" : ""} automatiquement, en jaune dans le tableau Fournisseurs ci-dessous : vérifie les montants puis clique sur
+                    « Confirmer ». Le Facturé, le Solde et le portail client s&apos;ajustent dès l&apos;approbation.
+                  </p>
                 </div>
               )}
               <SubsidyPanel summary={subsidy} supplierBudgetTotal={ledger.supplierBudgetTotal} narrative={billingNarrative} netOfRate={isPariProgram} />
