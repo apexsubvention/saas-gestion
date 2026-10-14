@@ -145,6 +145,9 @@ export default async function GrantProjectPage({ params, searchParams }: { param
   // sinon fiche du dossier -- même ordre que "Dates du projet" sur la page Facturation).
   const clientName = project.clients?.name ?? "Le client";
   const projectDeadline = agreement?.project_end ?? project.official_end_date ?? null;
+  // Jade : début/fin du projet visibles dans l'en-tête -- même priorité que projectDeadline
+  // (l'entente l'emporte sur la fiche du dossier).
+  const projectStartDate: string | null = agreement?.project_start ?? project.official_start_date ?? null;
   // Jade : alerte SÉPARÉE (jamais fondue dans les phrases de résumé ci-dessous) sur le délai de
   // paiement/facturation lu dans la convention -- date fixe, ou délai de grâce en jours après la
   // fin du projet, sinon repli sur la fin du projet elle-même (règle par défaut, expliquée dans le
@@ -317,6 +320,11 @@ export default async function GrantProjectPage({ params, searchParams }: { param
             </div>
           </div>
           <Metric label="Approuvé" value={money(approved)} />
+          <Metric
+            label="Projet"
+            value={projectStartDate || projectDeadline ? `${formatDay(projectStartDate)} → ${formatDay(projectDeadline)}` : "Dates à préciser"}
+            hint={projectTimingHint(projectStartDate, projectDeadline)}
+          />
           {/* Jade : renommé de "Dépensé" à "Facturé" -- c'est la somme de TOUTES les factures
               avant taxes (ledger.spent), peu importe si elles sont payées à ton fournisseur ou
               non ; "Payé" juste à côté n'en est qu'un sous-ensemble (les factures marquées
@@ -600,6 +608,27 @@ function Metric({ label, value, hint }: { label: string; value: string; hint?: s
       {hint && <p className="mt-0.5 text-[11px] text-neutral-400">{hint}</p>}
     </div>
   );
+}
+
+// « 2026-08-01 » -> « 1 août 2026 » (date seule, sans décalage de fuseau horaire).
+function formatDay(iso: string | null) {
+  if (!iso) return "—";
+  const d = new Date(`${iso.slice(0, 10)}T12:00:00`);
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString("fr-CA", { day: "numeric", month: "short", year: "numeric" });
+}
+
+// Repère sous les dates : pas commencé / jours restants / terminé.
+function projectTimingHint(start: string | null, end: string | null): string | undefined {
+  const today = new Date().toISOString().slice(0, 10);
+  const days = (a: string, b: string) => Math.round((Date.parse(`${b.slice(0, 10)}T12:00:00`) - Date.parse(`${a.slice(0, 10)}T12:00:00`)) / 86_400_000);
+  if (start && today < start.slice(0, 10)) return `Commence dans ${days(today, start)} jour${days(today, start) > 1 ? "s" : ""}`;
+  if (end) {
+    const left = days(today, end);
+    if (left < 0) return "Projet terminé";
+    if (left === 0) return "Se termine aujourd'hui";
+    return `Se termine dans ${left} jour${left > 1 ? "s" : ""}`;
+  }
+  return undefined;
 }
 
 function money(n: number) {
