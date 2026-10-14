@@ -200,7 +200,7 @@ export function portalInvoiceIntakeService(supabase: SupabaseClient) {
         expensesRepo.listByProject(grantProjectId),
       ]);
       if (error) throw error;
-      const docs = ((data ?? []) as Array<{ id: string; filename: string; invoice_scan_at?: string | null }>).filter((d) => !d.invoice_scan_at && analyzableMime(d.filename));
+      const docs = ((data ?? []) as unknown as Array<{ id: string; filename: string; invoice_scan_at?: string | null }>).filter((d) => !d.invoice_scan_at && analyzableMime(d.filename));
       if (docs.length === 0) return [];
       const installmentDocs = new Set(installments.map((i) => i.client_invoice_document_id).filter(Boolean));
       const links = expenses.length ? await documentsRepo.listInvoiceLinks(expenses.map((e) => e.id)) : [];
