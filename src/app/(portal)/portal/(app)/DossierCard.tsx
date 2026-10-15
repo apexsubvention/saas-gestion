@@ -572,7 +572,21 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
                       </span>
                     </div>
                     {inst.invoiceDescription && <p className="mt-1 whitespace-pre-wrap text-xs text-neutral-500">{inst.invoiceDescription}</p>}
-                    <InstallmentInvoiceUpload installmentId={inst.id} uploadedFilename={inst.clientInvoiceFilename} uploadedAt={inst.clientInvoiceUploadedAt} />
+                    {/* Facture(s) déjà associée(s) à ce versement par l'équipe Apex (tableau
+                        Fournisseurs) : le versement est couvert, plus besoin de l'envoyer ici. */}
+                    {inst.linkedInvoices.length > 0 && !inst.clientInvoiceFilename ? (
+                      <div className="mt-1 space-y-0.5">
+                        {inst.linkedInvoices.map((li) => (
+                          <p key={li.id} className="flex flex-wrap items-center gap-2 text-xs text-emerald-700">
+                            ✓ Facture{li.invoiceNumber ? ` n° ${li.invoiceNumber}` : ""} de {li.supplierName}
+                            {li.amount != null ? ` (${formatAmount(li.amount)})` : ""} associée à ce versement
+                            {li.document && <PortalOpenDocumentButton documentId={li.document.id} filename={li.document.filename} className="text-xs text-blue-600 hover:underline" />}
+                          </p>
+                        ))}
+                      </div>
+                    ) : (
+                      <InstallmentInvoiceUpload installmentId={inst.id} uploadedFilename={inst.clientInvoiceFilename} uploadedAt={inst.clientInvoiceUploadedAt} />
+                    )}
                   </div>
                 ))}
               </div>

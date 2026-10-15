@@ -34,6 +34,8 @@ import {
   deleteSupplierAction,
   getSupplierHistoryAction,
   linkInvoiceClaimAction,
+  linkInvoiceInstallmentAction,
+  linkSuggestedInstallmentsAction,
   moveSupplierAction,
   saveInvoiceAction,
   saveSupplierAction,
@@ -47,6 +49,7 @@ import type { LedgerInvoice, LedgerSupplier, Tracked } from "@/server/services/s
 import type { BillingLineItemRow } from "@/server/repositories/billingLineItems.repository";
 import type { DossierEventRow } from "@/server/services/audit";
 import { buildBillingNarrative, type BillingNarrativeInput } from "@/features/billing/billingSummary";
+import { suggestInstallment, type InstallmentOption } from "@/features/billing/matchInstallment";
 
 // Jade (0058) : pourquoi un poste est décoché -- même libellés que LineItemsEditor.tsx (Aide à la
 // facturation), pour que ce soit reconnaissable, que l'un ou l'autre écran serve à cocher.
@@ -437,7 +440,7 @@ function InvoiceReviewRow({ grantProjectId, invoice }: { grantProjectId: string;
       <td className="px-3 py-2" colSpan={5}>
         {inst && (
           <p className="text-xs text-neutral-500">
-            Reçue du portail pour le <span className="font-medium text-neutral-700">versement {inst.number}</span> ({inst.periodStart} → {inst.periodEnd}) · prévu{" "}
+            Associée au <span className="font-medium text-neutral-700">versement {inst.number}</span> ({inst.periodStart} → {inst.periodEnd}) · prévu{" "}
             {money(inst.amount)}
           </p>
         )}
@@ -510,6 +513,33 @@ function PendingPortalInvoices({ grantProjectId, count }: { grantProjectId: stri
   );
 }
 
+// Factures pas encore associées à un versement, mais dont la date (et le montant) tombe
+// clairement sur un versement : un clic les associe toutes.
+function SuggestedInstallmentsBanner({ grantProjectId, suggestions }: { grantProjectId: string; suggestions: Map<string, InstallmentOption> }) {
+  const [message, setMessage] = useState<string | null>(null);
+  const { pending, error, run } = useLedgerAction();
+  if (suggestions.size === 0 && !message) return null;
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2">
+      <p className="text-sm text-indigo-900">
+        {message ??
+          `${suggestions.size} facture${suggestions.size > 1 ? "s" : ""} pas encore associée${suggestions.size > 1 ? "s" : ""} à un versement de l'Aide à la facturation — la date correspond à un versement précis. Une fois associée, le portail client l'affiche sur ce versement.`}
+      </p>
+      {!message && (
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => run(() => linkSuggestedInstallmentsAction(grantProjectId, [...suggestions].map(([invoiceId, inst]) => ({ invoiceId, installmentId: inst.id }))), (r) => setMessage(r.message ?? "Associées ✓"))}
+          className={`${smallBtn} bg-indigo-700 text-white hover:bg-indigo-800`}
+        >
+          {pending ? "…" : "Associer aux versements suggérés"}
+        </button>
+      )}
+      {error && <p className="w-full text-xs text-red-600">{error}</p>}
+    </div>
+  );
+}
+
 function DocumentSelect({ value, onChange, documents }: { value: string; onChange: (v: string) => void; documents: DocOption[] }) {
   const sorted = [...documents].sort((a, b) => Number(b.category === "invoice") - Number(a.category === "invoice") || a.filename.localeCompare(b.filename));
   return (
@@ -534,6 +564,8 @@ function InvoiceRow({
   supplierChoices,
   isEmployee,
   onCancel,
+  installments = [],
+  suggestedInstallment = null,
 }: {
   grantProjectId: string;
   invoice: LedgerInvoice | null;
@@ -546,6 +578,9 @@ function InvoiceRow({
   // montant mais celui-ci reste modifiable directement, comme partout ailleurs dans ce tableau).
   isEmployee?: boolean;
   onCancel?: () => void;
+  // Versements de l'Aide à la facturation + versement suggéré pour cette facture (date/montant).
+  installments?: InstallmentOption[];
+  suggestedInstallment?: InstallmentOption | null;
 }) {
   const [docId, setDocId] = useState(invoice?.document?.id ?? "");
   const [number, setNumber] = useState(invoice?.invoice_number ?? "");
@@ -647,6 +682,36 @@ function InvoiceRow({
             {claimDirty && <button onClick={saveClaim} disabled={pending} className={`${smallBtn} bg-neutral-900 text-white hover:bg-neutral-800`}>{pending ? "…" : "Enregistrer le lien"}</button>}
           </div>
         )}
+        {/* Versement de l'Aide à la facturation couvert par cette facture -- le portail client
+            affiche alors la facture sur ce versement plutôt que « La facture est faite ». */}
+        {invoice && !isEmployee && installments.length > 0 && (
+          <div className="mt-2 space-y-1 rounded-md bg-white p-2 ring-1 ring-neutral-200">
+            <label className="block text-[11px] font-medium text-neutral-500">Versement
+              <select
+                value={invoice.installment?.id ?? ""}
+                disabled={pending}
+                onChange={(e) => run(() => linkInvoiceInstallmentAction(grantProjectId, invoice.id, e.target.value || null))}
+                className={input}
+              >
+                <option value="">Aucun versement</option>
+                {installments.map((i) => (
+                  <option key={i.id} value={i.id}>
+                    N°{i.number} — {i.periodStart} au {i.periodEnd} ({money(i.amount)})
+                  </option>
+                ))}
+              </select>
+            </label>
+            {!invoice.installment && suggestedInstallment && (
+              <button
+                onClick={() => run(() => linkInvoiceInstallmentAction(grantProjectId, invoice.id, suggestedInstallment.id))}
+                disabled={pending}
+                className="text-[11px] font-medium text-indigo-700 hover:underline"
+              >
+                Suggéré : versement n°{suggestedInstallment.number} — associer
+              </button>
+            )}
+          </div>
+        )}
       </td>
       <td className="px-3 py-2"><input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={input} /></td>
       <td className="px-3 py-2"><input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={isEmployee ? "Montant accepté par le PARI" : "Avant taxes"} className={input} /></td>
@@ -689,7 +754,7 @@ function InvoiceRow({
   );
 }
 
-function SupplierGroup({ grantProjectId, supplier, documents, clients, claims, lineItems, isFirst, isLast, billingContext }: { grantProjectId: string; supplier: LedgerSupplier; documents: DocOption[]; clients: ClientOption[]; claims: ClaimOption[]; lineItems: BillingLineItemRow[]; isFirst: boolean; isLast: boolean; billingContext?: SupplierBillingContext }) {
+function SupplierGroup({ grantProjectId, supplier, documents, clients, claims, lineItems, isFirst, isLast, billingContext, installments = [], suggestions = new Map() }: { grantProjectId: string; supplier: LedgerSupplier; documents: DocOption[]; clients: ClientOption[]; claims: ClaimOption[]; lineItems: BillingLineItemRow[]; isFirst: boolean; isLast: boolean; billingContext?: SupplierBillingContext; installments?: InstallmentOption[]; suggestions?: Map<string, InstallmentOption> }) {
   // Taux d'aide du dossier (0061) : repli pour les postes qui n'ont pas leur propre taux -- même
   // valeur que celle utilisée par le narratif ci-dessus (subsidy.rate, computeSubsidy()).
   const projectRate = billingContext?.subsidy.rate ?? null;
@@ -854,7 +919,7 @@ function SupplierGroup({ grantProjectId, supplier, documents, clients, claims, l
       )}
       {supplier.invoices.map((inv) => (
         <Fragment key={inv.id}>
-          <InvoiceRow key={`${inv.id}-${inv.status}`} grantProjectId={grantProjectId} invoice={inv} supplierId={supplier.id} documents={documents} claims={claims} isEmployee={isEmployee} />
+          <InvoiceRow key={`${inv.id}-${inv.status}-${inv.installment?.id ?? ""}`} grantProjectId={grantProjectId} invoice={inv} supplierId={supplier.id} documents={documents} claims={claims} isEmployee={isEmployee} installments={installments} suggestedInstallment={suggestions.get(inv.id) ?? null} />
           <InvoicePaymentRow key={`${inv.id}-payment`} grantProjectId={grantProjectId} invoice={inv} documents={documents} />
           <InvoiceReviewRow key={`${inv.id}-review-${inv.reviewIssues.length}-${inv.reviewNoteSentAt ?? ""}`} grantProjectId={grantProjectId} invoice={inv} />
         </Fragment>
@@ -901,6 +966,7 @@ export function SuppliersTable({
   totals,
   billingContext,
   pendingPortalInvoices = 0,
+  installments = [],
 }: {
   grantProjectId: string;
   suppliers: LedgerSupplier[];
@@ -915,11 +981,27 @@ export function SuppliersTable({
   billingContext?: SupplierBillingContext;
   // Jade (0073) : versements dont la facture reçue du portail n'est pas encore au tableau.
   pendingPortalInvoices?: number;
+  installments?: InstallmentOption[];
 }) {
   const choices = suppliers.map((s) => ({ id: s.id, name: s.name }));
+  // Versement suggéré pour chaque facture pas encore associée (par date de facture, sans jamais
+  // proposer deux fois le même versement -- ni un versement déjà associé à une autre facture).
+  const suggestions = new Map<string, InstallmentOption>();
+  {
+    const all = [...suppliers.filter((s) => !s.is_employee).flatMap((s) => s.invoices), ...unassigned];
+    const taken = new Set(all.map((i) => i.installment?.id).filter((id): id is string => !!id));
+    for (const inv of all.filter((i) => !i.installment).sort((a, b) => (a.invoice_date ?? "").localeCompare(b.invoice_date ?? ""))) {
+      const sug = suggestInstallment({ date: inv.invoice_date, amount: inv.amount }, installments, taken);
+      if (sug) {
+        suggestions.set(inv.id, sug.installment);
+        taken.add(sug.installment.id);
+      }
+    }
+  }
   return (
     <div className="space-y-2">
       <PendingPortalInvoices grantProjectId={grantProjectId} count={pendingPortalInvoices} />
+      <SuggestedInstallmentsBanner grantProjectId={grantProjectId} suggestions={suggestions} />
       <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
         <table className="w-full min-w-[1180px] text-sm">
           <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
@@ -945,6 +1027,8 @@ export function SuppliersTable({
                 isFirst={i === 0}
                 isLast={i === suppliers.length - 1}
                 billingContext={billingContext}
+                installments={installments}
+                suggestions={suggestions}
               />
             ))}
             {unassigned.length > 0 && (
@@ -952,7 +1036,7 @@ export function SuppliersTable({
                 <tr className="border-b border-neutral-100 bg-amber-50"><td colSpan={6} className="px-3 py-2 text-xs font-medium text-amber-900">Factures sans fournisseur — choisis le fournisseur de chacune.</td></tr>
                 {unassigned.map((inv) => (
                   <Fragment key={inv.id}>
-                    <InvoiceRow key={`${inv.id}-${inv.status}`} grantProjectId={grantProjectId} invoice={inv} supplierId={null} documents={documents} claims={claims} supplierChoices={choices} />
+                    <InvoiceRow key={`${inv.id}-${inv.status}-${inv.installment?.id ?? ""}`} grantProjectId={grantProjectId} invoice={inv} supplierId={null} documents={documents} claims={claims} supplierChoices={choices} installments={installments} suggestedInstallment={suggestions.get(inv.id) ?? null} />
                     <InvoicePaymentRow key={`${inv.id}-payment`} grantProjectId={grantProjectId} invoice={inv} documents={documents} />
                     <InvoiceReviewRow key={`${inv.id}-review-${inv.reviewIssues.length}-${inv.reviewNoteSentAt ?? ""}`} grantProjectId={grantProjectId} invoice={inv} />
                   </Fragment>

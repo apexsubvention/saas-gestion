@@ -36,6 +36,9 @@ function InvoiceCard({ invoice, requiresPaymentProof }: { invoice: PortalSupplie
         <span className="font-medium text-neutral-900">
           {invoice.supplierName}
           {invoice.invoiceNumber && <span className="ml-2 font-normal text-neutral-500">N° {invoice.invoiceNumber}</span>}
+          {invoice.installmentNumber != null && (
+            <span className="ml-2 rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700">Versement n°{invoice.installmentNumber}</span>
+          )}
         </span>
         <span className="text-neutral-800">{formatAmount(invoice.amount)}</span>
       </div>

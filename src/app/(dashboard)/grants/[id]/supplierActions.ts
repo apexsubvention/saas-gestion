@@ -499,3 +499,35 @@ export async function recheckInvoiceAction(grantProjectId: string, invoiceId: st
     return { error: formatCaughtError(e) };
   }
 }
+
+// Associer une facture à un versement de l'Aide à la facturation (ou la dissocier : null) -- le
+// portail client affiche alors la facture sur ce versement plutôt que « La facture est faite ».
+export async function linkInvoiceInstallmentAction(grantProjectId: string, invoiceId: string, installmentId: string | null): Promise<LedgerActionResult> {
+  const ctx = await requireOrgContext();
+  const supabase = await createClient();
+  try {
+    if (!(await ownedInvoice(supabase, grantProjectId, invoiceId))) return { error: "Facture introuvable dans ce dossier." };
+    let label = "aucun versement";
+    if (installmentId) {
+      const inst = (await billingInstallmentsRepository(supabase).listByProject(grantProjectId)).find((i) => i.id === installmentId);
+      if (!inst) return { error: "Versement introuvable dans ce dossier." };
+      label = `versement n°${inst.installment_number}`;
+    }
+    await supplierLedgerService(supabase).linkInvoiceInstallment(invoiceId, installmentId);
+    await logDossierEvent(supabase, ctx, { grant_project_id: grantProjectId, kind: "invoice_installment_linked", title: `Facture associée à : ${label}`, source: "manual", ref_type: "expense", ref_id: invoiceId });
+    revalidatePath(`/grants/${grantProjectId}`);
+    return { error: null };
+  } catch (e) {
+    return { error: formatCaughtError(e) };
+  }
+}
+
+// Associer d'un coup toutes les factures suggérées (date dans la période du versement, montant
+// cohérent -- voir src/features/billing/matchInstallment.ts).
+export async function linkSuggestedInstallmentsAction(grantProjectId: string, pairs: Array<{ invoiceId: string; installmentId: string }>): Promise<LedgerActionResult> {
+  for (const p of pairs.slice(0, 100)) {
+    const r = await linkInvoiceInstallmentAction(grantProjectId, p.invoiceId, p.installmentId);
+    if (r.error) return r;
+  }
+  return { error: null, message: `${pairs.length} facture(s) associée(s) à leur versement.` };
+}

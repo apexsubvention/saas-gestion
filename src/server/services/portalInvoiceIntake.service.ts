@@ -11,6 +11,7 @@ import { supplierLedgerService } from "@/server/services/supplierLedger.service"
 import { grantAgreementsRepository } from "@/server/repositories/grantAgreements.repository";
 import { budgetLinesRepository } from "@/server/repositories/budgetLines.repository";
 import { buildProjectContext } from "@/features/invoices/projectContext";
+import { suggestInstallment } from "@/features/billing/matchInstallment";
 
 // Facture reçue du portail pour un versement (0054) -> ligne pré-remplie dans le tableau
 // Fournisseurs du dossier (0073, Jade) : numéro, document, date, montant AVANT taxes, sous le bon
@@ -190,8 +191,21 @@ export function portalInvoiceIntakeService(supabase: SupabaseClient) {
       });
       const note = draftClientNote(issues, x, { installment: installmentForCheck, filename: file.filename });
 
+      // Facture déposée hors versement : associée automatiquement au versement seulement si c'est
+      // sans ambiguïté (date dans la période ET montant prévu identique) -- sinon, choix manuel
+      // dans le tableau Fournisseurs (suggestion affichée).
+      const takenInstallments = new Set(expenses.filter((e) => e.id !== existing?.id).map((e) => e.billing_installment_id).filter((id): id is string => !!id));
+      const autoInstallmentId =
+        installment?.id ??
+        (existing?.billing_installment_id
+          ? null
+          : (() => {
+              const sug = suggestInstallment({ date: x.invoice_date, amount }, ledger.installments, takenInstallments);
+              return sug?.confident ? sug.installment.id : null;
+            })());
+
       if (existing) {
-        await expensesRepo.updateReview(existing.id, { ...(installment ? { billing_installment_id: installment.id } : {}), review_issues: issues, review_note: note });
+        await expensesRepo.updateReview(existing.id, { ...(autoInstallmentId ? { billing_installment_id: autoInstallmentId } : {}), review_issues: issues, review_note: note });
         return { status: "linked_existing", expenseId: existing.id, issues: issues.length, supplierName: effectiveSupplierName, amount: Number(existing.eligible_amount ?? existing.subtotal ?? existing.total ?? 0) || null };
       }
 
@@ -213,7 +227,7 @@ export function portalInvoiceIntakeService(supabase: SupabaseClient) {
         eligible_amount: amount,
         status: "to_review",
         source: "ai",
-        billing_installment_id: installment?.id ?? null,
+        billing_installment_id: autoInstallmentId,
         review_issues: issues,
         review_note: note,
       });

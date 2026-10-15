@@ -539,6 +539,7 @@ export default async function GrantProjectPage({ params, searchParams }: { param
                 totals={ledger.totals}
                 billingContext={{ clientName, subsidy, deadline: projectDeadline }}
                 pendingPortalInvoices={pendingPortalInvoices}
+                installments={ledger.installments}
               />
               <details className="rounded-lg border border-neutral-200 bg-white p-4">
                 <summary className="cursor-pointer text-sm font-medium text-neutral-800">{isPariProgram ? "Ajouter un salarié ou un fournisseur" : "Ajouter un fournisseur avec ses détails de facturation"}</summary>

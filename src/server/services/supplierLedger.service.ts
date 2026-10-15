@@ -94,6 +94,8 @@ export type Ledger = {
   // n'entrent dans AUCUN total (Facturé, Payé, Solde, Facturé par fournisseur) tant qu'elles ne
   // sont pas confirmées ; affichées à part pour savoir ce qui attend une approbation.
   pendingReview: { count: number; amount: number };
+  // Versements de l'Aide à la facturation (0042) -- pour associer chaque facture à son versement.
+  installments: Array<{ id: string; number: number; periodStart: string; periodEnd: string; amount: number }>;
   supplierBudgetTotal: number;
   // Jade : `claimedSubsidyEquivalent` (somme de s.claimedSubsidyEquivalent) sert au Solde restant
   // PAR FOURNISSEUR dans le Tableau 2 (voir `remaining` plus haut) -- approved - claimed brut
@@ -343,6 +345,7 @@ export function supplierLedgerService(supabase: SupabaseClient) {
         unassigned,
         spent: invoices.filter(isCounted).reduce((sum, i) => sum + (i.amount ?? 0), 0),
         paid: invoices.filter(isCounted).reduce((sum, i) => sum + (i.paymentStatus === "paid" ? (i.amount ?? 0) : 0), 0),
+        installments: installments.map((i) => ({ id: i.id, number: i.installment_number, periodStart: i.period_start, periodEnd: i.period_end, amount: Number(i.amount) })),
         pendingReview: {
           count: invoices.filter((i) => !isCounted(i)).length,
           amount: Math.round(invoices.filter((i) => !isCounted(i)).reduce((sum, i) => sum + (i.amount ?? 0), 0) * 100) / 100,
@@ -453,6 +456,9 @@ export function supplierLedgerService(supabase: SupabaseClient) {
     dismissReviewIssues: (id: string) => expensesRepo.updateReview(id, { review_issues: [] }),
     markReviewNoteSent: (id: string, noteId: string, body: string) =>
       expensesRepo.updateReview(id, { review_note: body, review_note_id: noteId, review_note_sent_at: new Date().toISOString() }),
+
+    // Associer une facture à un versement (ou la dissocier : null). Les montants ne changent pas.
+    linkInvoiceInstallment: (id: string, installmentId: string | null) => expensesRepo.updateReview(id, { billing_installment_id: installmentId }),
 
     // Confirmer une facture lue automatiquement (enlève la mention « à vérifier »).
     confirmInvoice: (id: string) => expensesRepo.update(id, { status: "compliant" }),

@@ -129,6 +129,9 @@ export type PortalBillingInstallment = {
   // uploadInstallmentInvoiceAction, jamais ici (lecture seule dans ce service).
   clientInvoiceFilename: string | null;
   clientInvoiceUploadedAt: string | null;
+  // Factures approuvées du tableau Fournisseurs associées à ce versement (Jade) -- le versement
+  // est alors couvert : on les affiche plutôt que le bouton « La facture est faite ».
+  linkedInvoices: Array<{ id: string; supplierName: string; invoiceNumber: string | null; amount: number | null; document: { id: string; filename: string } | null }>;
 };
 
 // Résumé du programme montré au client quand son dossier est « à rédiger » (Jade) -- un
@@ -168,6 +171,7 @@ export type PortalSupplierInvoice = {
   paymentStatus: "sent_unpaid" | "paid";
   paymentStatusUpdatedAt: string | null;
   paymentProof: { id: string; filename: string } | null;
+  installmentNumber: number | null; // versement associé (Jade), null si aucun
 };
 
 export type PortalDossier = {
@@ -389,6 +393,7 @@ export function portalDossiersService(supabase: SupabaseClient) {
                 paymentStatus: inv.paymentStatus,
                 paymentStatusUpdatedAt: inv.paymentStatusUpdatedAt,
                 paymentProof: inv.paymentProof ? { id: inv.paymentProof.id, filename: inv.paymentProof.filename } : null,
+                installmentNumber: inv.installment?.number ?? null,
               }))
           );
           const latestSnapshot = snapshotRows[0] ?? null;
@@ -541,6 +546,11 @@ export function portalDossiersService(supabase: SupabaseClient) {
               status: r.status,
               clientInvoiceFilename: r.client_invoice_document_id ? (documentFilenameById.get(r.client_invoice_document_id) ?? "Facture envoyée") : null,
               clientInvoiceUploadedAt: r.client_invoice_uploaded_at,
+              linkedInvoices: ledger.suppliers.flatMap((s) =>
+                s.invoices
+                  .filter((inv) => inv.status === "compliant" && inv.installment?.id === r.id)
+                  .map((inv) => ({ id: inv.id, supplierName: s.name, invoiceNumber: inv.invoice_number, amount: inv.amount, document: inv.document ? { id: inv.document.id, filename: inv.document.filename } : null }))
+              ),
             })),
             programSummary,
             supplierInvoices,
