@@ -3,6 +3,7 @@ import { billingInstallmentsRepository, type BillingInstallmentRow, type Billing
 import { billingLineItemsRepository } from "@/server/repositories/billingLineItems.repository";
 import { computeBillingPeriods, splitAmountEvenly } from "@/features/billing/schedule";
 import { draftBillingBatch, type BillingPeriodToGenerate } from "@/features/billing/draftBilling";
+import { describePlan, planHours } from "@/features/billing/hoursPlan";
 
 function addOneDay(iso: string): string {
   const d = new Date(`${iso}T00:00:00Z`);
@@ -28,11 +29,17 @@ export function billingInstallmentsService(supabase: SupabaseClient) {
     amounts: number[]; // même longueur/ordre que periods
     activities: { label: string; description: string | null; amount: number; hours: number | null }[];
     priorSummary: string | null;
+    alreadyBilled?: number; // dollars déjà couverts par les versements facturés (ajustement)
   }): Promise<BillingInstallmentRow[]> {
-    const periodsToGenerate: BillingPeriodToGenerate[] = input.periods.map((p) => ({
+    // Jade : heures de chaque versement = son montant ÷ le taux horaire de l'activité, modules pris
+    // dans l'ordre (coupés au besoin) -- calculées ici, imposées au rédacteur.
+    const plans = planHours(input.activities, input.amounts, input.alreadyBilled ?? 0);
+    const planTexts = plans ? plans.map((p) => describePlan(p)) : null;
+    const periodsToGenerate: BillingPeriodToGenerate[] = input.periods.map((p, i) => ({
       installment_number: p.installment_number,
       period_start: p.period_start,
       period_end: p.period_end,
+      plan: planTexts?.[i] ?? null,
     }));
 
     let drafted: Awaited<ReturnType<typeof draftBillingBatch>> = [];
@@ -56,7 +63,8 @@ export function billingInstallmentsService(supabase: SupabaseClient) {
       installment_number: p.installment_number,
       period_start: p.period_start,
       period_end: p.period_end,
-      invoice_description: byNumber.get(p.installment_number)?.invoice_description ?? null,
+      // Repli si la rédaction échoue : la liste des modules et heures calculée (jamais vide si connue).
+      invoice_description: byNumber.get(p.installment_number)?.invoice_description ?? planTexts?.[i] ?? null,
       amount: input.amounts[i] ?? 0,
       generated_by: "ai" as const,
     }));
@@ -150,6 +158,7 @@ export function billingInstallmentsService(supabase: SupabaseClient) {
         amounts,
         activities: billableItems.map((it) => ({ label: it.label, description: it.description, amount: Number(it.amount ?? 0), hours: it.hours != null ? Number(it.hours) : null })),
         priorSummary,
+        alreadyBilled: lockedTotal,
       });
     },
 
