@@ -8,6 +8,9 @@ import { billingLineItemsRepository } from "@/server/repositories/billingLineIte
 import { billingInstallmentsRepository, type BillingInstallmentRow } from "@/server/repositories/billingInstallments.repository";
 import { documentsRepository } from "@/server/repositories/documents.repository";
 import { supplierLedgerService } from "@/server/services/supplierLedger.service";
+import { grantAgreementsRepository } from "@/server/repositories/grantAgreements.repository";
+import { budgetLinesRepository } from "@/server/repositories/budgetLines.repository";
+import { buildProjectContext } from "@/features/invoices/projectContext";
 
 // Facture reçue du portail pour un versement (0054) -> ligne pré-remplie dans le tableau
 // Fournisseurs du dossier (0073, Jade) : numéro, document, date, montant AVANT taxes, sous le bon
@@ -61,6 +64,53 @@ export function portalInvoiceIntakeService(supabase: SupabaseClient) {
     return { filename: d.filename, bytes: await blob.arrayBuffer(), mime };
   }
 
+  // Projet déposé (0078) : période (dépenses admissibles de la convention, sinon début/fin du
+  // projet), entreprise bénéficiaire (+ son parent), et résumé du contenu accepté pour comparer.
+  async function loadProjectFacts(grantProjectId: string, lineItems: Awaited<ReturnType<typeof lineItemsRepo.listByProject>>, suppliers: ProjectSupplierRow[], installment: BillingInstallmentRow | null) {
+    const [{ data: project }, agreements, budgetLines] = await Promise.all([
+      supabase.from("grant_projects").select("name, client_id, official_start_date, official_end_date, grant_programs(name)").eq("id", grantProjectId).maybeSingle(),
+      grantAgreementsRepository(supabase).listByProject(grantProjectId).catch(() => []),
+      budgetLinesRepository(supabase).listByProject(grantProjectId).catch(() => []),
+    ]);
+    const proj = project as unknown as { name: string; client_id: string; official_start_date: string | null; official_end_date: string | null; grant_programs: { name: string } | null } | null;
+    const agreement = agreements[0] ?? null;
+    const clientNames: string[] = [];
+    if (proj?.client_id) {
+      const { data: client } = await supabase.from("clients").select("name, parent_client_id").eq("id", proj.client_id).maybeSingle();
+      const c = client as unknown as { name: string; parent_client_id: string | null } | null;
+      if (c?.name) clientNames.push(c.name);
+      if (c?.parent_client_id) {
+        const { data: parent } = await supabase.from("clients").select("name").eq("id", c.parent_client_id).maybeSingle();
+        const pn = (parent as unknown as { name: string } | null)?.name;
+        if (pn) clientNames.push(pn);
+      }
+    }
+    const useEligible = !!(agreement?.eligible_expense_period_start || agreement?.eligible_expense_period_end);
+    const periodStart = (useEligible ? agreement?.eligible_expense_period_start : null) ?? agreement?.project_start ?? proj?.official_start_date ?? null;
+    const periodEnd = (useEligible ? agreement?.eligible_expense_period_end : null) ?? agreement?.project_end ?? proj?.official_end_date ?? null;
+    const periodLabel = useEligible ? "la période de dépenses admissibles" : "le projet";
+    const supplierName = (id: string | null) => suppliers.find((s) => s.id === id)?.name ?? null;
+    const context = buildProjectContext({
+      projectName: proj?.name ?? "Projet",
+      programName: proj?.grant_programs?.name ?? null,
+      clientNames,
+      periodStart,
+      periodEnd,
+      periodLabel,
+      activities: lineItems.map((it) => ({ label: it.label, description: it.description, amount: it.amount != null ? Number(it.amount) : null, hours: it.hours != null ? Number(it.hours) : null, included: it.included_in_billing })),
+      budgetLines: budgetLines.map((b) => ({
+        category: b.category,
+        deposited: b.deposited_amount_override ?? b.deposited_amount_auto ?? null,
+        accepted: b.accepted_amount_override ?? b.accepted_amount_auto ?? null,
+        supplierName: supplierName(b.supplier_id),
+      })),
+      suppliers: suppliers.map((s) => ({ name: s.name, requirements: s.invoice_description_requirements })),
+      specialConditions: agreement?.special_conditions ?? null,
+      installmentText: installment?.invoice_description ?? null,
+    });
+    return { project: { periodStart, periodEnd, periodLabel, clientNames }, context };
+  }
+
   // Retient qu'un document a été lu (0077) -- évite de relire indéfiniment un document qui n'est
   // pas une facture. Facultatif : sans la migration 0077, la colonne n'existe pas et on ignore.
   async function markScanned(documentId: string, result: "invoice" | "not_invoice") {
@@ -97,7 +147,8 @@ export function portalInvoiceIntakeService(supabase: SupabaseClient) {
       const file = await loadFile(documentId);
       if ("error" in file) return { status: "skipped", reason: file.error };
 
-      const x = await analyzeInvoiceFile({ bytes: file.bytes, mime: file.mime });
+      const facts = await loadProjectFacts(grantProjectId, lineItems, suppliers, installment);
+      const x = await analyzeInvoiceFile({ bytes: file.bytes, mime: file.mime }, facts.context);
       await markScanned(documentId, x.is_invoice ? "invoice" : "not_invoice");
       const billableSupplierIds = new Set(lineItems.filter((it) => it.included_in_billing && it.supplier_id).map((it) => it.supplier_id as string));
       const { supplier, matchedByName } = pickSupplier(x.supplier_name, suppliers, billableSupplierIds);
@@ -126,6 +177,7 @@ export function portalInvoiceIntakeService(supabase: SupabaseClient) {
         : null;
       const issues = checkInstallmentInvoice(x, {
         installment: installmentForCheck,
+        project: facts.project,
         supplierBudget: ledgerSupplier
           ? { budget: ledgerSupplier.budget.effective, alreadyInvoiced: ledgerSupplier.invoiced - (existing && existing.status !== "to_review" ? Number(existing.eligible_amount ?? existing.subtotal ?? 0) : 0), pendingInvoiced: pendingOthers }
           : null,

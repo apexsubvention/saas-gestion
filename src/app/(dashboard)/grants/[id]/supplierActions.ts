@@ -13,6 +13,7 @@ import { logAudit, logDossierEvent, listDossierEventsByRef, type DossierEventRow
 import { claimsService } from "@/server/services/claims.service";
 import { billingLineItemsService } from "@/server/services/billingLineItems.service";
 import { portalInvoiceIntakeService } from "@/server/services/portalInvoiceIntake.service";
+import { billingInstallmentsRepository } from "@/server/repositories/billingInstallments.repository";
 import { dossierNotesService } from "@/server/services/dossierNotes.service";
 
 const fmtMoney = (n: number) => new Intl.NumberFormat("fr-CA", { style: "currency", currency: "CAD", minimumFractionDigits: 2 }).format(n);
@@ -473,6 +474,27 @@ export async function dismissInvoiceReviewAction(grantProjectId: string, invoice
     await logDossierEvent(supabase, ctx, { grant_project_id: grantProjectId, kind: "invoice_review_dismissed", title: "Incohérences de facture ignorées", source: "manual", ref_type: "expense", ref_id: invoiceId });
     revalidatePath(`/grants/${grantProjectId}`);
     return { error: null };
+  } catch (e) {
+    return { error: formatCaughtError(e) };
+  }
+}
+
+// « Revérifier » (0078) : relit la facture liée à une ligne du tableau et refait tous les
+// contrôles (versement, budget, période du projet, entreprise facturée, contenu vs projet
+// déposé). Ne modifie jamais les montants saisis : seulement les incohérences et la note.
+export async function recheckInvoiceAction(grantProjectId: string, invoiceId: string, documentId: string): Promise<LedgerActionResult> {
+  const ctx = await requireOrgContext();
+  const supabase = await createClient();
+  try {
+    const expenses = await expensesRepository(supabase).listByProject(grantProjectId);
+    const expense = expenses.find((e) => e.id === invoiceId);
+    if (!expense) return { error: "Facture introuvable dans ce dossier." };
+    const installments = expense.billing_installment_id ? await billingInstallmentsRepository(supabase).listByProject(grantProjectId) : [];
+    const installment = installments.find((i) => i.id === expense.billing_installment_id) ?? null;
+    const r = await portalInvoiceIntakeService(supabase).processDocument({ organizationId: ctx.organizationId }, grantProjectId, documentId, installment);
+    revalidatePath(`/grants/${grantProjectId}`);
+    if (r.status === "skipped") return { error: `Relecture impossible : ${r.reason}.` };
+    return { error: null, message: r.issues > 0 ? `${r.issues} point(s) à vérifier.` : "Aucune incohérence trouvée ✓" };
   } catch (e) {
     return { error: formatCaughtError(e) };
   }

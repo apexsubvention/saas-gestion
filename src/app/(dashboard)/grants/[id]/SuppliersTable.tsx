@@ -29,6 +29,7 @@ import {
   deleteInvoiceAction,
   dismissInvoiceReviewAction,
   processPortalInvoicesAction,
+  recheckInvoiceAction,
   sendInvoiceReviewNoteAction,
   deleteSupplierAction,
   getSupplierHistoryAction,
@@ -554,6 +555,7 @@ function InvoiceRow({
   const [hourlyRate, setHourlyRate] = useState(invoice?.hourlyRate != null ? String(invoice.hourlyRate) : "");
   const [supplier, setSupplier] = useState(supplierId ?? "");
   const [saved, setSaved] = useState(false);
+  const [recheckMessage, setRecheckMessage] = useState<string | null>(null);
   const [claimId, setClaimId] = useState(invoice?.claim?.claim_id ?? "");
   const [claimAmount, setClaimAmount] = useState(invoice?.claim?.claimed_amount != null ? String(invoice.claim.claimed_amount) : "");
   const { pending, error, run } = useLedgerAction();
@@ -657,6 +659,16 @@ function InvoiceRow({
               Confirmer
             </button>
           )}
+          {invoice?.document && (
+            <button
+              onClick={() => { setSaved(false); run(() => recheckInvoiceAction(grantProjectId, invoice.id, invoice.document!.id), (r) => setRecheckMessage(r.message ?? null)); }}
+              disabled={pending}
+              className={smallBtn}
+              title="Relire la facture et la comparer au versement, au budget, aux dates et au projet déposé"
+            >
+              {pending ? "…" : "Revérifier"}
+            </button>
+          )}
           {invoice ? (
             <button
               onClick={() => { if (confirm(`Supprimer ce${isEmployee ? " DDR" : "tte facture"} du tableau ? Le document téléversé est conservé.`)) run(() => deleteInvoiceAction(grantProjectId, invoice.id)); }}
@@ -670,6 +682,7 @@ function InvoiceRow({
           )}
         </div>
         {needsReview && <p className="mt-1 text-xs text-amber-800">Lue automatiquement — à vérifier</p>}
+        {recheckMessage && <p className="mt-1 text-xs text-neutral-600">{recheckMessage}</p>}
         {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
       </td>
     </tr>

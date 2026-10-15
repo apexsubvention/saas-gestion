@@ -6,6 +6,7 @@
 // le fil de notes du dossier côté portail. Rien n'est bloquant : la facture est toujours ajoutée au
 // tableau (statut « à vérifier ») -- les incohérences servent à décider quoi approuver ou demander.
 import { amountBeforeTax, type InvoiceExtraction } from "./analyzeInvoice";
+import { matchSupplier } from "./matchSupplier";
 
 export type ReviewIssue = { code: string; message: string };
 
@@ -23,6 +24,14 @@ export type CheckContext = {
   // contrôles liés au versement (montant prévu, période) sont alors remplacés par le budget du
   // fournisseur (supplierBudget ci-dessous).
   installment: InstallmentForCheck | null;
+  // Projet (0078) : période où la facture doit tomber (période de dépenses admissibles de la
+  // convention, sinon début/fin du projet) et nom(s) acceptés pour l'entreprise facturée.
+  project?: {
+    periodStart: string | null;
+    periodEnd: string | null;
+    periodLabel: string; // « la période de dépenses admissibles » / « le projet »
+    clientNames: string[];
+  } | null;
   // Budget prévu du fournisseur et ce qui lui est déjà facturé (factures approuvées) -- null = inconnu.
   supplierBudget?: { budget: number | null; alreadyInvoiced: number; pendingInvoiced?: number } | null;
   filename: string;
@@ -131,6 +140,29 @@ export function checkInstallmentInvoice(x: InvoiceExtraction, ctx: CheckContext)
   } else if (x.invoice_date > ctx.today) {
     issues.push({ code: "date_future", message: `La facture est datée du ${x.invoice_date}, une date future.` });
   }
+
+  // Période du projet (0078) : la facture doit être datée entre le début et la fin.
+  const proj = ctx.project;
+  if (proj && x.invoice_date) {
+    const range = `${proj.periodStart ?? "…"} au ${proj.periodEnd ?? "…"}`;
+    if (proj.periodStart && x.invoice_date < proj.periodStart && !issues.some((i) => i.code === "date_before_period")) {
+      issues.push({ code: "date_before_project", message: `La facture est datée du ${x.invoice_date}, avant le début de ${proj.periodLabel} (${range}) : la dépense pourrait ne pas être admissible.` });
+    } else if (proj.periodEnd && x.invoice_date > proj.periodEnd) {
+      issues.push({ code: "date_after_project", message: `La facture est datée du ${x.invoice_date}, après la fin de ${proj.periodLabel} (${range}) : la dépense pourrait ne pas être admissible.` });
+    }
+  }
+
+  // Entreprise facturée (0078) : la facture doit être adressée au client du dossier.
+  if (proj && x.billed_to_name && proj.clientNames.length > 0) {
+    const known = proj.clientNames.map((name, i) => ({ id: String(i), name }));
+    if (!matchSupplier(x.billed_to_name, known)) {
+      issues.push({ code: "billed_to", message: `La facture est adressée à « ${x.billed_to_name} », alors que le dossier est au nom de ${proj.clientNames[0]}.` });
+    }
+  }
+
+  // Contenu (0078) : écarts relevés entre la facture et le projet déposé/accepté (convention,
+  // activités acceptées, budget déposé, mentions exigées) -- lus par Claude, à double vérifier.
+  (x.concordance_issues ?? []).forEach((message, i) => issues.push({ code: `content_${i + 1}`, message: `À vérifier avec le projet déposé : ${message}` }));
 
   return issues;
 }
