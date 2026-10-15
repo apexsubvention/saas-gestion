@@ -1,9 +1,7 @@
 import { requirePortalContext } from "@/lib/portal/auth";
 import { createClient } from "@/lib/supabase/server";
-import { projectSuppliersService } from "@/server/services/projectSuppliers.service";
 import { portalDossiersService } from "@/server/services/portalDossiers.service";
 import { DossiersList } from "./DossiersList";
-import { SupplierDossierCard, type SupplierBillingRow } from "./SupplierDossierCard";
 import { collectToProvideTitles, collectUnpaidSupplierNames, nextClaimDueSoon, remainingBalanceFor } from "./dossierPriority";
 
 // Page d'accueil du portail : « Mes dossiers » -- pour chaque dossier accessible à ce
@@ -60,10 +58,10 @@ export default async function PortalHomePage() {
   const ctx = await requirePortalContext();
   const supabase = await createClient();
 
-  const [dossiers, supplierRows] = await Promise.all([
-    portalDossiersService(supabase).listDossiers(ctx.clientId),
-    projectSuppliersService(supabase).listBySupplierClient(ctx.clientId),
-  ]);
+  // Jade : la section « Facturation à préparer » (vue fournisseur, SupplierDossierCard) est retirée
+  // du portail -- plus chargée ici. Le composant et le service restent disponibles pour une
+  // réactivation éventuelle.
+  const dossiers = await portalDossiersService(supabase).listDossiers(ctx.clientId);
 
   // « Tâches discutées / commentaires » (ClientNotes, 0062) retirée de l'affichage du portail
   // à la demande de Jade (0063) -- voir DossiersList.tsx. Le service reste disponible
@@ -186,23 +184,6 @@ export default async function PortalHomePage() {
       )}
 
       <DossiersList dossiers={dossiers} ownClientId={ctx.clientId} currentOrgUserId={ctx.organizationUserId} />
-
-      {supplierRows && supplierRows.length > 0 && (
-        <div className="space-y-3">
-          <div>
-            <h2 className="text-sm font-semibold text-neutral-900">Facturation à préparer</h2>
-            <p className="mt-1 text-xs text-neutral-500">
-              Pour chaque dossier ci-dessous : ta facturation prévue. Déplie une carte pour voir le budget complet
-              du dossier, la portion de subvention, les documents et un aperçu des autres sous-traitants.
-            </p>
-          </div>
-          <div className="space-y-3">
-            {(supplierRows as SupplierBillingRow[]).map((s) => (
-              <SupplierDossierCard key={s.id} row={s} clientName={ctx.clientName} />
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
