@@ -316,6 +316,23 @@ function OpportunitySection({ dossier }: { dossier: PortalDossier }) {
 
 export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDossier; currentOrgUserId: string | null }) {
   const [modalOpen, setModalOpen] = useState(false);
+  // Ouverture depuis le Résumé de la page d'accueil (lien « #dossier-<id> ») : la fenêtre du
+  // dossier s'ouvre directement, pour faire la tâche sans chercher la carte. À la fermeture, le
+  // lien est retiré de l'adresse pour qu'un nouveau clic sur le même titre fonctionne encore.
+  useEffect(() => {
+    function openIfTargeted() {
+      if (window.location.hash === `#dossier-${dossier.id}`) setModalOpen(true);
+    }
+    openIfTargeted();
+    window.addEventListener("hashchange", openIfTargeted);
+    return () => window.removeEventListener("hashchange", openIfTargeted);
+  }, [dossier.id]);
+  function closeModal() {
+    setModalOpen(false);
+    if (window.location.hash === `#dossier-${dossier.id}`) {
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
+  }
   // Résumé en langage clair (Jade) : mêmes chiffres que le tableau interne (SubsidyPanel), en
   // phrase -- voir src/features/billing/billingSummary.ts. spent=0 : on ne connaît pas les
   // dépenses déjà facturées ici (pas nécessaire, seule la cible totale compte pour ce résumé).
@@ -438,7 +455,7 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
 
       {modalOpen && (
         <Modal
-          onClose={() => setModalOpen(false)}
+          onClose={closeModal}
           header={
             <div className="min-w-0">
               <p className="truncate font-semibold text-neutral-900">{dossier.name}</p>

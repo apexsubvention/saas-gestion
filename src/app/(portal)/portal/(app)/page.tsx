@@ -38,7 +38,7 @@ function formatAmount(amount: number): string {
   return `${amount.toLocaleString("fr-CA", { minimumFractionDigits: 2 })} $`;
 }
 
-type SummaryLine = { dossierName: string; text: string };
+type SummaryLine = { dossierId: string; dossierName: string; text: string };
 
 // Jade (0070) : « ajouter le nom du client quand c'est un parent enfant » -- un compte parent
 // (hiérarchie, cf. 0028) voit dans ce résumé global les dossiers de ses clients enfants
@@ -91,13 +91,13 @@ export default async function PortalHomePage() {
   const today = new Date().toISOString().slice(0, 10);
   const toProvideLines: SummaryLine[] = dossiers.flatMap((d) => {
     const titles = [...collectToProvideTitles(d), ...collectUnpaidSupplierNames(d).map((name) => `preuve de paiement (${name})`)];
-    return titles.length > 0 ? [{ dossierName: dossierLabel(d, ctx.clientId), text: titles.join(", ") }] : [];
+    return titles.length > 0 ? [{ dossierId: d.id, dossierName: dossierLabel(d, ctx.clientId), text: titles.join(", ") }] : [];
   });
   const upcomingLines: SummaryLine[] = dossiers.flatMap((d) => {
     const claim = nextClaimDueSoon(d);
     if (!claim) return [];
     const overdue = claim.dueDate <= today;
-    return [{ dossierName: dossierLabel(d, ctx.clientId), text: `« ${claim.title} »${overdue ? " — en retard" : ""} : échéance le ${formatDate(claim.dueDate)}` }];
+    return [{ dossierId: d.id, dossierName: dossierLabel(d, ctx.clientId), text: `« ${claim.title} »${overdue ? " — en retard" : ""} : échéance le ${formatDate(claim.dueDate)}` }];
   });
 
   // Cumul de l'aide qu'il reste à recevoir (0071, Jade) -- somme de remainingBalanceFor sur tous
@@ -138,7 +138,12 @@ export default async function PortalHomePage() {
                 <ul className="mt-1 list-disc space-y-1 pl-4">
                   {toProvideLines.map((l, i) => (
                     <li key={i}>
-                      <span className="font-medium">{l.dossierName}</span> — {l.text}
+                      {/* Jade : cliquer sur le titre ouvre le dossier pour faire la tâche tout de
+                          suite -- lien #dossier-<id>, capté par DossiersList/DossierCard. */}
+                      <a href={`#dossier-${l.dossierId}`} className="font-medium text-indigo-900 underline decoration-indigo-300 underline-offset-2 hover:decoration-indigo-700">
+                        {l.dossierName}
+                      </a>{" "}
+                      — {l.text}
                     </li>
                   ))}
                 </ul>
@@ -150,7 +155,12 @@ export default async function PortalHomePage() {
                 <ul className="mt-1 list-disc space-y-1 pl-4">
                   {upcomingLines.map((l, i) => (
                     <li key={i}>
-                      <span className="font-medium">{l.dossierName}</span> — {l.text}
+                      {/* Jade : cliquer sur le titre ouvre le dossier pour faire la tâche tout de
+                          suite -- lien #dossier-<id>, capté par DossiersList/DossierCard. */}
+                      <a href={`#dossier-${l.dossierId}`} className="font-medium text-indigo-900 underline decoration-indigo-300 underline-offset-2 hover:decoration-indigo-700">
+                        {l.dossierName}
+                      </a>{" "}
+                      — {l.text}
                     </li>
                   ))}
                 </ul>

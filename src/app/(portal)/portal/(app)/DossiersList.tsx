@@ -28,7 +28,7 @@
 // « Tâches discutées / commentaires » (ClientNotes, 0062) est retirée de cet affichage à la
 // demande de Jade -- le code (service, actions, composant) reste en place pour une réactivation
 // éventuelle, seul l'appel depuis ce fichier a été enlevé.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { User, Users } from "lucide-react";
 import type { PortalDossier } from "@/server/services/portalDossiers.service";
 import { GRANT_PROJECT_STATUS_LABELS, grantProjectStatusBadgeClass } from "@/features/grants/constants";
@@ -115,6 +115,22 @@ export function DossiersList({
   // Onglet actif (0064) -- "Tes dossiers" par défaut ; sans objet quand hasChildClientDossiers
   // est faux (un seul tableau, pas d'onglets).
   const [activeTab, setActiveTab] = useState<"own" | "clients">("own");
+
+  // Lien « #dossier-<id> » du Résumé (page d'accueil) : affiche l'onglet qui contient ce dossier
+  // et vide la recherche, pour que sa carte soit bien présente -- c'est elle qui s'ouvre ensuite
+  // (DossierCard.tsx).
+  useEffect(() => {
+    function reveal() {
+      const m = window.location.hash.match(/^#dossier-(.+)$/);
+      const target = m ? dossiers.find((d) => d.id === decodeURIComponent(m[1]!)) : undefined;
+      if (!target) return;
+      setQuery("");
+      setActiveTab(target.clientId === ownClientId ? "own" : "clients");
+    }
+    reveal();
+    window.addEventListener("hashchange", reveal);
+    return () => window.removeEventListener("hashchange", reveal);
+  }, [dossiers, ownClientId]);
 
   if (dossiers.length === 0) {
     return (
