@@ -58,7 +58,9 @@ import { OpportunityAngleNotes } from "./OpportunityAngleNotes";
 import { isPariCnrcProgram } from "@/server/scheduling/monthlyClaims";
 
 // Le téléversement d'une facture déclenche sa lecture automatique (jusqu'à ~1 min).
-export const maxDuration = 60;
+// 90 s (Jade) : un téléversement de convention la lit deux fois (propositions + activités) --
+// 60 s ne suffisait pas toujours et coupait la requête (« Application error » côté navigateur).
+export const maxDuration = 90;
 
 // Jade : la fiche dossier était devenue une trop longue page à faire défiler -- les sections
 // consultées moins souvent (Documents demandés au client, Notes partagées, Entente de

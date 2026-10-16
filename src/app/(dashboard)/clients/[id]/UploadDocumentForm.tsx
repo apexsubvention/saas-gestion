@@ -2,6 +2,7 @@
 
 import { useFormState, useFormStatus } from "react-dom";
 import { uploadDocumentAction, type UploadDocumentFormState } from "./actions";
+import { FileInput } from "@/components/forms/FileInput";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -21,7 +22,7 @@ export function UploadDocumentForm({ clientId }: { clientId: string }) {
     <form action={formAction} className="flex flex-wrap items-end gap-3">
       <div className="space-y-1">
         <label className="text-sm font-medium text-neutral-700">Fichier</label>
-        <input name="file" type="file" required className="text-sm" />
+        <FileInput name="file" required className="text-sm" />
       </div>
       <div className="space-y-1">
         <label className="text-sm font-medium text-neutral-700">Catégorie</label>

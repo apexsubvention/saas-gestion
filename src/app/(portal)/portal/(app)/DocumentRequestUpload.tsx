@@ -8,6 +8,7 @@
 import { useFormState, useFormStatus } from "react-dom";
 import { uploadRequestedDocumentAction, type PortalUploadFormState } from "./actions";
 import { usePortalAccess } from "./PortalAccessContext";
+import { FileInput } from "@/components/forms/FileInput";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -32,7 +33,7 @@ export function DocumentRequestUpload({ requestId, filename }: { requestId: stri
   return (
     <form action={formAction} className="mt-2 flex flex-wrap items-center gap-2">
       {filename && <span className="text-xs text-neutral-500">Fichier actuel : {filename}</span>}
-      <input name="file" type="file" required className="text-xs" />
+      <FileInput name="file" required className="text-xs" />
       <SubmitButton />
       {state.error && <span className="text-xs text-red-600">{state.error}</span>}
     </form>

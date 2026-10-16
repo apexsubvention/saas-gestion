@@ -9,6 +9,7 @@ import { useFormState, useFormStatus } from "react-dom";
 import { uploadInvoicePaymentProofAction, type PortalUploadFormState } from "./actions";
 import { PortalOpenDocumentButton } from "./PortalOpenDocumentButton";
 import { usePortalAccess } from "./PortalAccessContext";
+import { FileInput } from "@/components/forms/FileInput";
 
 function SubmitButton({ hasExisting }: { hasExisting: boolean }) {
   const { pending } = useFormStatus();
@@ -33,7 +34,7 @@ export function PaymentProofUpload({ expenseId, proof }: { expenseId: string; pr
         </span>
       )}
       {canEdit && <form action={formAction} className="flex flex-wrap items-center gap-2">
-        <input name="file" type="file" required className="text-xs" />
+        <FileInput name="file" required className="text-xs" />
         <SubmitButton hasExisting={!!proof} />
         {state.error && <span className="text-xs text-red-600">{state.error}</span>}
       </form>}

@@ -19,6 +19,7 @@ import {
 } from "./budgetLineActions";
 import type { BudgetLineView } from "@/server/services/budgetLines.service";
 import type { Tracked } from "@/server/services/supplierLedger.service";
+import { FileInput } from "@/components/forms/FileInput";
 
 type SupplierOption = { id: string; name: string };
 
@@ -235,7 +236,7 @@ function GenerateFromConventionForm({ grantProjectId }: { grantProjectId: string
     >
       <div className="space-y-1">
         <label className="text-sm font-medium text-neutral-700">Convention (PDF ou image)</label>
-        <input name="file" type="file" accept=".pdf,image/*" required className="text-sm" />
+        <FileInput name="file" accept=".pdf,image/*" required className="text-sm" />
       </div>
       <GenerateSubmitButton />
       {state.info && !state.error && <span className="text-xs text-emerald-700">{state.info}</span>}
