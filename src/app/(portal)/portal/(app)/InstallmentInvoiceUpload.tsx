@@ -10,6 +10,7 @@
 import { useFormState, useFormStatus } from "react-dom";
 import { uploadInstallmentInvoiceAction, type PortalUploadFormState } from "./actions";
 import { usePortalAccess } from "./PortalAccessContext";
+import { FileInput } from "@/components/forms/FileInput";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -55,7 +56,7 @@ export function InstallmentInvoiceUpload({
 
   return (
     <form action={formAction} className="mt-1 flex flex-wrap items-center gap-2">
-      <input name="file" type="file" required className="text-xs" />
+      <FileInput name="file" required className="text-xs" />
       <SubmitButton />
       {state.error && <span className="text-xs text-red-600">{state.error}</span>}
     </form>

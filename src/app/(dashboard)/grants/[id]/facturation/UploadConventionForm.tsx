@@ -2,6 +2,7 @@
 
 import { useFormState, useFormStatus } from "react-dom";
 import { analyzeBillingConventionAction, type BillingActionResult } from "./actions";
+import { FileInput } from "@/components/forms/FileInput";
 
 const initialState: BillingActionResult = { error: null };
 
@@ -28,7 +29,7 @@ export function UploadConventionForm({ grantProjectId }: { grantProjectId: strin
     >
       <div className="space-y-1">
         <label className="text-sm font-medium text-neutral-700">Convention (PDF ou image)</label>
-        <input name="file" type="file" accept=".pdf,image/*" required className="text-sm" />
+        <FileInput name="file" accept=".pdf,image/*" required className="text-sm" />
       </div>
       <SubmitButton />
       {state.info && !state.error && <span className="text-xs text-emerald-700">{state.info}</span>}
