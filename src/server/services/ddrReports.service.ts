@@ -3,6 +3,19 @@ import { ddrReportsRepository, type DdrReportRow, type DdrObjectiveSnapshot, typ
 import { grantProjectObjectivesRepository } from "@/server/repositories/grantProjectObjectives.repository";
 import { computeDdrPeriods, suggestProgressPercent } from "@/features/ddr/schedule";
 import { draftDdrBatch, type DdrPeriodToGenerate } from "@/features/ddr/generateDdr";
+import type { ImportedDdrStatusReport } from "@/features/ddr/importStatusReport";
+
+const PROGRESS_END = 95; // même plafond que suggestProgressPercent (jamais 100 % avant la fin)
+
+// % d'avancement qui CONTINUE depuis le dernier DDR déposé (Jade) : de son % vers 95 % au dernier
+// DDR du calendrier, au lieu de repartir de la rampe par défaut (15 % au DDR 1).
+function continuedPercent(prevPercent: number, prevNumber: number, ddrNumber: number, lastNumber: number): number {
+  if (lastNumber <= prevNumber) return Math.max(prevPercent, PROGRESS_END);
+  const frac = (ddrNumber - prevNumber) / (lastNumber - prevNumber);
+  return Math.round(Math.min(PROGRESS_END, prevPercent + (Math.max(PROGRESS_END, prevPercent) - prevPercent) * frac));
+}
+
+const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
 function addOneDay(iso: string): string {
   const d = new Date(`${iso}T00:00:00Z`);
@@ -29,12 +42,24 @@ export function ddrReportsService(supabase: SupabaseClient) {
     objectives: { id: string; label: string }[];
     totalCount: number;
     priorSummary: string | null;
+    // Dernier DDR déposé : % d'avancement de chaque objectif (même ordre que objectives).
+    progressFrom?: { ddrNumber: number; percents: Array<number | null> } | null;
   }): Promise<DdrReportRow[]> {
+    const lastNumber = input.periods.length ? input.periods[input.periods.length - 1]!.ddr_number : input.totalCount;
     const periodsToGenerate: DdrPeriodToGenerate[] = input.periods.map((p) => ({
       ddr_number: p.ddr_number,
       period_start: p.period_start,
       period_end: p.period_end,
-      objectives: input.objectives.map((o) => ({ label: o.label, progress_percent: suggestProgressPercent(p.ddr_number, input.totalCount) })),
+      objectives: input.objectives.map((o, i) => {
+        const prev = input.progressFrom?.percents[i];
+        return {
+          label: o.label,
+          progress_percent:
+            prev != null && input.progressFrom
+              ? continuedPercent(prev, input.progressFrom.ddrNumber, p.ddr_number, lastNumber)
+              : suggestProgressPercent(p.ddr_number, input.totalCount),
+        };
+      }),
     }));
 
     let drafted: Awaited<ReturnType<typeof draftDdrBatch>> = [];
@@ -149,7 +174,11 @@ export function ddrReportsService(supabase: SupabaseClient) {
       if (!remainingStart) throw new Error("Aucun calendrier de DDR existant : utilise plutôt « Générer les DDR » pour créer le calendrier initial.");
 
       const objectives = await objectivesRepo.listByProject(params.grantProjectId);
-      const periods = computeDdrPeriods(remainingStart, params.projectEnd, params.newRemainingCount, locked.length + 1);
+      // Numérotation à la suite du DDR déposé le plus élevé (pas du nombre de DDR déposés) : un
+      // DDR importé d'avant Apex peut être le n°3 sans que les n°1 et 2 soient dans Apex.
+      const lastLocked = locked[locked.length - 1] ?? null;
+      const lastLockedNumber = lastLocked?.ddr_number ?? 0;
+      const periods = computeDdrPeriods(remainingStart, params.projectEnd, params.newRemainingCount, lastLockedNumber + 1);
 
       for (const d of drafts) await repo.remove(d.id);
 
@@ -164,9 +193,59 @@ export function ddrReportsService(supabase: SupabaseClient) {
         projectContext: params.projectContext,
         periods,
         objectives: objectives.map((o) => ({ id: o.id, label: o.label })),
-        totalCount: locked.length + params.newRemainingCount,
+        totalCount: lastLockedNumber + params.newRemainingCount,
         priorSummary,
+        progressFrom: lastLocked
+          ? {
+              ddrNumber: lastLocked.ddr_number,
+              percents: objectives.map((o, i) => {
+                const snap = lastLocked.objectives_snapshot.find((s) => s.objective_id === o.id) ?? lastLocked.objectives_snapshot[i];
+                return snap?.progress_percent ?? null;
+              }),
+            }
+          : null,
       });
+    },
+
+    // Importer un DDR déjà DÉPOSÉ avant Apex (rapport d'état lu) : enregistré « déposé », il sert
+    // ensuite de point de départ à « Ajuster les DDR restants » (numéro, date, texte, % d'avancement).
+    // Un brouillon portant le même numéro est remplacé ; un DDR déjà déposé ne l'est jamais.
+    async importSubmitted(params: { organizationId: string; grantProjectId: string; report: ImportedDdrStatusReport }): Promise<DdrReportRow> {
+      const r = params.report;
+      if (r.ddr_number == null) throw new Error("Numéro de la demande de remboursement introuvable dans le rapport.");
+      if (!r.period_end) throw new Error("Période visée du rapport (date de fin) introuvable dans le rapport.");
+      const existing = await repo.listByProject(params.grantProjectId);
+      const same = existing.find((d) => d.ddr_number === r.ddr_number);
+      if (same?.status === "submitted") throw new Error(`Le DDR ${r.ddr_number} est déjà enregistré comme déposé dans Apex.`);
+      if (same) await repo.remove(same.id);
+
+      const objectives = await objectivesRepo.listByProject(params.grantProjectId);
+      const used = new Set<number>();
+      const snapshot: DdrObjectiveSnapshot[] = objectives.length
+        ? objectives.map((o, i) => {
+            // Objectif du rapport : par libellé (normalisé), sinon par position.
+            let j = r.objectives.findIndex((x, k) => !used.has(k) && (norm(x.label).includes(norm(o.label)) || norm(o.label).includes(norm(x.label))));
+            if (j < 0 && i < r.objectives.length && !used.has(i)) j = i;
+            if (j >= 0) used.add(j);
+            const src = j >= 0 ? r.objectives[j] : undefined;
+            return { objective_id: o.id, label: o.label, progress_percent: src?.progress_percent ?? null, narrative: src?.narrative ?? "" };
+          })
+        : r.objectives.map((x) => ({ objective_id: null, label: x.label, progress_percent: x.progress_percent, narrative: x.narrative }));
+
+      const [row] = await repo.insertMany([
+        {
+          organization_id: params.organizationId,
+          grant_project_id: params.grantProjectId,
+          ddr_number: r.ddr_number,
+          period_start: r.period_start ?? r.period_end,
+          period_end: r.period_end,
+          activities_text: r.activities_text,
+          variations_text: r.variations_text,
+          objectives_snapshot: snapshot,
+          generated_by: "manual",
+        },
+      ]);
+      return repo.update(row!.id, { status: "submitted" });
     },
 
     update: (id: string, patch: DdrReportUpdate) => repo.update(id, patch),

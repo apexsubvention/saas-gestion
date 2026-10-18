@@ -10,6 +10,7 @@ import { defaultDdrCount } from "@/features/ddr/schedule";
 import { ObjectivesEditor } from "./ObjectivesEditor";
 import { ExternalProjectNumberForm } from "./ExternalProjectNumberForm";
 import { GenerateScheduleForm } from "./GenerateScheduleForm";
+import { ImportDdrForm } from "./ImportDdrForm";
 import { DdrReportCard } from "./DdrReportCard";
 
 // Rédaction assistée des DDR (Demandes de remboursement, PARI CNRC / IRAP) : un rapport
@@ -31,6 +32,11 @@ export default async function DdrPage({ params }: { params: { id: string } }) {
     ddrReportsService(supabase).listByProject(params.id),
     claimsService(supabase).listByProject(params.id).catch(() => []),
   ]);
+  // Rapports d'état déjà déposés avant Apex : documents Word/PDF du dossier, à importer comme DDR.
+  const { data: docRows } = await supabase.from("documents").select("id, filename, category").eq("grant_project_id", params.id).order("created_at", { ascending: false });
+  const importableDocs = ((docRows ?? []) as unknown as Array<{ id: string; filename: string; category: string }>)
+    .filter((d) => /\.(docx|pdf|png|jpe?g|webp)$/i.test(d.filename))
+    .map((d) => ({ id: d.id, filename: d.filename, isDdr: d.category === "ddr_report" || /ddr|rapport/i.test(d.filename) }));
   // Jade : dernier DDR déposé AVANT Apex -- la lecture d'un rapport Historique DDR téléversé crée
   // une réclamation « DDR n » avec sa période ; la plus élevée sert à préremplir la reprise.
   const lastImportedDdr = (claims as Array<{ claim_number: string | null; period_end: string | null }>)
@@ -88,6 +94,20 @@ export default async function DdrPage({ params }: { params: { id: string } }) {
           conversion autonome de 10 % à au moins 20 % »). Repris tel quel dans chaque DDR, avec un % d&apos;avancement qui évolue.
         </p>
         <ObjectivesEditor grantProjectId={params.id} initialObjectives={objectives.map((o) => o.label)} />
+      </section>
+
+      <section className="space-y-3 rounded-lg border border-neutral-200 bg-white p-4">
+        <h2 className="text-sm font-semibold text-neutral-900">DDR déjà déposés avant Apex</h2>
+        <p className="text-xs text-neutral-500">
+          Projet commencé avant Apex ? Téléverse le <strong>rapport d&apos;état</strong> de ton dernier DDR déposé (Word ou PDF) dans les Documents du
+          dossier, puis importe-le ici : Apex l&apos;enregistre comme déposé (numéro, période, activités, % d&apos;avancement de chaque objectif). Clique
+          ensuite sur « Ajuster les DDR restants » : les brouillons repartent du DDR suivant, dans la continuité de ce rapport.
+        </p>
+        {importableDocs.length > 0 ? (
+          <ImportDdrForm grantProjectId={params.id} documents={importableDocs} />
+        ) : (
+          <p className="text-xs text-amber-700">Aucun document Word ou PDF dans ce dossier pour l&apos;instant.</p>
+        )}
       </section>
 
       <section className="space-y-3 rounded-lg border border-neutral-200 bg-white p-4">

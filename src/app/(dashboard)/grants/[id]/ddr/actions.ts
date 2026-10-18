@@ -10,8 +10,11 @@ import { grantAgreementsService } from "@/server/services/grantAgreements.servic
 import { grantProjectObjectivesService } from "@/server/services/grantProjectObjectives.service";
 import { ddrReportsService } from "@/server/services/ddrReports.service";
 import { logDossierEvent } from "@/server/services/audit";
+import { analyzableMime, MAX_INVOICE_BYTES } from "@/features/invoices/analyzeInvoice";
+import { analyzeDdrStatusReport } from "@/features/ddr/importStatusReport";
+import { extractDocxText, isDocx } from "@/lib/docx";
 
-export type DdrActionResult = { error: string | null; ok?: boolean };
+export type DdrActionResult = { error: string | null; ok?: boolean; message?: string };
 
 type DdrContext = {
   supabase: Awaited<ReturnType<typeof createClient>>;
@@ -259,4 +262,53 @@ function numberOrNull(v: FormDataEntryValue | null): number | null {
   if (v == null || v === "") return null;
   const n = Number(v);
   return Number.isFinite(n) ? Math.max(0, Math.min(100, Math.round(n))) : null;
+}
+
+// Importer un DDR déjà déposé AVANT Apex (Jade) : rapport d'état (Word ou PDF) déjà téléversé
+// dans les Documents du dossier -> lu, puis enregistré comme DDR « déposé ». « Ajuster les DDR
+// restants » repart ensuite du DDR suivant, dans la continuité de son texte et de ses %.
+export async function importDdrStatusReportAction(grantProjectId: string, _prev: DdrActionResult, formData: FormData): Promise<DdrActionResult> {
+  const ctx = await requireOrgContext();
+  const documentId = String(formData.get("document_id") ?? "");
+  if (!documentId) return { error: "Choisis le rapport d'état à importer." };
+  const result = await loadDdrContext(grantProjectId);
+  if (!result.ok) return { error: result.error };
+  const { supabase } = result.context;
+  try {
+    const { data: doc } = await supabase.from("documents").select("filename, storage_path, size, grant_project_id").eq("id", documentId).maybeSingle();
+    const d = doc as unknown as { filename: string; storage_path: string; size: number | null; grant_project_id: string | null } | null;
+    if (!d || d.grant_project_id !== grantProjectId) return { error: "Document introuvable dans ce dossier." };
+    if (d.size != null && d.size > MAX_INVOICE_BYTES) return { error: "Document trop volumineux pour la lecture automatique (4 Mo max)." };
+    const { data: blob, error: dlError } = await supabase.storage.from("apex-documents").download(d.storage_path);
+    if (dlError || !blob) return { error: "Impossible d'ouvrir le document." };
+    const bytes = await blob.arrayBuffer();
+
+    let report;
+    if (isDocx(d.filename)) {
+      const text = extractDocxText(bytes);
+      if (!text) return { error: "Le fichier Word n'a pas pu être lu (format .docx attendu)." };
+      report = await analyzeDdrStatusReport({ text });
+    } else {
+      const mime = analyzableMime(d.filename);
+      if (!mime) return { error: "Format non pris en charge : Word (.docx), PDF ou image." };
+      report = await analyzeDdrStatusReport({ file: { bytes, mime } });
+    }
+
+    const row = await ddrReportsService(supabase).importSubmitted({ organizationId: ctx.organizationId, grantProjectId, report });
+    await logDossierEvent(supabase, ctx, {
+      grant_project_id: grantProjectId,
+      kind: "ddr_imported",
+      title: `DDR ${row.ddr_number} déposé avant Apex importé (${d.filename})`,
+      source: "ai",
+    });
+    refresh(grantProjectId);
+    const pcts = row.objectives_snapshot.map((o) => (o.progress_percent != null ? `${o.progress_percent} %` : "—")).join(" / ");
+    return {
+      error: null,
+      ok: true,
+      message: `DDR ${row.ddr_number} importé comme déposé (${row.period_start} au ${row.period_end}${pcts ? ` · avancement ${pcts}` : ""}). Clique maintenant sur « Ajuster les DDR restants » : les brouillons repartiront du DDR ${row.ddr_number + 1}.`,
+    };
+  } catch (e) {
+    return { error: formatCaughtError(e) };
+  }
 }
