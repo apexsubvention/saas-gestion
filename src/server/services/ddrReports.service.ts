@@ -93,6 +93,10 @@ export function ddrReportsService(supabase: SupabaseClient) {
       projectStart: string;
       projectEnd: string;
       count: number;
+      // Jade : projet PARI commencé AVANT Apex -- des DDR ont déjà été déposés hors du logiciel.
+      // La série reprend le lendemain de la fin du dernier DDR déposé, numérotée à la suite
+      // (ex. dernier = DDR 6 -> on génère DDR 7, 8...). Absent = calendrier complet depuis le début.
+      resumeAfter?: { ddrNumber: number; periodEnd: string } | null;
     }): Promise<DdrReportRow[]> {
       const existing = await repo.listByProject(params.grantProjectId);
       if (existing.length > 0) throw new Error("Des DDR existent déjà pour ce dossier -- utilise « Ajuster le nombre de DDR restants » pour les modifier.");
@@ -100,7 +104,11 @@ export function ddrReportsService(supabase: SupabaseClient) {
       if (objectives.length === 0) throw new Error("Ajoute d'abord au moins un objectif du projet.");
       if (params.count <= 0) throw new Error("Le nombre de DDR doit être d'au moins 1.");
 
-      const periods = computeDdrPeriods(params.projectStart, params.projectEnd, params.count, 1);
+      const resume = params.resumeAfter ?? null;
+      if (resume && resume.periodEnd >= params.projectEnd) throw new Error("Le dernier DDR déposé se termine déjà à la fin du projet (ou après) : il n'y a plus de DDR à générer.");
+      const periods = resume
+        ? computeDdrPeriods(addOneDay(resume.periodEnd), params.projectEnd, params.count, resume.ddrNumber + 1)
+        : computeDdrPeriods(params.projectStart, params.projectEnd, params.count, 1);
       return draftAndInsert({
         organizationId: params.organizationId,
         grantProjectId: params.grantProjectId,
@@ -111,7 +119,8 @@ export function ddrReportsService(supabase: SupabaseClient) {
         projectContext: params.projectContext,
         periods,
         objectives: objectives.map((o) => ({ id: o.id, label: o.label })),
-        totalCount: params.count,
+        // % d'avancement : la rampe tient compte des DDR déjà déposés hors d'Apex.
+        totalCount: (resume?.ddrNumber ?? 0) + params.count,
         priorSummary: null,
       });
     },

@@ -96,6 +96,24 @@ export async function generateDdrScheduleAction(grantProjectId: string, _prev: D
   const context = result.context;
   if (!context.projectStart || !context.projectEnd) return { error: "Les dates de début et de fin du projet doivent être connues (entente ou dossier) avant de générer les DDR." };
 
+  // Reprise après des DDR déjà déposés hors d'Apex (Jade) : numéro + fin de période du dernier DDR
+  // déposé, et le solde restant après celui-ci (optionnel -- met à jour le solde PARI du dossier).
+  let resumeAfter: { ddrNumber: number; periodEnd: string } | null = null;
+  let balanceAfter: number | null = null;
+  if (formData.get("resume") === "on") {
+    const n = Number(String(formData.get("resume_ddr_number") ?? "").trim());
+    const end = String(formData.get("resume_period_end") ?? "").trim();
+    if (!Number.isInteger(n) || n < 1 || n > 99) return { error: "Numéro du dernier DDR déposé invalide." };
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(end)) return { error: "Date de fin du dernier DDR déposé invalide." };
+    resumeAfter = { ddrNumber: n, periodEnd: end };
+    const rawBalance = String(formData.get("resume_balance") ?? "").replace(/\s| /g, "").replace(",", ".").replace(/\$/g, "");
+    if (rawBalance) {
+      const b = Number(rawBalance);
+      if (!Number.isFinite(b) || b < 0) return { error: "Solde restant invalide." };
+      balanceAfter = Math.round(b * 100) / 100;
+    }
+  }
+
   try {
     await ddrReportsService(context.supabase).generateSchedule({
       organizationId: ctx.organizationId,
@@ -108,11 +126,17 @@ export async function generateDdrScheduleAction(grantProjectId: string, _prev: D
       projectStart: context.projectStart,
       projectEnd: context.projectEnd,
       count: parsedCount.data,
+      resumeAfter,
     });
+    if (balanceAfter != null) {
+      await grantProjectsService(context.supabase).updatePariBalance(grantProjectId, balanceAfter, `Après le DDR ${resumeAfter!.ddrNumber}`);
+    }
     await logDossierEvent(context.supabase, ctx, {
       grant_project_id: grantProjectId,
       kind: "ddr_schedule_generated",
-      title: `Calendrier de ${parsedCount.data} DDR généré`,
+      title: resumeAfter
+        ? `Calendrier de ${parsedCount.data} DDR généré à partir du DDR ${resumeAfter.ddrNumber + 1} (DDR 1 à ${resumeAfter.ddrNumber} déposés avant Apex)`
+        : `Calendrier de ${parsedCount.data} DDR généré`,
       source: "ai",
     });
     refresh(grantProjectId);

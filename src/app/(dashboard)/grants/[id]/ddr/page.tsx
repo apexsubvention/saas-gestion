@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { claimsService } from "@/server/services/claims.service";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { grantProjectsService } from "@/server/services/grantProjects.service";
@@ -24,11 +25,24 @@ export default async function DdrPage({ params }: { params: { id: string } }) {
   const project: any = await grantProjectsService(supabase).get(params.id);
   if (!project) notFound();
 
-  const [agreements, objectives, reports] = await Promise.all([
+  const [agreements, objectives, reports, claims] = await Promise.all([
     grantAgreementsService(supabase).listByProject(params.id),
     grantProjectObjectivesService(supabase).listByProject(params.id),
     ddrReportsService(supabase).listByProject(params.id),
+    claimsService(supabase).listByProject(params.id).catch(() => []),
   ]);
+  // Jade : dernier DDR déposé AVANT Apex -- la lecture d'un rapport Historique DDR téléversé crée
+  // une réclamation « DDR n » avec sa période ; la plus élevée sert à préremplir la reprise.
+  const lastImportedDdr = (claims as Array<{ claim_number: string | null; period_end: string | null }>)
+    .map((c) => ({ n: Number((c.claim_number ?? "").match(/^DDR\s*(\d+)/i)?.[1] ?? NaN), end: c.period_end }))
+    .filter((c) => Number.isInteger(c.n))
+    .sort((a, b) => b.n - a.n)[0];
+  const resumeDefaults = {
+    ddrNumber: lastImportedDdr?.n ?? null,
+    periodEnd: lastImportedDdr?.end ?? null,
+    balance: project.pari_balance_remaining != null ? Number(project.pari_balance_remaining) : null,
+    fromReport: !!lastImportedDdr,
+  };
   const agreement = agreements[0] ?? null;
   const projectStart = agreement?.project_start ?? project.official_start_date ?? null;
   const projectEnd = agreement?.project_end ?? project.official_end_date ?? null;
@@ -82,13 +96,14 @@ export default async function DdrPage({ params }: { params: { id: string } }) {
           <>
             <p className="text-xs text-neutral-500">
               Génère le calendrier complet : Apex répartit la durée du projet en périodes consécutives et rédige un premier
-              brouillon de chaque DDR.
+              brouillon de chaque DDR. Projet commencé avant Apex ? Coche la reprise : le calendrier repart après ton dernier DDR déposé.
             </p>
             <GenerateScheduleForm
               grantProjectId={params.id}
               mode="generate"
               disabled={!projectStart || !projectEnd || objectives.length === 0}
               defaultCount={projectStart && projectEnd ? defaultDdrCount(projectStart, projectEnd) : 8}
+              resumeDefaults={resumeDefaults}
             />
           </>
         ) : (
