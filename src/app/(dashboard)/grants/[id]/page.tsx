@@ -40,6 +40,8 @@ import { grantAgreementsService } from "@/server/services/grantAgreements.servic
 import { NewSupplierForm } from "./NewSupplierForm";
 import { DeleteGrantProjectButton } from "../DeleteGrantProjectButton";
 import { NewDocumentRequestForm } from "./NewDocumentRequestForm";
+import { MforGuidePanel } from "./MforGuidePanel";
+import { isMforProgram } from "@/features/mfor/servicesQuebecGuide";
 import { DocumentRequestsList, type DocumentRequestListItem } from "./DocumentRequestsList";
 import {
   buildDocumentRequestTargetOptions,
@@ -433,6 +435,15 @@ export default async function GrantProjectPage({ params, searchParams }: { param
               « Téléversement d&apos;un document requis » si elle n&apos;a qu&apos;à cocher la tâche
               comme faite, sans fichier à fournir.
             </p>
+            {/* MFOR (Jade) : marche à suivre Services Québec générée à partir de l'offre de service. */}
+            {isMforProgram(project.grant_programs?.name ?? null) && (
+              <MforGuidePanel
+                grantProjectId={project.id}
+                clientId={project.client_id}
+                clientName={clientName}
+                documents={documents.map((d) => ({ id: d.id, filename: d.filename }))}
+              />
+            )}
             <div className="rounded-lg border border-neutral-200 bg-white p-4">
               <NewDocumentRequestForm
                 grantProjectId={project.id}

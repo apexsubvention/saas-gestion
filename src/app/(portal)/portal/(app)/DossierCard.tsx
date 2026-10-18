@@ -75,6 +75,26 @@ function Modal({ onClose, header, children }: { onClose: () => void; header: Rea
   );
 }
 
+// Numéros de téléphone cliquables dans une consigne (ex. « au 418 643-4721 ») -- un tap sur
+// mobile lance l'appel.
+function linkPhones(text: string): ReactNode[] {
+  const re = /(\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}/g;
+  const out: ReactNode[] = [];
+  let last = 0;
+  for (const m of text.matchAll(re)) {
+    const i = m.index ?? 0;
+    if (i > last) out.push(text.slice(last, i));
+    out.push(
+      <a key={i} href={`tel:${m[0].replace(/[^\d+]/g, "")}`} className="font-medium text-blue-600 underline">
+        {m[0]}
+      </a>
+    );
+    last = i + m[0].length;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return out;
+}
+
 // 0070 -- exporté pour être réutilisé tel quel par SupplierDossierCard.tsx (demandes attribuées à
 // un fournisseur inscrit, même rendu que côté client).
 export function DocumentRequestItem({ request }: { request: PortalDocumentRequestView }) {
@@ -86,7 +106,8 @@ export function DocumentRequestItem({ request }: { request: PortalDocumentReques
           {request.statusLabel}
         </span>
       </div>
-      {request.instructions && <p className="mt-1 text-xs text-neutral-500">{request.instructions}</p>}
+      {/* whitespace-pre-wrap : garde les étapes et puces (ex. marche à suivre Services Québec MFOR). */}
+      {request.instructions && <p className="mt-1 whitespace-pre-wrap text-xs text-neutral-600">{linkPhones(request.instructions)}</p>}
       {request.dueDate && <p className="mt-1 text-xs text-neutral-500">Échéance : {formatDate(request.dueDate)}</p>}
       {UPLOADABLE_STATUSES.includes(request.status) ? (
         request.requiresUpload ? (
