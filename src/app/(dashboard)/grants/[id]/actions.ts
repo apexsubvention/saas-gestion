@@ -146,8 +146,14 @@ async function analyzeUploadedDdrReport(
 
     const r = await supplierLedgerService(supabase).recordAnalyzedDdrReport(organizationId, grantProjectId, documentId, extraction);
 
+    // 0078 : un solde fixé à la main n'est jamais remplacé par la lecture d'un rapport.
+    let balanceNote: string | null = null;
     if (extraction.financial_year_balance_remaining != null) {
-      await grantProjectsService(supabase).updatePariBalance(grantProjectId, extraction.financial_year_balance_remaining, extraction.financial_year_label);
+      const { applied } = await grantProjectsService(supabase).updatePariBalanceFromReport(grantProjectId, extraction.financial_year_balance_remaining, extraction.financial_year_label);
+      if (!applied) {
+        const lu = new Intl.NumberFormat("fr-CA", { style: "currency", currency: "CAD" }).format(extraction.financial_year_balance_remaining);
+        balanceNote = `Solde lu sur le rapport : ${lu} -- non appliqué, car le solde restant PARI est fixé à la main (« Revenir à l'automatique » pour l'utiliser).`;
+      }
     }
 
     const parts: string[] = [];
@@ -169,7 +175,9 @@ async function analyzeUploadedDdrReport(
       if (r.claimLinked) parts.push(`Réclamation « DDR ${extraction.ddr_number ?? "?"} » créée/mise à jour et liée (statut « Déposée — en attente » à ajuster au besoin).`);
     }
     if (extraction.claimed_amount_for_period != null) parts.push(`Montant rectifié réclamé pour la période (utilisé ci-dessus) : ${moneyCad(extraction.claimed_amount_for_period)}.`);
-    if (extraction.financial_year_balance_remaining != null) {
+    if (balanceNote) {
+      parts.push(balanceNote);
+    } else if (extraction.financial_year_balance_remaining != null) {
       parts.push(`Solde restant actualisé${extraction.financial_year_label ? ` (${extraction.financial_year_label})` : ""} : ${moneyCad(extraction.financial_year_balance_remaining)}.`);
     } else {
       parts.push("Solde restant non lisible sur ce rapport : valeur précédente conservée.");
@@ -752,14 +760,36 @@ export async function updatePariBalanceAction(grantProjectId: string, remaining:
   const ctx = await requireOrgContext();
   const supabase = await createClient();
   try {
-    await grantProjectsService(supabase).updatePariBalance(grantProjectId, remaining, label);
+    // 0078 : un montant saisi à la main verrouille le solde (indépendant des réclamations et des
+    // factures) ; l'effacer le rend à l'automatique.
+    await grantProjectsService(supabase).updatePariBalance(grantProjectId, remaining, label, remaining != null);
   } catch (e) {
     return { error: formatCaughtError(e) };
   }
   await logDossierEvent(supabase, ctx, {
     grant_project_id: grantProjectId,
     kind: "pari_balance_updated",
-    title: remaining != null ? `Solde restant PARI modifié à la main : ${remaining}` : "Solde restant PARI effacé",
+    title: remaining != null ? `Solde restant PARI fixé à la main : ${remaining}` : "Solde restant PARI effacé",
+    source: "manual",
+  });
+  revalidatePath(`/grants/${grantProjectId}`);
+  revalidatePath(`/grants/${grantProjectId}/ddr`);
+  return { error: null };
+}
+
+// 0078 : « Revenir à l'automatique » -- le prochain rapport Historique DDR lu remplacera le solde.
+export async function resetPariBalanceAutoAction(grantProjectId: string): Promise<{ error: string | null }> {
+  const ctx = await requireOrgContext();
+  const supabase = await createClient();
+  try {
+    await grantProjectsService(supabase).setPariBalanceManual(grantProjectId, false);
+  } catch (e) {
+    return { error: formatCaughtError(e) };
+  }
+  await logDossierEvent(supabase, ctx, {
+    grant_project_id: grantProjectId,
+    kind: "pari_balance_updated",
+    title: "Solde restant PARI rendu à l'automatique (rapports DDR)",
     source: "manual",
   });
   revalidatePath(`/grants/${grantProjectId}`);

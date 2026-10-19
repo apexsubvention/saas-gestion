@@ -349,7 +349,21 @@ export default async function GrantProjectPage({ params, searchParams }: { param
             }
           />
           <Metric label="Payé" value={money(ledger.paid)} />
-          <Metric label="Solde" value={money(balance)} />
+          {/* Jade (0078) : PARI -- solde restant ajustable à la main directement ici, indépendant
+              des réclamations et des factures (voir PariBalance.tsx). */}
+          {isPariProgram ? (
+            <PariBalance
+              variant="header"
+              grantProjectId={project.id}
+              initialRemaining={project.pari_balance_remaining}
+              initialLabel={project.pari_balance_label}
+              initialUpdatedAt={project.pari_balance_updated_at}
+              initialManual={Boolean(project.pari_balance_manual)}
+              fallbackRemaining={subsidy.remaining ?? null}
+            />
+          ) : (
+            <Metric label="Solde" value={money(balance)} />
+          )}
           <Metric
             label="Prochaine échéance"
             value={nextMilestone ? `${nextMilestone.title} (${nextMilestone.internal_due_date ?? "—"})` : "Aucune"}
@@ -473,6 +487,7 @@ export default async function GrantProjectPage({ params, searchParams }: { param
                 initialRemaining={project.pari_balance_remaining}
                 initialLabel={project.pari_balance_label}
                 initialUpdatedAt={project.pari_balance_updated_at}
+                initialManual={Boolean(project.pari_balance_manual)}
               />
             )}
             <SuggestionsPanel grantProjectId={project.id} suggestions={suggestions} />

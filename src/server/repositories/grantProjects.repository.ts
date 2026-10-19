@@ -32,6 +32,9 @@ export type GrantProjectRow = {
   pari_balance_remaining: number | null;
   pari_balance_label: string | null;
   pari_balance_updated_at: string | null;
+  // Jade (0078) : solde fixé à la main -- les rapports DDR lus ne le remplacent plus. Absent
+  // (undefined) tant que la migration 0078 n'est pas passée.
+  pari_balance_manual?: boolean | null;
   // Jade (0071, chantier 2) : texte libre montré au client pendant que le statut du dossier est
   // "opportunity_to_confirm" -- voir updateOpportunityDetails ci-dessous.
   opportunity_angle_notes: string | null;
@@ -172,15 +175,24 @@ export function grantProjectsRepository(supabase: SupabaseClient) {
     // Jade (0065) : « actualiser le montant restant facilement » -- appelé automatiquement après
     // la lecture d'un rapport Historique DDR (quand le solde y est lisible), et disponible en
     // modification manuelle (PariBalance.tsx) pour corriger/compléter à tout moment.
-    async updatePariBalance(id: string, remaining: number | null, label: string | null): Promise<GrantProjectRow> {
-      const { data, error } = await supabase
-        .from("grant_projects")
-        .update({ pari_balance_remaining: remaining, pari_balance_label: label, pari_balance_updated_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-        .eq("id", id)
-        .select()
-        .single();
+    // manual (0078) : true = saisi à la main (verrouillé), false = rendu à l'automatique,
+    // undefined = inchangé. Si la colonne 0078 n'existe pas encore, on enregistre sans elle.
+    async updatePariBalance(id: string, remaining: number | null, label: string | null, manual?: boolean): Promise<GrantProjectRow> {
+      const now = new Date().toISOString();
+      const base = { pari_balance_remaining: remaining, pari_balance_label: label, pari_balance_updated_at: now, updated_at: now };
+      const run = (values: Record<string, unknown>) => supabase.from("grant_projects").update(values).eq("id", id).select().single();
+      let { data, error } = await run(manual === undefined ? base : { ...base, pari_balance_manual: manual });
+      if (error && manual !== undefined && /pari_balance_manual/.test(error.message ?? "")) ({ data, error } = await run(base));
       if (error) throw error;
-      return data as GrantProjectRow;
+      return data as unknown as GrantProjectRow;
+    },
+
+    async setPariBalanceManual(id: string, manual: boolean): Promise<void> {
+      const { error } = await supabase.from("grant_projects").update({ pari_balance_manual: manual, updated_at: new Date().toISOString() }).eq("id", id);
+      if (error) {
+        if (/pari_balance_manual/.test(error.message ?? "")) throw new Error("Passe d'abord la migration 0078 dans Supabase (SQL Editor).");
+        throw error;
+      }
     },
 
     // Jade (0071/0072, chantier 2) : « angles possibles pour vous » (texte libre) + « potentiel $

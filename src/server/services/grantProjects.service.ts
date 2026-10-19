@@ -37,14 +37,26 @@ export function grantProjectsService(supabase: SupabaseClient) {
 
     // Jade (0065, PARI CNRC/IRAP) : solde restant, modifiable à la main ou actualisé
     // automatiquement à la lecture d'un rapport Historique DDR.
-    async updatePariBalance(id: string, remaining: number | null, label: string | null) {
+    // manual (0078) : true quand Jade le saisit à la main -- le solde devient alors indépendant
+    // des réclamations et des factures (voir updatePariBalanceFromReport).
+    async updatePariBalance(id: string, remaining: number | null, label: string | null, manual?: boolean) {
       if (remaining != null && (!Number.isFinite(remaining) || remaining < -100_000_000 || remaining > 100_000_000)) {
         throw new Error("Montant invalide.");
       }
       const trimmedLabel = label?.trim() || null;
       if (trimmedLabel && trimmedLabel.length > 100) throw new Error("Libellé trop long (100 caractères maximum).");
-      return repo.updatePariBalance(id, remaining, trimmedLabel);
+      return repo.updatePariBalance(id, remaining, trimmedLabel, manual);
     },
+
+    /** Solde lu sur un rapport DDR : appliqué seulement s'il n'a pas été fixé à la main (0078). */
+    async updatePariBalanceFromReport(id: string, remaining: number, label: string | null): Promise<{ applied: boolean }> {
+      const current = await repo.findById(id);
+      if ((current as { pari_balance_manual?: boolean | null } | null)?.pari_balance_manual) return { applied: false };
+      await repo.updatePariBalance(id, remaining, label?.trim().slice(0, 100) || null);
+      return { applied: true };
+    },
+
+    setPariBalanceManual: (id: string, manual: boolean) => repo.setPariBalanceManual(id, manual),
 
     // Jade (0068) : mode simple de la section « Ce qui a été déposé » -- tant qu'aucun poste détaillé
     // n'existe, ces 3 champs restent la source des totaux du dossier (voir resolveSubsidyInputs).
