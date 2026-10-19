@@ -218,6 +218,10 @@ export const DOCUMENT_CATEGORY_LABELS: Record<string, string> = {
   budget: "Budget",
   report: "Rapport",
   annex: "Annexe",
+  // Jade (0079) : preuve d'un dépôt reçu (onglet Dépôts du portail) et modèle de facture vierge
+  // d'un fournisseur (rempli automatiquement pour chaque versement).
+  deposit_proof: "Preuve de dépôt",
+  invoice_template: "Modèle de facture",
   other: "Autre",
 };
 

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { analyzableMime, analyzeInvoiceFile, amountBeforeTax, invoiceAnalysisAvailable, MAX_INVOICE_BYTES } from "@/features/invoices/analyzeInvoice";
+import { analyzableMime, analyzeInvoiceFile, amountBeforeTax, invoiceAnalysisAvailable, MAX_INVOICE_BYTES, type InvoiceExtraction } from "@/features/invoices/analyzeInvoice";
 import { matchSupplier } from "@/features/invoices/matchSupplier";
 import { checkInstallmentInvoice, draftClientNote, expectedShareForSupplier } from "@/features/invoices/checkInstallmentInvoice";
 import { expensesRepository, type ExpenseRow } from "@/server/repositories/expenses.repository";
@@ -143,9 +143,11 @@ export function portalInvoiceIntakeService(supabase: SupabaseClient) {
       grantProjectId: string,
       documentId: string,
       installment: BillingInstallmentRow | null = null,
-      opts: { replaceExpenseId?: string } = {}
+      // opts.extraction (0079) : facture GÉNÉRÉE par Apex à partir du modèle du fournisseur -- ses
+      // valeurs sont déjà connues, rien à lire (un .docx rempli n'est pas lisible comme un PDF).
+      opts: { replaceExpenseId?: string; extraction?: InvoiceExtraction } = {}
     ): Promise<IntakeResult> {
-      if (!invoiceAnalysisAvailable()) return { status: "skipped", reason: "lecture automatique non configurée (ANTHROPIC_API_KEY)" };
+      if (!opts.extraction && !invoiceAnalysisAvailable()) return { status: "skipped", reason: "lecture automatique non configurée (ANTHROPIC_API_KEY)" };
 
       const [expenses, suppliers, lineItems, ledger] = await Promise.all([
         expensesRepo.listByProject(grantProjectId),
@@ -154,11 +156,18 @@ export function portalInvoiceIntakeService(supabase: SupabaseClient) {
         supplierLedgerService(supabase).load(grantProjectId),
       ]);
 
-      const file = await loadFile(documentId);
-      if ("error" in file) return { status: "skipped", reason: file.error };
+      let file: { filename: string; bytes: ArrayBuffer | null; mime: string | null };
+      if (opts.extraction) {
+        const { data: doc } = await supabase.from("documents").select("filename").eq("id", documentId).maybeSingle();
+        file = { filename: (doc as { filename: string } | null)?.filename ?? "facture.docx", bytes: null, mime: null };
+      } else {
+        const loaded = await loadFile(documentId);
+        if ("error" in loaded) return { status: "skipped", reason: loaded.error };
+        file = loaded;
+      }
 
       const facts = await loadProjectFacts(grantProjectId, lineItems, suppliers, installment);
-      const x = await analyzeInvoiceFile({ bytes: file.bytes, mime: file.mime }, facts.context);
+      const x = opts.extraction ?? (await analyzeInvoiceFile({ bytes: file.bytes!, mime: file.mime! }, facts.context));
       await markScanned(documentId, x.is_invoice ? "invoice" : "not_invoice");
       const billableSupplierIds = new Set(lineItems.filter((it) => it.included_in_billing && it.supplier_id).map((it) => it.supplier_id as string));
       const { supplier, matchedByName } = pickSupplier(x.supplier_name, suppliers, billableSupplierIds);

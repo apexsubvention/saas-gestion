@@ -16,6 +16,7 @@ import { PortalOpenDocumentButton } from "./PortalOpenDocumentButton";
 import { PortalTaskCard } from "./PortalTaskCard";
 import { DocumentRequestItem } from "./DossierCard";
 import { InstallmentInvoiceUpload } from "./InstallmentInvoiceUpload";
+import { GeneratedInvoicePanel } from "./GeneratedInvoicePanel";
 import { computeSubsidy } from "@/features/grants/subsidyMath";
 import { buildBillingNarrative } from "@/features/billing/billingSummary";
 import { computePaymentDeadline, paymentDeadlineAlertText } from "@/features/billing/paymentDeadline";
@@ -242,6 +243,7 @@ export function SupplierDossierCard({ row, clientName }: { row: SupplierBillingR
                           uploadedFilename={inst.client_invoice_document_id ? (details.documents.find((d) => d.id === inst.client_invoice_document_id)?.filename ?? "Facture envoyée") : null}
                           uploadedAt={inst.client_invoice_uploaded_at}
                         />
+                        <GeneratedInvoicePanel installmentId={inst.id} alreadySent={!!inst.client_invoice_document_id} />
                       </div>
                     ))}
                   </div>

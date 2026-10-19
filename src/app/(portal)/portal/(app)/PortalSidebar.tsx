@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { FolderKanban, FileText, Radar } from "lucide-react";
+import { FolderKanban, FileText, Radar, Landmark, Receipt } from "lucide-react";
 
 // Même style que le menu latéral de la plateforme admin (src/components/layout/Sidebar.tsx)
 // -- Jade a demandé un portail « qui se rapproche plus de ma plateforme admin » : même
@@ -9,6 +9,9 @@ const NAV = [
   { href: "/portal/veille", label: "Veille de subventions", icon: Radar },
   { href: "/portal", label: "Mes dossiers", icon: FolderKanban },
   { href: "/portal/documents", label: "Documents", icon: FileText },
+  // Jade (0079) : comptabilité des dépôts reçus, et modèle de facture rempli automatiquement.
+  { href: "/portal/depots", label: "Dépôts", icon: Landmark },
+  { href: "/portal/modele-facture", label: "Modèle de facture", icon: Receipt },
 ] as const;
 
 export function PortalSidebar() {

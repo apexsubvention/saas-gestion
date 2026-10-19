@@ -17,6 +17,8 @@ import { buildScheduleRows } from "@/features/schedule/buildScheduleRows";
 import { StatusSelect } from "./StatusSelect";
 import { UploadProjectDocumentForm } from "./UploadProjectDocumentForm";
 import { OpenDocumentButton } from "./OpenDocumentButton";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { subsidyDepositsService } from "@/server/services/subsidyDeposits.service";
 import { AgreementForm } from "./AgreementForm";
 import { SuppliersTable } from "./SuppliersTable";
 import { SubsidyPanel } from "./SubsidyPanel";
@@ -240,6 +242,9 @@ export default async function GrantProjectPage({ params, searchParams }: { param
   // le fichier reçu, s'il y en a un, à chaque demande.
   const documentRequests = await documentRequestsService(supabase).listByProject(params.id);
   const dossierNotes = await dossierNotesService(supabase).listByProject(params.id);
+  // Jade (0079) : dépôts reçus inscrits par le client dans l'onglet « Dépôts » du portail.
+  const deposits = await subsidyDepositsService(supabase as unknown as SupabaseClient).listByProject(params.id);
+  const depositsTotal = Math.round(deposits.reduce((s, d) => s + d.amount, 0) * 100) / 100;
   const requestLinks = await documentsRepository(supabase).listDocumentRequestLinks(documentRequests.map((r) => r.id));
   const linkByRequestId = new Map(requestLinks.map((l) => [l.request_id, l]));
   const claimLabelById = new Map(claims.map((c) => [c.id, c.claim_number || `Réclamation (${c.period_start ?? "—"})`]));
@@ -473,6 +478,31 @@ export default async function GrantProjectPage({ params, searchParams }: { param
               <DocumentRequestsList grantProjectId={project.id} items={documentRequestItems} />
             </div>
           </CollapsibleSection>
+
+          {deposits.length > 0 && (
+            <CollapsibleSection title="Dépôts reçus (inscrits par le client)" badge={`(${deposits.length} — ${money(depositsTotal)})`}>
+              <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+                <table className="w-full text-sm">
+                  <tbody>
+                    {deposits.map((d) => (
+                      <tr key={d.id} className="border-b border-neutral-100 last:border-0">
+                        <td className="whitespace-nowrap px-4 py-2 text-neutral-900">{d.depositDate}</td>
+                        <td className="whitespace-nowrap px-4 py-2 text-right font-medium text-neutral-900">{money(d.amount)}</td>
+                        <td className="px-4 py-2 text-neutral-700">
+                          {d.payer ?? "—"}
+                          {d.reference && <span className="block text-xs text-neutral-500">Réf. {d.reference}</span>}
+                          {d.note && <span className="block text-xs text-neutral-500">{d.note}</span>}
+                        </td>
+                        <td className="px-4 py-2 text-right">
+                          {d.document ? <OpenDocumentButton storagePath={d.document.storagePath} filename={d.document.filename} /> : <span className="text-xs text-amber-700">Preuve manquante</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CollapsibleSection>
+          )}
 
           <CollapsibleSection title="Notes partagées avec le client" badge={`(${dossierNotes.length})`}>
             <DossierNotes grantProjectId={project.id} clientId={project.client_id} notes={dossierNotes} />

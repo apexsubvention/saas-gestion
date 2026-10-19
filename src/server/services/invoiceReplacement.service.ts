@@ -3,6 +3,7 @@ import { expensesRepository, type ExpenseRow } from "@/server/repositories/expen
 import { billingInstallmentsRepository, type BillingInstallmentRow } from "@/server/repositories/billingInstallments.repository";
 import { documentsRepository } from "@/server/repositories/documents.repository";
 import { portalInvoiceIntakeService, type IntakeResult } from "@/server/services/portalInvoiceIntake.service";
+import type { InvoiceExtraction } from "@/features/invoices/analyzeInvoice";
 
 // « Remplacer » une facture (Jade) : le fournisseur corrige sa facture (ex. Sitegrow, à la demande
 // d'Apex) et le client -- ou le personnel -- téléverse la nouvelle version À LA PLACE de l'ancienne :
@@ -38,6 +39,8 @@ export async function replaceInvoiceFile(
     file: File;
     uploadedBy: string | null; // organization_users.id
     source: "client_portal" | "manual";
+    // Facture générée par Apex (0079) : valeurs connues, pas de lecture.
+    extraction?: InvoiceExtraction;
   }
 ): Promise<ReplaceInvoiceResult> {
   const expensesRepo = expensesRepository(supabase);
@@ -125,9 +128,9 @@ export async function replaceInvoiceFile(
     const intake = portalInvoiceIntakeService(supabase);
     if (expense) {
       const inst = installment ?? (expense.billing_installment_id ? (installments.find((i) => i.id === expense!.billing_installment_id) ?? null) : null);
-      read = await intake.processDocument({ organizationId: p.organizationId }, p.grantProjectId, documentId, inst, { replaceExpenseId: expense.id });
+      read = await intake.processDocument({ organizationId: p.organizationId }, p.grantProjectId, documentId, inst, { replaceExpenseId: expense.id, extraction: p.extraction });
     } else if (installment) {
-      read = await intake.processInstallment({ organizationId: p.organizationId }, installment);
+      read = await intake.processDocument({ organizationId: p.organizationId }, p.grantProjectId, documentId, installment, { extraction: p.extraction });
     }
   } catch {
     read = null;

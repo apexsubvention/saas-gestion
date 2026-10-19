@@ -27,6 +27,7 @@ import { PortalTaskDoneButton } from "./PortalTaskDoneButton";
 import { PortalTaskCard } from "./PortalTaskCard";
 import { InstallmentInvoiceUpload } from "./InstallmentInvoiceUpload";
 import { ReplaceInvoiceButton } from "./ReplaceInvoiceButton";
+import { GeneratedInvoicePanel } from "./GeneratedInvoicePanel";
 import { PortalNotes } from "./PortalNotes";
 import { PortalSupplierInvoices } from "./PortalSupplierInvoices";
 import { computeSubsidy } from "@/features/grants/subsidyMath";
@@ -611,6 +612,8 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
                     ) : (
                       <InstallmentInvoiceUpload installmentId={inst.id} uploadedFilename={inst.clientInvoiceFilename} uploadedAt={inst.clientInvoiceUploadedAt} />
                     )}
+                    {/* Jade (0079) : facture préparée dans le modèle du fournisseur connecté. */}
+                    <GeneratedInvoicePanel installmentId={inst.id} alreadySent={!!inst.clientInvoiceFilename} />
                   </div>
                 ))}
               </div>

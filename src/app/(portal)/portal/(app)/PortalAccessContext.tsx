@@ -21,3 +21,15 @@ export function usePortalAccess() {
 export function ReadOnlyHint({ children }: { children?: React.ReactNode }) {
   return <p className="text-xs italic text-neutral-400">{children ?? "Consultation seulement"}</p>;
 }
+
+// Jade (0079) : le compte connecté a-t-il un modèle de facture (menu « Modèle de facture ») ? Si
+// oui, chaque versement du plan de facturation offre « Préparer ma facture ».
+const InvoiceTemplateContext = createContext(false);
+
+export function InvoiceTemplateProvider({ hasTemplate, children }: { hasTemplate: boolean; children: React.ReactNode }) {
+  return <InvoiceTemplateContext.Provider value={hasTemplate}>{children}</InvoiceTemplateContext.Provider>;
+}
+
+export function useHasInvoiceTemplate() {
+  return useContext(InvoiceTemplateContext);
+}
