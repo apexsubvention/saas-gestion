@@ -131,7 +131,8 @@ export type PortalBillingInstallment = {
   clientInvoiceUploadedAt: string | null;
   // Factures approuvées du tableau Fournisseurs associées à ce versement (Jade) -- le versement
   // est alors couvert : on les affiche plutôt que le bouton « La facture est faite ».
-  linkedInvoices: Array<{ id: string; supplierName: string; invoiceNumber: string | null; amount: number | null; document: { id: string; filename: string } | null }>;
+  // inReview : pas encore confirmée par Apex (ex. version corrigée qui vient d'être téléversée).
+  linkedInvoices: Array<{ id: string; inReview: boolean; supplierName: string; invoiceNumber: string | null; amount: number | null; document: { id: string; filename: string } | null }>;
 };
 
 // Résumé du programme montré au client quand son dossier est « à rédiger » (Jade) -- un
@@ -172,6 +173,11 @@ export type PortalSupplierInvoice = {
   paymentStatusUpdatedAt: string | null;
   paymentProof: { id: string; filename: string } | null;
   installmentNumber: number | null; // versement associé (Jade), null si aucun
+  // Jade (remplacement de facture) : une facture pas encore confirmée par Apex (« à vérifier »,
+  // ex. une version corrigée qui vient d'être téléversée) est aussi montrée, avec la mention « En
+  // vérification » et SANS les contrôles de paiement -- seule action possible : la remplacer.
+  // Les factures rejetées ne sont jamais montrées.
+  inReview: boolean;
 };
 
 export type PortalDossier = {
@@ -382,9 +388,10 @@ export function portalDossiersService(supabase: SupabaseClient) {
             .map((s) => ({ supplierName: s.name, amount: s.budget.effective as number }));
           const supplierInvoices: PortalSupplierInvoice[] = ledger.suppliers.flatMap((s) =>
             s.invoices
-              .filter((inv) => inv.status === "compliant")
+              .filter((inv) => inv.status !== "rejected")
               .map((inv) => ({
                 id: inv.id,
+                inReview: inv.status !== "compliant",
                 supplierName: s.name,
                 invoiceNumber: inv.invoice_number,
                 invoiceDate: inv.invoice_date,
@@ -548,8 +555,8 @@ export function portalDossiersService(supabase: SupabaseClient) {
               clientInvoiceUploadedAt: r.client_invoice_uploaded_at,
               linkedInvoices: ledger.suppliers.flatMap((s) =>
                 s.invoices
-                  .filter((inv) => inv.status === "compliant" && inv.installment?.id === r.id)
-                  .map((inv) => ({ id: inv.id, supplierName: s.name, invoiceNumber: inv.invoice_number, amount: inv.amount, document: inv.document ? { id: inv.document.id, filename: inv.document.filename } : null }))
+                  .filter((inv) => inv.status !== "rejected" && inv.installment?.id === r.id)
+                  .map((inv) => ({ id: inv.id, inReview: inv.status !== "compliant", supplierName: s.name, invoiceNumber: inv.invoice_number, amount: inv.amount, document: inv.document ? { id: inv.document.id, filename: inv.document.filename } : null }))
               ),
             })),
             programSummary,

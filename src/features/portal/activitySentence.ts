@@ -20,6 +20,7 @@ export type ActivityFacts =
   | { kind: "task_done"; taskTitle: string | null }
   | { kind: "payment_status"; paid: boolean }
   | { kind: "payment_proof"; filename: string | null }
+  | { kind: "invoice_replaced"; oldFilename: string | null; newFilename: string | null }
   | { kind: "opportunity_response"; interested: boolean }
   | { kind: "note"; excerpt: string }
   | { kind: "other"; title: string };
@@ -77,6 +78,8 @@ function phrase(f: ActivityFacts): string {
       return f.paid ? "marqué une facture comme payée" : "remis une facture à « envoyée, non payée »";
     case "payment_proof":
       return `déposé une preuve de paiement${f.filename ? ` (${f.filename})` : ""}`;
+    case "invoice_replaced":
+      return `remplacé une facture${f.oldFilename ? ` (${f.oldFilename})` : ""} par une nouvelle version${f.newFilename ? ` (${f.newFilename})` : ""}`;
     case "opportunity_response":
       return f.interested ? "répondu que l'opportunité l'intéresse" : "répondu que l'opportunité ne convient pas";
     case "note":
@@ -112,6 +115,10 @@ export function factsFromEvent(e: { kind: string; title: string }, extra: { inst
       return { kind: "payment_status", paid: /payée par le client/.test(e.title) && !/non payée/.test(e.title) };
     case "invoice_payment_proof_uploaded_portal":
       return { kind: "payment_proof", filename: extra.filename ?? null };
+    case "invoice_replaced_portal": {
+      const m = afterColon?.split(" → ") ?? [];
+      return { kind: "invoice_replaced", oldFilename: m[0] && m[0] !== "ancienne version" ? m[0] : null, newFilename: m[1] ?? null };
+    }
     case "opportunity_response_submitted":
       return { kind: "opportunity_response", interested: /intéresse/.test(e.title) };
     default:

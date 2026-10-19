@@ -15,6 +15,7 @@ import { billingLineItemsService } from "@/server/services/billingLineItems.serv
 import { portalInvoiceIntakeService } from "@/server/services/portalInvoiceIntake.service";
 import { billingInstallmentsRepository } from "@/server/repositories/billingInstallments.repository";
 import { dossierNotesService } from "@/server/services/dossierNotes.service";
+import { replaceInvoiceFile } from "@/server/services/invoiceReplacement.service";
 
 const fmtMoney = (n: number) => new Intl.NumberFormat("fr-CA", { style: "currency", currency: "CAD", minimumFractionDigits: 2 }).format(n);
 const OVERRIDE_FIELD_LABELS = { accepted: "Subvention acceptée", claimed: "Réclamé à ce jour", budget: "Budget prévu" } as const;
@@ -160,6 +161,39 @@ export async function deleteInvoiceAction(grantProjectId: string, invoiceId: str
     await logDossierEvent(supabase, ctx, { grant_project_id: grantProjectId, kind: "invoice_deleted", title: "Facture supprimée du tableau", detail: "Le document téléversé est conservé.", source: "manual" });
     revalidatePath(`/grants/${grantProjectId}`);
     return { error: null };
+  } catch (e) {
+    return { error: formatCaughtError(e) };
+  }
+}
+
+// « Remplacer » (Jade) : téléverser la version corrigée d'une facture à la place de l'ancienne --
+// même traitement que depuis le portail (invoiceReplacement.service.ts) : nouveau document lié,
+// relecture automatique, ligne « à vérifier », ancienne version conservée (« Remplacée — … »).
+export async function replaceInvoiceFileAction(grantProjectId: string, invoiceId: string, formData: FormData): Promise<LedgerActionResult> {
+  const ctx = await requireOrgContext();
+  const supabase = await createClient();
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) return { error: "Choisis le fichier de la nouvelle facture." };
+  try {
+    if (!(await ownedInvoice(supabase, grantProjectId, invoiceId))) return { error: "Facture introuvable dans ce dossier." };
+    const { data: project } = await supabase.from("grant_projects").select("client_id").eq("id", grantProjectId).maybeSingle();
+    const clientId = (project as unknown as { client_id: string } | null)?.client_id;
+    if (!clientId) return { error: "Dossier introuvable." };
+    const r = await replaceInvoiceFile(supabase, {
+      organizationId: ctx.organizationId,
+      grantProjectId,
+      clientId,
+      expenseId: invoiceId,
+      installmentId: null,
+      file,
+      uploadedBy: ctx.organizationUserId,
+      source: "manual",
+    });
+    const old = r.oldFilenames.length ? r.oldFilenames.join(", ") : "ancienne version";
+    await logDossierEvent(supabase, ctx, { grant_project_id: grantProjectId, kind: "invoice_replaced", title: `Facture remplacée : ${old} → ${file.name}`, detail: "L'ancienne version est conservée dans les documents (« Remplacée — … »).", source: "manual", ref_type: "expense", ref_id: invoiceId });
+    revalidatePath(`/grants/${grantProjectId}`);
+    const read = r.read && r.read.status !== "skipped" ? (r.read.issues > 0 ? ` Relue : ${r.read.issues} point(s) à vérifier.` : " Relue : aucune incohérence ✓") : " Lecture automatique indisponible : vérifie les valeurs.";
+    return { error: null, message: `Facture remplacée par ${file.name}.${read}` };
   } catch (e) {
     return { error: formatCaughtError(e) };
   }

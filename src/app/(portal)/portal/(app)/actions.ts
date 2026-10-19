@@ -11,6 +11,7 @@ import { portalInvoiceIntakeService } from "@/server/services/portalInvoiceIntak
 import { supplierLedgerService } from "@/server/services/supplierLedger.service";
 import { notifyUser } from "@/server/services/notifications.service";
 import { grantProjectsService } from "@/server/services/grantProjects.service";
+import { replaceInvoiceFile } from "@/server/services/invoiceReplacement.service";
 
 const BUCKET = "apex-documents";
 
@@ -47,7 +48,7 @@ async function notifyInvoicePaid(
   });
 }
 
-export type PortalUploadFormState = { error: string | null };
+export type PortalUploadFormState = { error: string | null; message?: string | null };
 
 // Téléverser un fichier pour répondre à une demande de document (document_requests --
 // créée par le personnel depuis le dossier, voir grants/[id]/documentRequestActions.ts).
@@ -676,4 +677,82 @@ export async function respondToOpportunityAction(grantProjectId: string, respons
 
   revalidatePath("/portal");
   return { error: null };
+}
+
+// ---- Remplacer une facture (Jade) -----------------------------------------------------------
+// Le fournisseur a corrigé sa facture (ex. corrections demandées par Apex à Sitegrow) : le client
+// téléverse la nouvelle version À LA PLACE de l'ancienne -- sur une facture du tableau
+// (expenseId) ou sur la facture envoyée pour un versement (installmentId). Même principe que les
+// autres actions du portail : accès vérifié avec le client RLS normal (SELECT), écriture avec le
+// client admin, strictement sur les lignes vérifiées. Détail dans invoiceReplacement.service.ts.
+export async function replacePortalInvoiceAction(
+  target: { expenseId?: string | null; installmentId?: string | null },
+  _prev: PortalUploadFormState,
+  formData: FormData
+): Promise<PortalUploadFormState> {
+  const ctx = await requirePortalContext();
+  const refusal = portalEditRefusal(ctx);
+  if (refusal) return { error: refusal };
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) return { error: "Choisis le fichier de la nouvelle facture." };
+  if (!target.expenseId && !target.installmentId) return { error: "Facture introuvable." };
+
+  const supabase = await createClient();
+  let grantProjectId: string | null = null;
+  let organizationId: string | null = null;
+  if (target.expenseId) {
+    const { data } = await supabase.from("expenses").select("id, organization_id, grant_project_id").eq("id", target.expenseId).maybeSingle();
+    const row = data as unknown as { organization_id: string; grant_project_id: string } | null;
+    if (!row) return { error: "Facture introuvable ou accès refusé." };
+    ({ grant_project_id: grantProjectId, organization_id: organizationId } = row);
+  } else {
+    const { data } = await supabase.from("billing_installments").select("id, organization_id, grant_project_id").eq("id", target.installmentId!).maybeSingle();
+    const row = data as unknown as { organization_id: string; grant_project_id: string } | null;
+    if (!row) return { error: "Versement introuvable ou accès refusé." };
+    ({ grant_project_id: grantProjectId, organization_id: organizationId } = row);
+  }
+
+  const admin = createAdminClient();
+  try {
+    const { data: project } = await admin.from("grant_projects").select("client_id, owner_id, name").eq("id", grantProjectId!).maybeSingle();
+    const proj = project as unknown as { client_id: string; owner_id: string | null; name: string } | null;
+    if (!proj) return { error: "Dossier introuvable." };
+
+    const r = await replaceInvoiceFile(admin, {
+      organizationId: organizationId!,
+      grantProjectId: grantProjectId!,
+      clientId: proj.client_id,
+      expenseId: target.expenseId ?? null,
+      installmentId: target.installmentId ?? null,
+      file,
+      uploadedBy: ctx.organizationUserId ?? null,
+      source: "client_portal",
+    });
+
+    const old = r.oldFilenames.length ? r.oldFilenames.join(", ") : "ancienne version";
+    await logDossierEvent(admin, { organizationId: organizationId!, organizationUserId: ctx.organizationUserId ?? "" }, {
+      grant_project_id: grantProjectId!,
+      client_id: ctx.clientId,
+      kind: "invoice_replaced_portal",
+      title: `Facture remplacée par le client : ${old} → ${file.name}`,
+      detail: "L'ancienne version est conservée dans les documents du dossier (« Remplacée — … »). La facture repasse « à vérifier ».",
+      source: "portal",
+      ref_type: r.expenseId ? "expense" : "billing_installment",
+      ref_id: r.expenseId ?? target.installmentId ?? null,
+    });
+    const issues = r.read && r.read.status !== "skipped" ? r.read.issues : null;
+    await notifyUser(admin, { organizationId: organizationId!, organizationUserId: ctx.organizationUserId ?? null }, {
+      userId: proj.owner_id,
+      type: "ai_review",
+      message: `Facture remplacée dans le portail (${proj.name}) : ${old} → ${file.name}${issues == null ? " -- à vérifier" : issues > 0 ? ` -- ${issues} incohérence(s) à vérifier` : " -- relue, à approuver"}`,
+      href: `/grants/${grantProjectId}`,
+      entity_type: "grant_project",
+      entity_id: grantProjectId!,
+    });
+  } catch (e) {
+    return { error: formatCaughtError(e) };
+  }
+
+  revalidatePath("/portal");
+  return { error: null, message: "Facture remplacée. L'équipe Apex va vérifier la nouvelle version." };
 }

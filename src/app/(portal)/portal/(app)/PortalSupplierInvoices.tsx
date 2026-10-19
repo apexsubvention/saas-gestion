@@ -2,8 +2,9 @@
 
 // Factures fournisseurs d'un dossier, visibles du portail (0057) -- Jade : le client (enfant ET
 // parent, via la hiérarchie) marque une facture « Envoyée, non payée » / « Payée », et ajoute une
-// preuve de paiement une fois payée. Ne montre que les factures déjà confirmées par le personnel
-// (voir portalDossiers.service.ts#PortalSupplierInvoice pour le raisonnement complet) -- le
+// preuve de paiement une fois payée -- seulement sur les factures déjà confirmées par le personnel
+// (voir portalDossiers.service.ts#PortalSupplierInvoice). Jade : « Remplacer » une facture par sa
+// version corrigée ; une facture pas encore confirmée est montrée « En vérification ». Le
 // personnel peut faire le même changement depuis SuppliersTable.tsx (grants/[id]).
 import { useState, useTransition } from "react";
 import type { PortalSupplierInvoice } from "@/server/services/portalDossiers.service";
@@ -11,6 +12,7 @@ import { updatePortalInvoicePaymentStatusAction } from "./actions";
 import { PortalOpenDocumentButton } from "./PortalOpenDocumentButton";
 import { PaymentProofUpload } from "./PaymentProofUpload";
 import { usePortalAccess } from "./PortalAccessContext";
+import { ReplaceInvoiceButton } from "./ReplaceInvoiceButton";
 
 const PAYMENT_STATUS_LABELS: Record<string, string> = { sent_unpaid: "Envoyée, non payée", paid: "Payée" };
 
@@ -45,7 +47,10 @@ function InvoiceCard({ invoice, requiresPaymentProof }: { invoice: PortalSupplie
       <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-neutral-500">
         {invoice.invoiceDate && <span>{formatDate(invoice.invoiceDate)}</span>}
         {invoice.document && <PortalOpenDocumentButton documentId={invoice.document.id} filename={invoice.document.filename} />}
+        {invoice.inReview && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800">En vérification par Apex</span>}
+        <ReplaceInvoiceButton expenseId={invoice.id} />
       </div>
+      {!invoice.inReview && (
       <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-neutral-100 pt-2">
         <label className="flex items-center gap-2 text-xs text-neutral-600">
           Statut de paiement
@@ -73,7 +78,8 @@ function InvoiceCard({ invoice, requiresPaymentProof }: { invoice: PortalSupplie
         </label>
         {error && <span className="text-xs text-red-600">{error}</span>}
       </div>
-      {status === "paid" && requiresPaymentProof && (
+      )}
+      {!invoice.inReview && status === "paid" && requiresPaymentProof && (
         <div className="mt-2 border-t border-neutral-100 pt-2">
           <PaymentProofUpload expenseId={invoice.id} proof={invoice.paymentProof} />
         </div>

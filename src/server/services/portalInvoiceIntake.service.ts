@@ -135,7 +135,16 @@ export function portalInvoiceIntakeService(supabase: SupabaseClient) {
     // « Documents » (installment = null, 0077). Même résultat dans les deux cas : une ligne « à
     // vérifier » sous le bon fournisseur, liée au document, qui ne compte dans aucun total tant
     // qu'elle n'est pas approuvée (supplierLedger.service.ts#isCounted).
-    async processDocument(ctx: Ctx, grantProjectId: string, documentId: string, installment: BillingInstallmentRow | null = null): Promise<IntakeResult> {
+    // opts.replaceExpenseId (remplacement d'une facture, invoiceReplacement.service.ts) : la
+    // nouvelle version remplace les valeurs lues de CETTE ligne (n°, date, montants), qui repasse
+    // « à vérifier » -- au lieu de seulement refaire le contrôle d'une facture déjà présente.
+    async processDocument(
+      ctx: Ctx,
+      grantProjectId: string,
+      documentId: string,
+      installment: BillingInstallmentRow | null = null,
+      opts: { replaceExpenseId?: string } = {}
+    ): Promise<IntakeResult> {
       if (!invoiceAnalysisAvailable()) return { status: "skipped", reason: "lecture automatique non configurée (ANTHROPIC_API_KEY)" };
 
       const [expenses, suppliers, lineItems, ledger] = await Promise.all([
@@ -156,7 +165,9 @@ export function portalInvoiceIntakeService(supabase: SupabaseClient) {
       const amount = amountBeforeTax(x);
 
       // Facture déjà au tableau ? (même document, ou même fournisseur + même numéro + même total)
+      const replaced = opts.replaceExpenseId ? (expenses.find((e) => e.id === opts.replaceExpenseId) ?? null) : null;
       const existing =
+        replaced ??
         (await expenseLinkedToDocument(documentId, expenses)) ??
         (x.invoice_number ? (expenses.find((e) => e.invoice_number === x.invoice_number && e.supplier_id === (supplier?.id ?? null) && Number(e.total) === x.total) ?? null) : null);
 
@@ -203,6 +214,20 @@ export function portalInvoiceIntakeService(supabase: SupabaseClient) {
               const sug = suggestInstallment({ date: x.invoice_date, amount }, ledger.installments, takenInstallments);
               return sug?.confident ? sug.installment.id : null;
             })());
+
+      if (replaced && x.is_invoice) {
+        const updated = await expensesRepo.update(replaced.id, {
+          invoice_number: x.invoice_number ?? replaced.invoice_number,
+          invoice_date: x.invoice_date ?? replaced.invoice_date,
+          subtotal: amount ?? replaced.subtotal,
+          tax: x.tax ?? replaced.tax,
+          total: x.total ?? replaced.total,
+          eligible_amount: amount ?? replaced.eligible_amount,
+          status: "to_review",
+        });
+        await expensesRepo.updateReview(replaced.id, { ...(autoInstallmentId ? { billing_installment_id: autoInstallmentId } : {}), review_issues: issues, review_note: note });
+        return { status: "linked_existing", expenseId: replaced.id, issues: issues.length, supplierName: effectiveSupplierName, amount: Number(updated.eligible_amount ?? updated.subtotal ?? updated.total ?? 0) || null };
+      }
 
       if (existing) {
         await expensesRepo.updateReview(existing.id, { ...(autoInstallmentId ? { billing_installment_id: autoInstallmentId } : {}), review_issues: issues, review_note: note });

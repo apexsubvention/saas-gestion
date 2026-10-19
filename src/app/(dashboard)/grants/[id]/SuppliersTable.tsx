@@ -22,7 +22,7 @@
 // optionnel ; sans lui, il utilise le taux du dossier. « Subvention acceptée » (AUTO) est alors
 // calculée poste par poste avec le bon taux plutôt qu'en appliquant le taux global à tout le
 // Budget prévu -- voir supplierLedger.service.ts.
-import { Fragment, useState, useTransition } from "react";
+import { Fragment, useEffect, useState, useTransition } from "react";
 import { OpenDocumentButton } from "./OpenDocumentButton";
 import {
   confirmInvoiceAction,
@@ -30,6 +30,7 @@ import {
   dismissInvoiceReviewAction,
   processPortalInvoicesAction,
   recheckInvoiceAction,
+  replaceInvoiceFileAction,
   sendInvoiceReviewNoteAction,
   deleteSupplierAction,
   getSupplierHistoryAction,
@@ -594,6 +595,15 @@ function InvoiceRow({
   const [claimId, setClaimId] = useState(invoice?.claim?.claim_id ?? "");
   const [claimAmount, setClaimAmount] = useState(invoice?.claim?.claimed_amount != null ? String(invoice.claim.claimed_amount) : "");
   const { pending, error, run } = useLedgerAction();
+  // Valeurs relues après un « Remplacer » (ou une autre mise à jour serveur) : on resynchronise
+  // les champs, sinon l'ancienne saisie paraîtrait « modifiée » et pourrait être réenregistrée.
+  useEffect(() => {
+    if (!invoice) return;
+    setDocId(invoice.document?.id ?? "");
+    setNumber(invoice.invoice_number ?? "");
+    setDate(invoice.invoice_date ?? "");
+    setAmount(invoice.amount != null ? String(invoice.amount) : "");
+  }, [invoice?.document?.id, invoice?.invoice_number, invoice?.invoice_date, invoice?.amount]); // eslint-disable-line react-hooks/exhaustive-deps
   const claimDirty = !!invoice && (claimId !== (invoice.claim?.claim_id ?? "") || (claimId !== "" && claimAmount !== (invoice.claim?.claimed_amount != null ? String(invoice.claim.claimed_amount) : "")));
 
   function saveClaim() {
@@ -733,6 +743,26 @@ function InvoiceRow({
             >
               {pending ? "…" : "Revérifier"}
             </button>
+          )}
+          {invoice && !isEmployee && (
+            <label className={`${smallBtn} cursor-pointer`} title="Téléverser la version corrigée de cette facture à la place de l'ancienne (conservée dans les documents)">
+              Remplacer
+              <input
+                type="file"
+                className="hidden"
+                disabled={pending}
+                onChange={(e) => {
+                  const f = e.currentTarget.files?.[0];
+                  e.currentTarget.value = "";
+                  if (!f) return;
+                  if (f.size > 4 * 1024 * 1024) return run(async () => ({ error: "Fichier trop volumineux : 4 Mo maximum." }));
+                  const fd = new FormData();
+                  fd.set("file", f);
+                  setSaved(false);
+                  run(() => replaceInvoiceFileAction(grantProjectId, invoice.id, fd), (r) => setRecheckMessage(r.message ?? null));
+                }}
+              />
+            </label>
           )}
           {invoice ? (
             <button

@@ -5,12 +5,13 @@
 // DocumentRequestUpload : téléverser LE fichier de facture EST l'action qui déclare « la
 // facture est faite » -- pas une case à cocher séparée qui pourrait rester cochée sans
 // aucun fichier joint (pas utile pour Apex). Une fois envoyée, la confirmation remplace le
-// formulaire ; seul le personnel (bouton « Retirer », écran Aide à la facturation) peut la
-// faire réapparaître, si le client doit corriger un mauvais fichier.
+// formulaire ; le client peut ensuite « Remplacer » la facture par une version corrigée, et le
+// personnel peut toujours la « Retirer » (écran Aide à la facturation).
 import { useFormState, useFormStatus } from "react-dom";
 import { uploadInstallmentInvoiceAction, type PortalUploadFormState } from "./actions";
 import { usePortalAccess } from "./PortalAccessContext";
 import { FileInput } from "@/components/forms/FileInput";
+import { ReplaceInvoiceButton } from "./ReplaceInvoiceButton";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -44,11 +45,16 @@ export function InstallmentInvoiceUpload({
   const [state, formAction] = useFormState(action, initialState);
   const { canEdit } = usePortalAccess();
 
+  // Jade : « Remplacer » -- le fournisseur a corrigé la facture, la nouvelle version prend la place
+  // de l'ancienne (ReplaceInvoiceButton). Le personnel peut toujours aussi la « Retirer ».
   if (uploadedFilename) {
     return (
-      <p className="mt-1 text-xs text-emerald-700">
-        ✓ Facture envoyée{uploadedAt ? ` le ${formatDate(uploadedAt)}` : ""} ({uploadedFilename})
-      </p>
+      <div className="mt-1 flex flex-wrap items-center gap-2">
+        <p className="text-xs text-emerald-700">
+          ✓ Facture envoyée{uploadedAt ? ` le ${formatDate(uploadedAt)}` : ""} ({uploadedFilename})
+        </p>
+        <ReplaceInvoiceButton installmentId={installmentId} />
+      </div>
     );
   }
 

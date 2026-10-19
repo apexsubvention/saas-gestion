@@ -26,6 +26,7 @@ import { DocumentRequestUpload } from "./DocumentRequestUpload";
 import { PortalTaskDoneButton } from "./PortalTaskDoneButton";
 import { PortalTaskCard } from "./PortalTaskCard";
 import { InstallmentInvoiceUpload } from "./InstallmentInvoiceUpload";
+import { ReplaceInvoiceButton } from "./ReplaceInvoiceButton";
 import { PortalNotes } from "./PortalNotes";
 import { PortalSupplierInvoices } from "./PortalSupplierInvoices";
 import { computeSubsidy } from "@/features/grants/subsidyMath";
@@ -602,6 +603,8 @@ export function DossierCard({ dossier, currentOrgUserId }: { dossier: PortalDoss
                             ✓ Facture{li.invoiceNumber ? ` n° ${li.invoiceNumber}` : ""} de {li.supplierName}
                             {li.amount != null ? ` (${formatAmount(li.amount)})` : ""} associée à ce versement
                             {li.document && <PortalOpenDocumentButton documentId={li.document.id} filename={li.document.filename} className="text-xs text-blue-600 hover:underline" />}
+                            {li.inReview && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800">En vérification par Apex</span>}
+                            <ReplaceInvoiceButton expenseId={li.id} />
                           </p>
                         ))}
                       </div>
