@@ -6,6 +6,7 @@ import {
   FolderKanban,
   Landmark,
   CalendarClock,
+  ClipboardList,
   Settings,
 } from "lucide-react";
 import type { OrgRole } from "@/lib/permissions";
@@ -20,6 +21,7 @@ import type { OrgRole } from "@/lib/permissions";
 // plus dans ce menu (même traitement que /documents ci-dessus).
 const NAV = [
   { href: "/dashboard", label: "Tableau de bord", icon: LayoutDashboard },
+  { href: "/resume", label: "Résumé", icon: ClipboardList },
   { href: "/watch", label: "Veille des subventions", icon: Radar },
   { href: "/clients", label: "Clients", icon: Building2 },
   { href: "/grants", label: "Dossiers", icon: FolderKanban },
