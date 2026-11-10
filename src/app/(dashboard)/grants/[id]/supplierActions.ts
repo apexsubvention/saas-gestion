@@ -226,6 +226,38 @@ export async function updateInvoicePaymentStatusAction(grantProjectId: string, i
   }
 }
 
+// 0082 (Jade) : coche « Réclamé au programme » sur la ligne d'une facture + numéro(s) de
+// réclamation (1, 2, ...). Enregistrée tout de suite, indépendamment du bouton « Enregistrer » de
+// la facture. Décocher vide aussi les numéros.
+export async function setInvoiceClaimedAction(grantProjectId: string, invoiceId: string, claimed: boolean, claimNumbers: number[]): Promise<LedgerActionResult> {
+  const ctx = await requireOrgContext();
+  if (typeof claimed !== "boolean" || !Array.isArray(claimNumbers)) return { error: "Valeur invalide." };
+  const numbers = Array.from(new Set(claimNumbers.filter((n) => Number.isInteger(n) && n >= 1 && n <= 50))).sort((a, b) => a - b);
+  const supabase = await createClient();
+  try {
+    if (!(await ownedInvoice(supabase, grantProjectId, invoiceId))) return { error: "Facture introuvable dans ce dossier." };
+    await expensesRepository(supabase).setClaimed(invoiceId, {
+      claimed_to_program: claimed,
+      claim_numbers: claimed ? numbers : [],
+      claimed_by: claimed ? ctx.organizationUserId : null,
+      claimed_at: claimed ? new Date().toISOString() : null,
+    });
+    const where = claimed && numbers.length > 0 ? ` (réclamation${numbers.length > 1 ? "s" : ""} ${numbers.join(" et ")})` : "";
+    await logDossierEvent(supabase, ctx, {
+      grant_project_id: grantProjectId,
+      kind: claimed ? "invoice_claimed" : "invoice_unclaimed",
+      title: claimed ? `Facture réclamée au programme${where}` : "Facture : réclamation au programme retirée",
+      source: "manual",
+      ref_type: "expense",
+      ref_id: invoiceId,
+    });
+    revalidatePath(`/grants/${grantProjectId}`);
+    return { error: null };
+  } catch (e) {
+    return { error: formatCaughtError(e) };
+  }
+}
+
 // Choisir, parmi les documents déjà déposés sur ce dossier, lequel est la preuve de paiement
 // d'une facture (ou en retirer un -- documentId = null). Voir DocumentSelect (déjà utilisé pour
 // le document de la facture elle-même) pour l'équivalent en UI.
@@ -330,35 +362,6 @@ export async function updateBillingLineItemAction(grantProjectId: string, itemId
       grant_project_id: grantProjectId,
       kind: "billing_line_item_updated",
       title: `Poste modifié : ${parsed.data.label}`,
-      source: "manual",
-      ref_type: "billing_line_item",
-      ref_id: itemId,
-    });
-    revalidatePath(`/grants/${grantProjectId}`);
-    revalidatePath(`/grants/${grantProjectId}/facturation`);
-    return { error: null, id: itemId };
-  } catch (e) {
-    return { error: formatCaughtError(e) };
-  }
-}
-
-// 0081 : coche « Réclamé au programme » d'un poste de facturation + réclamation(s) du dossier
-// (souvent 2). Enregistrée tout de suite, indépendamment du bouton « Enregistrer » du poste. Les
-// identifiants reçus sont filtrés contre les réclamations de CE dossier (jamais d'un autre).
-export async function setBillingLineItemClaimedAction(grantProjectId: string, itemId: string, claimed: boolean, claimIds: string[]): Promise<LedgerActionResult> {
-  const ctx = await requireOrgContext();
-  if (typeof claimed !== "boolean" || !Array.isArray(claimIds)) return { error: "Valeur invalide." };
-  const supabase = await createClient();
-  try {
-    const projectClaims = await claimsService(supabase).listByProject(grantProjectId);
-    const labelById = new Map(projectClaims.map((c) => [c.id, c.claim_number || `Réclamation (${c.period_start ?? "—"})`]));
-    const validIds = Array.from(new Set(claimIds)).filter((id) => labelById.has(id));
-    const item = await billingLineItemsService(supabase).setClaimed(grantProjectId, itemId, claimed, validIds, ctx.organizationUserId);
-    const where = claimed && validIds.length > 0 ? ` (${validIds.map((id) => labelById.get(id)).join(", ")})` : "";
-    await logDossierEvent(supabase, ctx, {
-      grant_project_id: grantProjectId,
-      kind: claimed ? "billing_line_item_claimed" : "billing_line_item_unclaimed",
-      title: claimed ? `Poste « ${item.label} » réclamé au programme${where}` : `Poste « ${item.label} » : réclamation au programme retirée`,
       source: "manual",
       ref_type: "billing_line_item",
       ref_id: itemId,

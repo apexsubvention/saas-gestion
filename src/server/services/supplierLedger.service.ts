@@ -37,6 +37,9 @@ export type LedgerInvoice = {
   reviewIssues: Array<{ code: string; message: string }>;
   reviewNote: string | null;
   reviewNoteSentAt: string | null;
+  // 0082 (Jade) : réclamé au programme ? et dans quelle(s) réclamation(s) (numéros 1, 2, ...).
+  claimedToProgram: boolean;
+  claimNumbers: number[];
 };
 
 // Valeur effective = override manuel ?? valeur automatique ?? calcul de repli.
@@ -224,6 +227,8 @@ export function supplierLedgerService(supabase: SupabaseClient) {
         reviewIssues: Array.isArray(e.review_issues) ? e.review_issues : [],
         reviewNote: e.review_note ?? null,
         reviewNoteSentAt: e.review_note_sent_at ?? null,
+        claimedToProgram: Boolean(e.claimed_to_program),
+        claimNumbers: Array.isArray(e.claim_numbers) ? e.claim_numbers.map(Number).filter((n) => Number.isInteger(n) && n > 0).sort((a, b) => a - b) : [],
       }));
 
       const bySupplier = new Map<string, LedgerInvoice[]>();

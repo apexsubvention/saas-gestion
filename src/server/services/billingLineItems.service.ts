@@ -67,20 +67,5 @@ export function billingLineItemsService(supabase: SupabaseClient) {
       if (item.label.length === 0) throw new Error("Le libellé est requis.");
       return repo.update(itemId, item);
     },
-
-    // 0081 : décocher « Réclamé » vide aussi la liste des réclamations. claimIds doit déjà être
-    // filtré sur les réclamations du dossier (fait dans l'action).
-    async setClaimed(grantProjectId: string, itemId: string, claimed: boolean, claimIds: string[], organizationUserId: string) {
-      const existing = await repo.listByProject(grantProjectId);
-      const item = existing.find((it) => it.id === itemId);
-      if (!item) throw new Error("Poste introuvable dans ce dossier.");
-      await repo.setClaimed(itemId, {
-        claimed_to_program: claimed,
-        claimed_claim_ids: claimed ? claimIds : [],
-        claimed_by: claimed ? organizationUserId : null,
-        claimed_at: claimed ? new Date().toISOString() : null,
-      });
-      return item;
-    },
   };
 }

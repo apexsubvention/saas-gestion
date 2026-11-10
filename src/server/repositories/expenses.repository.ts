@@ -32,6 +32,11 @@ export type ExpenseRow = {
   review_note: string | null;
   review_note_sent_at: string | null;
   review_note_id: string | null;
+  // 0082 (Jade) : coche « Réclamé au programme » + numéro(s) de réclamation (1, 2, ...).
+  claimed_to_program: boolean;
+  claim_numbers: number[];
+  claimed_by: string | null;
+  claimed_at: string | null;
 };
 
 export type ExpenseReviewPatch = Partial<Pick<ExpenseRow, "billing_installment_id" | "review_issues" | "review_note" | "review_note_sent_at" | "review_note_id">>;
@@ -93,6 +98,13 @@ export function expensesRepository(supabase: SupabaseClient) {
       const { data, error } = await supabase.from("expenses").delete().eq("id", id).select("id");
       if (error) throw error;
       return data?.length ?? 0;
+    },
+
+    // 0082 : coche « Réclamé au programme » + numéros, modifiée seule (sans toucher au reste).
+    async setClaimed(id: string, patch: Pick<ExpenseRow, "claimed_to_program" | "claim_numbers" | "claimed_by" | "claimed_at">): Promise<ExpenseRow> {
+      const { data, error } = await supabase.from("expenses").update(patch).eq("id", id).select().single();
+      if (error) throw error;
+      return data as ExpenseRow;
     },
 
     async updatePaymentStatus(id: string, status: "sent_unpaid" | "paid", updatedBy: string | null): Promise<ExpenseRow> {

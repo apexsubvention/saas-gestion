@@ -29,12 +29,6 @@ export type BillingLineItemRow = {
   // convention a des taux différents selon le type de frais (ex. formation vs salaire plafonné).
   // null = utilise le taux du dossier (comportement historique).
   subsidy_rate: number | null;
-  // Réclamé au programme (0081, Jade) : coche à côté de « À facturer » + la ou les réclamations
-  // du dossier (claims.id) dans lesquelles ce poste a été réclamé -- souvent 2.
-  claimed_to_program: boolean;
-  claimed_claim_ids: string[];
-  claimed_by: string | null;
-  claimed_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -53,13 +47,6 @@ export type BillingLineItemInput = {
 
 export function billingLineItemsRepository(supabase: SupabaseClient) {
   return {
-    // 0081 : coche « Réclamé au programme » + réclamation(s), modifiée seule (sans toucher au reste du poste).
-    async setClaimed(id: string, patch: Pick<BillingLineItemRow, "claimed_to_program" | "claimed_claim_ids" | "claimed_by" | "claimed_at">): Promise<BillingLineItemRow> {
-      const { data, error } = await supabase.from("billing_line_items").update(patch).eq("id", id).select().single();
-      if (error) throw error;
-      return data as unknown as BillingLineItemRow;
-    },
-
     async listByProject(grantProjectId: string): Promise<BillingLineItemRow[]> {
       const { data, error } = await supabase
         .from("billing_line_items")
@@ -73,19 +60,6 @@ export function billingLineItemsRepository(supabase: SupabaseClient) {
     // Remplace toute la liste d'un coup (édition en bloc, comme le formulaire de la liste complète) :
     // supprime les anciennes lignes, insère les nouvelles dans l'ordre.
     async replaceAll(organizationId: string, grantProjectId: string, items: BillingLineItemInput[], source: "ai" | "manual"): Promise<BillingLineItemRow[]> {
-      // 0081 : « Réclamé au programme » n'est pas saisi dans la liste complète -- reporté ici depuis
-      // l'ancien poste de même libellé (insensible à la casse/espaces) pour ne jamais le perdre
-      // silencieusement lors d'un enregistrement de la liste ou d'une relecture de la convention.
-      const { data: before, error: readError } = await supabase
-        .from("billing_line_items")
-        .select("label, claimed_to_program, claimed_claim_ids, claimed_by, claimed_at")
-        .eq("grant_project_id", grantProjectId);
-      if (readError) throw readError;
-      type ClaimedState = Pick<BillingLineItemRow, "claimed_to_program" | "claimed_claim_ids" | "claimed_by" | "claimed_at">;
-      const claimedByLabel = new Map<string, ClaimedState>();
-      for (const r of (before ?? []) as unknown as (ClaimedState & { label: string })[]) {
-        if (r.claimed_to_program) claimedByLabel.set(r.label.trim().toLowerCase(), r);
-      }
       const { error: delError } = await supabase.from("billing_line_items").delete().eq("grant_project_id", grantProjectId);
       if (delError) throw delError;
       if (items.length === 0) return [];
@@ -102,12 +76,6 @@ export function billingLineItemsRepository(supabase: SupabaseClient) {
         supplier_id: item.supplier_id ?? null,
         subsidy_rate: item.subsidy_rate ?? null,
         source,
-        ...(() => {
-          const kept = claimedByLabel.get(item.label.trim().toLowerCase());
-          return kept
-            ? { claimed_to_program: true, claimed_claim_ids: kept.claimed_claim_ids ?? [], claimed_by: kept.claimed_by, claimed_at: kept.claimed_at }
-            : {};
-        })(),
       }));
       const { data, error } = await supabase.from("billing_line_items").insert(rows).select();
       if (error) throw error;
