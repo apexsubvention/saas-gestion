@@ -7,6 +7,7 @@ import { requireOrgContext } from "@/lib/permissions";
 import { formatCaughtError } from "@/lib/errors";
 import { budgetLinesService } from "@/server/services/budgetLines.service";
 import { grantProjectsService } from "@/server/services/grantProjects.service";
+import { claimsService } from "@/server/services/claims.service";
 import { projectSuppliersService } from "@/server/services/projectSuppliers.service";
 import { logDossierEvent } from "@/server/services/audit";
 import { analyzeConventionBudget } from "@/features/budget/analyzeConventionBudget";
@@ -136,6 +137,34 @@ export async function deleteBudgetLineAction(grantProjectId: string, lineId: str
     const removed = await budgetLinesService(supabase).remove(lineId);
     if (removed === 0) return { error: "Suppression refusée : tu n'as pas accès à ce dossier." };
     await logDossierEvent(supabase, ctx, { grant_project_id: grantProjectId, kind: "budget_line_removed", title: `Poste de budget déposé supprimé : ${target.category}`, source: "manual" });
+    refresh(grantProjectId);
+    return { error: null };
+  } catch (e) {
+    return { error: formatCaughtError(e) };
+  }
+}
+
+// 0080 : coche « Réclamé au programme » + réclamation(s) du dossier. Les identifiants de
+// réclamation reçus sont filtrés contre les réclamations de CE dossier (jamais d'un autre).
+export async function setBudgetLineClaimedAction(grantProjectId: string, lineId: string, claimed: boolean, claimIds: string[]): Promise<BudgetLineActionResult> {
+  const ctx = await requireOrgContext();
+  if (typeof claimed !== "boolean" || !Array.isArray(claimIds)) return { error: "Valeur invalide." };
+  const supabase = await createClient();
+  try {
+    const lines = await budgetLinesService(supabase).listByProject(grantProjectId);
+    const target = lines.find((l) => l.id === lineId);
+    if (!target) return { error: "Poste introuvable dans ce dossier." };
+    const projectClaims = await claimsService(supabase).listByProject(grantProjectId);
+    const labelById = new Map(projectClaims.map((c) => [c.id, c.claim_number || `Réclamation (${c.period_start ?? "—"})`]));
+    const validIds = Array.from(new Set(claimIds)).filter((id) => labelById.has(id));
+    await budgetLinesService(supabase).setClaimed(lineId, claimed, validIds, ctx.organizationUserId);
+    const where = claimed && validIds.length > 0 ? ` (${validIds.map((id) => labelById.get(id)).join(", ")})` : "";
+    await logDossierEvent(supabase, ctx, {
+      grant_project_id: grantProjectId,
+      kind: claimed ? "budget_line_claimed" : "budget_line_unclaimed",
+      title: claimed ? `Poste « ${target.category} » réclamé au programme${where}` : `Poste « ${target.category} » : réclamation au programme retirée`,
+      source: "manual",
+    });
     refresh(grantProjectId);
     return { error: null };
   } catch (e) {

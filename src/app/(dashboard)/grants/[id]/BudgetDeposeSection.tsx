@@ -12,6 +12,7 @@ import {
   createBudgetLineAction,
   deleteBudgetLineAction,
   generateBudgetLinesFromConventionAction,
+  setBudgetLineClaimedAction,
   setBudgetLineOverrideAction,
   updateBudgetLineAction,
   updateProjectFinancialsAction,
@@ -22,6 +23,7 @@ import type { Tracked } from "@/server/services/supplierLedger.service";
 import { FileInput } from "@/components/forms/FileInput";
 
 type SupplierOption = { id: string; name: string };
+type ClaimOption = { id: string; label: string };
 
 function money(n: number | null | undefined) {
   return n == null ? "—" : new Intl.NumberFormat("fr-CA", { style: "currency", currency: "CAD", minimumFractionDigits: 2 }).format(n);
@@ -118,7 +120,78 @@ function TrackedCell({ grantProjectId, lineId, field, tracked, isPercent }: { gr
   );
 }
 
-function BudgetLineRow({ grantProjectId, line, suppliers }: { grantProjectId: string; line: BudgetLineView; suppliers: SupplierOption[] }) {
+// 0080 : coche « Réclamé au programme » + choix de la ou des réclamations du dossier (souvent 2).
+// Chaque clic enregistre tout de suite (pas de bouton « Enregistrer »). Décocher retire aussi les
+// réclamations associées.
+function ClaimedCell({ grantProjectId, line, claims }: { grantProjectId: string; line: BudgetLineView; claims: ClaimOption[] }) {
+  const knownIds = new Set(claims.map((c) => c.id));
+  const [claimed, setClaimed] = useState(line.claimed);
+  const [ids, setIds] = useState<string[]>(line.claimIds.filter((id) => knownIds.has(id)));
+  const { pending, error, run } = useLedgerAction();
+
+  function save(nextClaimed: boolean, nextIds: string[]) {
+    const prev = { claimed, ids };
+    setClaimed(nextClaimed);
+    setIds(nextIds);
+    run(async () => {
+      const r = await setBudgetLineClaimedAction(grantProjectId, line.id, nextClaimed, nextIds);
+      if (r.error) { setClaimed(prev.claimed); setIds(prev.ids); }
+      return r;
+    });
+  }
+
+  function toggleClaimed(checked: boolean) {
+    // Une seule réclamation dans le dossier : la cocher d'office.
+    const autoIds = checked && ids.length === 0 && claims.length === 1 ? [claims[0].id] : ids;
+    save(checked, checked ? autoIds : []);
+  }
+
+  function toggleClaim(id: string) {
+    save(true, ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]);
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-neutral-800">
+        <input
+          type="checkbox"
+          checked={claimed}
+          disabled={pending}
+          onChange={(e) => toggleClaimed(e.target.checked)}
+          className="h-4 w-4 rounded border-neutral-300 accent-emerald-600"
+        />
+        <span className={claimed ? "font-medium text-emerald-700" : "text-neutral-500"}>{claimed ? "Réclamé" : "Non réclamé"}</span>
+      </label>
+      {claimed && claims.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {claims.map((c) => {
+            const on = ids.includes(c.id);
+            return (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => toggleClaim(c.id)}
+                disabled={pending}
+                aria-pressed={on}
+                className={`rounded-full border px-2 py-0.5 text-[11px] font-medium disabled:opacity-50 ${
+                  on ? "border-emerald-600 bg-emerald-50 text-emerald-800" : "border-neutral-300 text-neutral-500 hover:bg-neutral-50"
+                }`}
+                title={on ? "Retirer cette réclamation" : "Réclamé dans cette réclamation"}
+              >
+                {on ? "✓ " : ""}{c.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {claimed && claims.length === 0 && <p className="text-[11px] text-neutral-400">Aucune réclamation créée dans ce dossier.</p>}
+      {claimed && claims.length > 0 && ids.length === 0 && <p className="text-[11px] text-amber-700">Préciser la réclamation</p>}
+      {error && <p className="text-xs text-red-600">{error}</p>}
+    </div>
+  );
+}
+
+function BudgetLineRow({ grantProjectId, line, suppliers, claims }: { grantProjectId: string; line: BudgetLineView; suppliers: SupplierOption[]; claims: ClaimOption[] }) {
   const [editingHeader, setEditingHeader] = useState(false);
   const [category, setCategory] = useState(line.category);
   const [supplierId, setSupplierId] = useState(line.supplierId ?? "");
@@ -155,6 +228,7 @@ function BudgetLineRow({ grantProjectId, line, suppliers }: { grantProjectId: st
       <td className="px-3 py-2"><TrackedCell grantProjectId={grantProjectId} lineId={line.id} field="rate" tracked={line.rate} isPercent /></td>
       <td className="px-3 py-2"><TrackedCell grantProjectId={grantProjectId} lineId={line.id} field="deposited" tracked={line.deposited} /></td>
       <td className="px-3 py-2"><TrackedCell grantProjectId={grantProjectId} lineId={line.id} field="accepted" tracked={line.accepted} /></td>
+      <td className="px-3 py-2"><ClaimedCell grantProjectId={grantProjectId} line={line} claims={claims} /></td>
       <td className="px-3 py-2">
         <button
           onClick={() => { if (confirm(`Supprimer le poste « ${line.category} » ?`)) run(() => deleteBudgetLineAction(grantProjectId, line.id)); }}
@@ -201,6 +275,7 @@ function AddBudgetLineRow({ grantProjectId, suppliers }: { grantProjectId: strin
       <td className="px-3 py-2"><input inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="% (optionnel)" className={input} /></td>
       <td className="px-3 py-2"><input inputMode="decimal" value={deposited} onChange={(e) => setDeposited(e.target.value)} placeholder="Déposé $" className={input} /></td>
       <td className="px-3 py-2"><input inputMode="decimal" value={accepted} onChange={(e) => setAccepted(e.target.value)} placeholder="Accepté $" className={input} /></td>
+      <td className="px-3 py-2" />
       <td className="px-3 py-2">
         <button onClick={add} disabled={pending || !category.trim()} className={`${smallBtn} bg-neutral-900 text-white hover:bg-neutral-800`}>{pending ? "…" : "+ Ajouter"}</button>
         {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
@@ -311,6 +386,7 @@ export function BudgetDeposeSection({
   lines,
   totals,
   suppliers,
+  claims,
   totalProjectCost,
   approvedGrantAmount,
   grantRatePercent,
@@ -319,6 +395,8 @@ export function BudgetDeposeSection({
   lines: BudgetLineView[];
   totals: { deposited: number; accepted: number };
   suppliers: SupplierOption[];
+  // 0080 : réclamations du dossier, pour la colonne « Réclamé au programme ».
+  claims: ClaimOption[];
   // Repli « mode simple » (aucun poste détaillé) -- valeurs déjà résolues par la page (fiche du
   // dossier en priorité, sinon l'entente -- même ordre que resolveSubsidyInputs).
   totalProjectCost: number | null;
@@ -347,19 +425,20 @@ export function BudgetDeposeSection({
 
       {hasLines && (
         <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
-          <table className="w-full min-w-[900px] text-sm">
+          <table className="w-full min-w-[1080px] text-sm">
             <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
               <tr>
                 <th className="px-3 py-2 font-medium">Poste / sous-traitant</th>
                 <th className="px-3 py-2 font-medium">% subvention</th>
                 <th className="px-3 py-2 font-medium">Déposé</th>
                 <th className="px-3 py-2 font-medium">Accepté</th>
+                <th className="px-3 py-2 font-medium">Réclamé au programme</th>
                 <th className="px-3 py-2 font-medium" />
               </tr>
             </thead>
             <tbody>
               {lines.map((l) => (
-                <BudgetLineRow key={l.id} grantProjectId={grantProjectId} line={l} suppliers={suppliers} />
+                <BudgetLineRow key={l.id} grantProjectId={grantProjectId} line={l} suppliers={suppliers} claims={claims} />
               ))}
               <AddBudgetLineRow grantProjectId={grantProjectId} suppliers={suppliers} />
             </tbody>
@@ -369,6 +448,9 @@ export function BudgetDeposeSection({
                 <td className="px-3 py-2" />
                 <td className="px-3 py-2">{money(totals.deposited)}</td>
                 <td className="px-3 py-2">{money(totals.accepted)}</td>
+                <td className="px-3 py-2 text-xs font-medium text-neutral-600">
+                  {lines.filter((l) => l.claimed).length} / {lines.length} poste(s) réclamé(s)
+                </td>
                 <td />
               </tr>
             </tfoot>

@@ -528,6 +528,7 @@ export default async function GrantProjectPage({ params, searchParams }: { param
                 lines={budgetLines.lines}
                 totals={budgetLines.totals}
                 suppliers={ledger.suppliers.map((s) => ({ id: s.id, name: s.name }))}
+                claims={claims.map((c) => ({ id: c.id, label: c.claim_number || `Réclamation (${c.period_start ?? "—"})` }))}
                 totalProjectCost={project.total_project_cost != null ? Number(project.total_project_cost) : null}
                 approvedGrantAmount={subsidy.maxSubsidy}
                 grantRatePercent={subsidy.rate != null ? Math.round(subsidy.rate * 10000) / 100 : null}

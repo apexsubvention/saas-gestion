@@ -19,6 +19,9 @@ export type BudgetLineView = {
   deposited: Tracked;
   accepted: Tracked;
   rate: Tracked; // fraction 0-1
+  // 0080 : réclamé au programme ? et dans quelle(s) réclamation(s) du dossier.
+  claimed: boolean;
+  claimIds: string[];
 };
 
 export type BudgetLinesResult = {
@@ -49,6 +52,8 @@ export function budgetLinesService(supabase: SupabaseClient) {
         deposited: tracked(num(r.deposited_amount_auto), num(r.deposited_amount_override)),
         accepted: tracked(num(r.accepted_amount_auto), num(r.accepted_amount_override)),
         rate: tracked(num(r.subsidy_rate_auto), num(r.subsidy_rate_override)),
+        claimed: Boolean(r.claimed_to_program),
+        claimIds: r.claimed_claim_ids ?? [],
       }));
       const sum = (pick: (l: BudgetLineView) => number | null) => Math.round(lines.reduce((s, l) => s + (pick(l) ?? 0), 0) * 100) / 100;
       return {
@@ -76,6 +81,17 @@ export function budgetLinesService(supabase: SupabaseClient) {
     updateCategoryAndSupplier: (id: string, patch: { category: string; supplier_id: string | null }) => repo.update(id, patch),
 
     remove: repo.remove,
+
+    // 0080 : décocher « Réclamé » vide aussi la liste des réclamations (rien de réclamé = aucune
+    // réclamation associée).
+    setClaimed(lineId: string, claimed: boolean, claimIds: string[], organizationUserId: string) {
+      return repo.update(lineId, {
+        claimed_to_program: claimed,
+        claimed_claim_ids: claimed ? claimIds : [],
+        claimed_by: claimed ? organizationUserId : null,
+        claimed_at: claimed ? new Date().toISOString() : null,
+      });
+    },
 
     // value = null -> revenir à l'automatique (efface seulement l'override, jamais la valeur auto).
     async setOverride(lineId: string, field: "deposited" | "accepted" | "rate", value: number | null, organizationUserId: string) {
