@@ -142,7 +142,8 @@ function ClaimedCell({ grantProjectId, line, claims }: { grantProjectId: string;
 
   function toggleClaimed(checked: boolean) {
     // Une seule réclamation dans le dossier : la cocher d'office.
-    const autoIds = checked && ids.length === 0 && claims.length === 1 ? [claims[0].id] : ids;
+    const onlyClaim = claims.length === 1 ? claims[0] : undefined;
+    const autoIds = checked && ids.length === 0 && onlyClaim ? [onlyClaim.id] : ids;
     save(checked, checked ? autoIds : []);
   }
 
