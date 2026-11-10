@@ -24,11 +24,6 @@ export type BudgetLineRow = {
   subsidy_rate_auto: number | null; // fraction 0-1
   subsidy_rate_override: number | null;
   source: "ai" | "manual";
-  // 0080 : coche « Réclamé au programme » + réclamation(s) du dossier concernée(s).
-  claimed_to_program: boolean;
-  claimed_claim_ids: string[];
-  claimed_by: string | null;
-  claimed_at: string | null;
 };
 
 // Poste proposé par la lecture automatique de la convention (voir analyzeConventionBudget.ts) --
@@ -157,10 +152,6 @@ export function budgetLinesRepository(supabase: SupabaseClient) {
         | "accepted_amount_override_by"
         | "accepted_amount_override_at"
         | "subsidy_rate_override"
-        | "claimed_to_program"
-        | "claimed_claim_ids"
-        | "claimed_by"
-        | "claimed_at"
       >
     >
   ): Promise<BudgetLineRow> {

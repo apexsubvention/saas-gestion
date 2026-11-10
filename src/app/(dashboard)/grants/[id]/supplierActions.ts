@@ -342,6 +342,35 @@ export async function updateBillingLineItemAction(grantProjectId: string, itemId
   }
 }
 
+// 0081 : coche « Réclamé au programme » d'un poste de facturation + réclamation(s) du dossier
+// (souvent 2). Enregistrée tout de suite, indépendamment du bouton « Enregistrer » du poste. Les
+// identifiants reçus sont filtrés contre les réclamations de CE dossier (jamais d'un autre).
+export async function setBillingLineItemClaimedAction(grantProjectId: string, itemId: string, claimed: boolean, claimIds: string[]): Promise<LedgerActionResult> {
+  const ctx = await requireOrgContext();
+  if (typeof claimed !== "boolean" || !Array.isArray(claimIds)) return { error: "Valeur invalide." };
+  const supabase = await createClient();
+  try {
+    const projectClaims = await claimsService(supabase).listByProject(grantProjectId);
+    const labelById = new Map(projectClaims.map((c) => [c.id, c.claim_number || `Réclamation (${c.period_start ?? "—"})`]));
+    const validIds = Array.from(new Set(claimIds)).filter((id) => labelById.has(id));
+    const item = await billingLineItemsService(supabase).setClaimed(grantProjectId, itemId, claimed, validIds, ctx.organizationUserId);
+    const where = claimed && validIds.length > 0 ? ` (${validIds.map((id) => labelById.get(id)).join(", ")})` : "";
+    await logDossierEvent(supabase, ctx, {
+      grant_project_id: grantProjectId,
+      kind: claimed ? "billing_line_item_claimed" : "billing_line_item_unclaimed",
+      title: claimed ? `Poste « ${item.label} » réclamé au programme${where}` : `Poste « ${item.label} » : réclamation au programme retirée`,
+      source: "manual",
+      ref_type: "billing_line_item",
+      ref_id: itemId,
+    });
+    revalidatePath(`/grants/${grantProjectId}`);
+    revalidatePath(`/grants/${grantProjectId}/facturation`);
+    return { error: null, id: itemId };
+  } catch (e) {
+    return { error: formatCaughtError(e) };
+  }
+}
+
 // Historique des modifications d'UN fournisseur (ajout, champs modifiés, valeurs ajustées à la main) --
 // alimente le bouton « Historique » du tableau fournisseurs. Chargé à la demande (pas au chargement de
 // la page) pour ne pas multiplier les requêtes tant que personne ne l'ouvre.

@@ -41,6 +41,7 @@ import {
   saveInvoiceAction,
   saveSupplierAction,
   setInvoicePaymentProofAction,
+  setBillingLineItemClaimedAction,
   setSupplierOverrideAction,
   updateBillingLineItemAction,
   updateInvoicePaymentStatusAction,
@@ -60,11 +61,79 @@ const EXCLUSION_REASON_LABELS: Record<string, string> = {
   new_supplier: "Nécessite l'ajout d'un nouveau fournisseur",
 };
 
+// 0081 (Jade) : coche « Réclamé au programme » à côté de « À facturer », puis choix de la ou des
+// réclamations du dossier (souvent 2), en pastilles. Enregistrée à chaque clic -- indépendante du
+// bouton « Enregistrer » du poste (qui ne touche jamais à ces champs). Décocher retire aussi les
+// réclamations associées.
+function useClaimedState(grantProjectId: string, item: BillingLineItemRow, claims: ClaimOption[]) {
+  const knownIds = new Set(claims.map((c) => c.id));
+  const [claimed, setClaimed] = useState(Boolean(item.claimed_to_program));
+  const [ids, setIds] = useState<string[]>((item.claimed_claim_ids ?? []).filter((id) => knownIds.has(id)));
+  const { pending, error, run } = useLedgerAction();
+
+  function save(nextClaimed: boolean, nextIds: string[]) {
+    const prev = { claimed, ids };
+    setClaimed(nextClaimed);
+    setIds(nextIds);
+    run(async () => {
+      const r = await setBillingLineItemClaimedAction(grantProjectId, item.id, nextClaimed, nextIds);
+      if (r.error) {
+        setClaimed(prev.claimed);
+        setIds(prev.ids);
+      }
+      return r;
+    });
+  }
+
+  function toggleClaimed(checked: boolean) {
+    // Une seule réclamation dans le dossier : la cocher d'office.
+    const onlyClaim = claims.length === 1 ? claims[0] : undefined;
+    const autoIds = ids.length === 0 && onlyClaim ? [onlyClaim.id] : ids;
+    save(checked, checked ? autoIds : []);
+  }
+
+  function toggleClaim(id: string) {
+    save(true, ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]);
+  }
+
+  return { claimed, ids, pending, error, toggleClaimed, toggleClaim };
+}
+
+function ClaimPills({ claims, ids, pending, onToggle }: { claims: ClaimOption[]; ids: string[]; pending: boolean; onToggle: (id: string) => void }) {
+  if (claims.length === 0) return <span className="text-[11px] text-neutral-400">Aucune réclamation créée dans ce dossier.</span>;
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      <span className="text-[11px] text-neutral-500">Réclamé dans :</span>
+      {claims.map((c) => {
+        const on = ids.includes(c.id);
+        return (
+          <button
+            key={c.id}
+            type="button"
+            onClick={() => onToggle(c.id)}
+            disabled={pending}
+            aria-pressed={on}
+            title={on ? "Retirer cette réclamation" : "Réclamé dans cette réclamation"}
+            className={`rounded-full border px-2 py-0.5 text-[11px] font-medium disabled:opacity-50 ${
+              on ? "border-emerald-600 bg-emerald-50 text-emerald-800" : "border-neutral-300 text-neutral-500 hover:bg-neutral-50"
+            }`}
+          >
+            {on ? "✓ " : ""}
+            {c.label}
+          </button>
+        );
+      })}
+      {ids.length === 0 && <span className="text-[11px] text-amber-700">Préciser la réclamation</span>}
+    </div>
+  );
+}
+
 // Postes budgétaires (Aide à la facturation) associés à CE fournisseur (0060, Jade) : affichés
 // juste sous chaque fournisseur (toujours visibles, plus besoin d'ouvrir « Détails »), modifiables
 // directement ici -- même mécanisme, sans changer d'onglet. Budget prévu = somme de ceux cochés
 // « À facturer » ci-dessous.
-function SupplierLineItemRow({ grantProjectId, item, projectRate }: { grantProjectId: string; item: BillingLineItemRow; projectRate: number | null }) {
+function SupplierLineItemRow({ grantProjectId, item, projectRate, claims }: { grantProjectId: string; item: BillingLineItemRow; projectRate: number | null; claims: ClaimOption[] }) {
+  const claim = useClaimedState(grantProjectId, item, claims);
   const [label, setLabel] = useState(item.label);
   const [description, setDescription] = useState(item.description ?? "");
   const [amount, setAmount] = useState(String(item.amount ?? 0));
@@ -121,9 +190,15 @@ function SupplierLineItemRow({ grantProjectId, item, projectRate }: { grantProje
       <textarea value={description} onChange={(e) => setDescription(e.target.value)} className={`${input} sm:col-span-3`} rows={1} placeholder="Détail" />
       <input type="number" min={0} step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} className={`${input} sm:col-span-1`} placeholder="Montant $" />
       <input type="number" min={0} step="0.5" value={hours} onChange={(e) => setHours(e.target.value)} className={`${input} sm:col-span-1`} placeholder="Heures" />
-      <label className="flex items-center gap-1 text-xs text-neutral-600 sm:col-span-1">
-        <input type="checkbox" checked={included} onChange={(e) => setIncluded(e.target.checked)} /> À facturer
-      </label>
+      <div className="space-y-1 text-xs text-neutral-600 sm:col-span-1">
+        <label className="flex items-center gap-1">
+          <input type="checkbox" checked={included} onChange={(e) => setIncluded(e.target.checked)} /> À facturer
+        </label>
+        <label className="flex items-center gap-1" title="Enregistré tout de suite">
+          <input type="checkbox" checked={claim.claimed} disabled={claim.pending} onChange={(e) => claim.toggleClaimed(e.target.checked)} className="accent-emerald-600" />
+          <span className={claim.claimed ? "font-medium text-emerald-700" : ""}>Réclamé</span>
+        </label>
+      </div>
       {!included && (
         <select value={exclusionReason} onChange={(e) => setExclusionReason(e.target.value)} className={`${input} sm:col-span-2`}>
           <option value="">Pourquoi (optionnel)…</option>
@@ -151,6 +226,12 @@ function SupplierLineItemRow({ grantProjectId, item, projectRate }: { grantProje
         )}
         {!dirty && saved && <span className="text-xs text-emerald-700">Enregistré ✓</span>}
       </div>
+      {claim.claimed && (
+        <div className="sm:col-span-12">
+          <ClaimPills claims={claims} ids={claim.ids} pending={claim.pending} onToggle={claim.toggleClaim} />
+        </div>
+      )}
+      {claim.error && <p className="text-xs text-red-600 sm:col-span-12">{claim.error}</p>}
       {subsidyPreview != null && (
         <p className="text-[11px] text-neutral-400 sm:col-span-12">
           {included ? "Subventionné" : "Couvert par la subvention (non facturé)"} : <span className="font-medium text-neutral-600">{money(subsidyPreview)}</span>
@@ -172,11 +253,14 @@ function SupplierLineItems({
   items,
   budget,
   projectRate,
+  claims,
 }: {
   grantProjectId: string;
   supplierId: string;
   items: BillingLineItemRow[];
   budget: Tracked;
+  // Réclamations du dossier, pour la coche « Réclamé au programme » (0081).
+  claims: ClaimOption[];
   // Taux d'aide du dossier -- utilisé comme repli quand un poste n'a pas son propre taux (0061).
   projectRate: number | null;
 }) {
@@ -202,7 +286,7 @@ function SupplierLineItems({
       </p>
       <div className="space-y-2">
         {items.map((it) => (
-          <SupplierLineItemRow key={it.id} grantProjectId={grantProjectId} item={it} projectRate={projectRate} />
+          <SupplierLineItemRow key={it.id} grantProjectId={grantProjectId} item={it} projectRate={projectRate} claims={claims} />
         ))}
       </div>
     </div>
@@ -905,7 +989,7 @@ function SupplierGroup({ grantProjectId, supplier, documents, clients, claims, l
         <td colSpan={6} className="px-3 pb-3">
           {narrative && <p className="mb-2 rounded-md bg-indigo-50 px-3 py-2 text-sm text-indigo-900">{narrative}</p>}
           <h4 className="mb-2 text-xs font-semibold text-neutral-700">Budget prévu — postes de facturation</h4>
-          <SupplierLineItems grantProjectId={grantProjectId} supplierId={supplier.id} items={lineItems} budget={supplier.budget} projectRate={projectRate} />
+          <SupplierLineItems grantProjectId={grantProjectId} supplierId={supplier.id} items={lineItems} budget={supplier.budget} projectRate={projectRate} claims={claims} />
         </td>
       </tr>
       {showDetails && (
