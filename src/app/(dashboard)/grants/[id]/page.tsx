@@ -222,9 +222,13 @@ export default async function GrantProjectPage({ params, searchParams }: { param
   // erreur de synchronisation, juste deux questions différentes (taux global vs réel par poste).
   // approved - earned peut dépasser 0 même à earned négatif ou nul -- jamais un Solde à 0 $ alors
   // qu'un montant approuvé existe déjà (même garde-fou que pour "Approuvé" ci-dessus).
+  // Jade (2026-11-17) : « Solde » = ce qui reste de la subvention APRÈS RÉCLAMATION seulement --
+  // une facture reçue mais pas encore réclamée ne doit plus le faire baisser. On retire donc la
+  // subvention équivalente aux montants réclamés (ledger.totals.claimedSubsidyEquivalent, même
+  // taux par poste que le repère « ≈ X $ de subvention » sous Réclamé), plus ledger.totals.earned.
   const balance = isPariProgram
     ? project.pari_balance_remaining ?? subsidy.remaining
-    : Math.max(0, Math.round((approved - ledger.totals.earned) * 100) / 100);
+    : Math.max(0, Math.round((approved - ledger.totals.claimedSubsidyEquivalent) * 100) / 100);
 
   // Échéancier unifié : tâches (manuel), échéances (suggérées ou manuelles depuis
   // l'entente) et réclamations (dossiers réels) forment ensemble UNE liste triée par
