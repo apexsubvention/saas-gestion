@@ -167,11 +167,12 @@ export async function generateBillingScheduleAction(grantProjectId: string, _pre
 const sitegrowSchema = z.object({
   level: z.enum(["essentiel", "optimisation", "domination"]),
   months: z.coerce.number().int().min(1, "Au moins 1 mois.").max(36, "36 mois maximum."),
+  engagement: z.coerce.number().int().min(0).max(36).optional(),
 });
 
 export async function generateSitegrowScheduleAction(grantProjectId: string, _prev: BillingActionResult, formData: FormData): Promise<BillingActionResult> {
   const ctx = await requireOrgContext();
-  const parsed = sitegrowSchema.safeParse({ level: formData.get("level"), months: formData.get("months") });
+  const parsed = sitegrowSchema.safeParse({ level: formData.get("level"), months: formData.get("months"), engagement: formData.get("engagement") ?? undefined });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Forfait invalide." };
 
   const result = await loadBillingContext(grantProjectId);
@@ -190,11 +191,13 @@ export async function generateSitegrowScheduleAction(grantProjectId: string, _pr
       projectEnd: context.projectEnd,
       level: parsed.data.level,
       months: parsed.data.months,
+      // 0 ou absent : engagement = mois couverts (1re suggestion).
+      engagementMonths: parsed.data.engagement && parsed.data.engagement > parsed.data.months ? parsed.data.engagement : undefined,
     });
     await logDossierEvent(context.supabase, ctx, {
       grant_project_id: grantProjectId,
       kind: "billing_schedule_generated",
-      title: `Calendrier de ${parsed.data.months} versement(s) généré selon le forfait Sitegrow (${SITEGROW_LEVEL_LABELS[parsed.data.level]})`,
+      title: `Calendrier de ${parsed.data.months} versement(s) généré selon le forfait Sitegrow (${SITEGROW_LEVEL_LABELS[parsed.data.level]}${parsed.data.engagement && parsed.data.engagement > parsed.data.months ? `, engagement ${parsed.data.engagement} mois dont ${parsed.data.engagement - parsed.data.months} hors subvention` : ""})`,
       source: "manual",
     });
     refresh(grantProjectId);

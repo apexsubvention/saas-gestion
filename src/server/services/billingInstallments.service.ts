@@ -4,12 +4,17 @@ import { billingLineItemsRepository } from "@/server/repositories/billingLineIte
 import { computeBillingPeriods, splitAmountEvenly } from "@/features/billing/schedule";
 import { draftBillingBatch, type BillingPeriodToGenerate } from "@/features/billing/draftBilling";
 import { describePlan, planHours } from "@/features/billing/hoursPlan";
-import { buildSitegrowPlan, projectMonths, sitegrowMonthlyPeriods, type SitegrowLevel } from "@/features/billing/sitegrowPackages";
+import { buildSitegrowPlan, programShortLabel, projectMonths, sitegrowMonthlyPeriods, SITEGROW_LEVEL_LABELS, type SitegrowLevel } from "@/features/billing/sitegrowPackages";
 
 function addOneDay(iso: string): string {
   const d = new Date(`${iso}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + 1);
   return d.toISOString().slice(0, 10);
+}
+
+function withPrefix(prefix: string | undefined, text: string | null): string | null {
+  if (!prefix) return text;
+  return text ? `${prefix}\n${text}` : prefix;
 }
 
 export function billingInstallmentsService(supabase: SupabaseClient) {
@@ -31,6 +36,7 @@ export function billingInstallmentsService(supabase: SupabaseClient) {
     activities: { label: string; description: string | null; amount: number; hours: number | null }[];
     priorSummary: string | null;
     alreadyBilled?: number; // dollars déjà couverts par les versements facturés (ajustement)
+    descriptionPrefixes?: string[]; // ligne ajoutée en tête du texte de chaque versement (même ordre que periods)
   }): Promise<BillingInstallmentRow[]> {
     // Jade : heures de chaque versement = son montant ÷ le taux horaire de l'activité, modules pris
     // dans l'ordre (coupés au besoin) -- calculées ici, imposées au rédacteur.
@@ -65,7 +71,7 @@ export function billingInstallmentsService(supabase: SupabaseClient) {
       period_start: p.period_start,
       period_end: p.period_end,
       // Repli si la rédaction échoue : la liste des modules et heures calculée (jamais vide si connue).
-      invoice_description: byNumber.get(p.installment_number)?.invoice_description ?? planTexts?.[i] ?? null,
+      invoice_description: withPrefix(input.descriptionPrefixes?.[i], byNumber.get(p.installment_number)?.invoice_description ?? planTexts?.[i] ?? null),
       amount: input.amounts[i] ?? 0,
       generated_by: "ai" as const,
     }));
@@ -129,6 +135,7 @@ export function billingInstallmentsService(supabase: SupabaseClient) {
       projectEnd: string;
       level: SitegrowLevel;
       months: number;
+      engagementMonths?: number; // engagement plus long que les mois couverts (2e suggestion)
     }): Promise<BillingInstallmentRow[]> {
       const existing = await repo.listByProject(params.grantProjectId);
       if (existing.length > 0) throw new Error("Des versements existent déjà pour ce dossier -- utilise « Ajuster les versements restants » pour les modifier.");
@@ -139,9 +146,18 @@ export function billingInstallmentsService(supabase: SupabaseClient) {
       const maxMonths = projectMonths(params.projectStart, params.projectEnd);
       if (params.months < 1 || params.months > maxMonths) throw new Error(`Le nombre de mois doit être entre 1 et ${maxMonths} (durée du projet).`);
 
-      const plan = buildSitegrowPlan(params.level, params.months, total);
+      if (params.engagementMonths != null && (params.engagementMonths < params.months || params.engagementMonths > 36)) {
+        throw new Error("La durée de l'engagement doit être au moins égale au nombre de mois couverts (36 mois maximum).");
+      }
+      const plan = buildSitegrowPlan(params.level, params.months, total, params.engagementMonths);
       const periods = sitegrowMonthlyPeriods(params.projectStart, params.projectEnd, plan.months);
       const amounts = periods.map(() => plan.monthlyPrice);
+      // Jade : chaque facture rappelle le forfait et le mois de l'engagement (« mois 2 sur 12 ») --
+      // les mois hors subvention ne sont pas dans ce calendrier (facturés directement au client).
+      const programLabel = programShortLabel(params.programName);
+      const descriptionPrefixes = periods.map(
+        (p) => `${SITEGROW_LEVEL_LABELS[plan.level]} Sitegrow — mois ${p.installment_number} sur ${plan.engagementMonths} de l'engagement (couvert par ${programLabel})`
+      );
       return draftAndInsert({
         organizationId: params.organizationId,
         grantProjectId: params.grantProjectId,
@@ -152,6 +168,7 @@ export function billingInstallmentsService(supabase: SupabaseClient) {
         amounts,
         activities: billableItems.map((it) => ({ label: it.label, description: it.description, amount: Number(it.amount ?? 0), hours: it.hours != null ? Number(it.hours) : null })),
         priorSummary: null,
+        descriptionPrefixes,
       });
     },
 

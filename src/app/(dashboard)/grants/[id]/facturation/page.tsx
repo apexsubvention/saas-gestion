@@ -8,7 +8,7 @@ import { billingInstallmentsService } from "@/server/services/billingInstallment
 import { documentsService } from "@/server/services/documents.service";
 import { projectSuppliersService } from "@/server/services/projectSuppliers.service";
 import { suggestInstallmentCount } from "@/features/billing/schedule";
-import { isSitegrowName } from "@/features/billing/sitegrowPackages";
+import { isSitegrowName, programShortLabel } from "@/features/billing/sitegrowPackages";
 import { SitegrowScheduleForm } from "./SitegrowScheduleForm";
 import { UploadConventionForm } from "./UploadConventionForm";
 import { LineItemsEditor } from "./LineItemsEditor";
@@ -122,6 +122,7 @@ export default async function BillingAidPage({ params }: { params: { id: string 
                 totalAmount={totalAmount}
                 projectStart={projectStart}
                 projectEnd={projectEnd}
+                programLabel={programShortLabel(project.grant_programs?.name)}
                 disabled={lineItems.length === 0}
               />
             )}
