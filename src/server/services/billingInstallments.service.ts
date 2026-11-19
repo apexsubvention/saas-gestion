@@ -4,6 +4,7 @@ import { billingLineItemsRepository } from "@/server/repositories/billingLineIte
 import { computeBillingPeriods, splitAmountEvenly } from "@/features/billing/schedule";
 import { draftBillingBatch, type BillingPeriodToGenerate } from "@/features/billing/draftBilling";
 import { describePlan, planHours } from "@/features/billing/hoursPlan";
+import { buildSitegrowPlan, projectMonths, sitegrowMonthlyPeriods, type SitegrowLevel } from "@/features/billing/sitegrowPackages";
 
 function addOneDay(iso: string): string {
   const d = new Date(`${iso}T00:00:00Z`);
@@ -102,6 +103,45 @@ export function billingInstallmentsService(supabase: SupabaseClient) {
 
       const periods = computeBillingPeriods(params.projectStart, params.projectEnd, params.count, 1);
       const amounts = splitAmountEvenly(total, params.count);
+      return draftAndInsert({
+        organizationId: params.organizationId,
+        grantProjectId: params.grantProjectId,
+        clientName: params.clientName,
+        programName: params.programName,
+        projectName: params.projectName,
+        periods,
+        amounts,
+        activities: billableItems.map((it) => ({ label: it.label, description: it.description, amount: Number(it.amount ?? 0), hours: it.hours != null ? Number(it.hours) : null })),
+        priorSummary: null,
+      });
+    },
+
+    // Jade : clients enfants de Sitegrow -- calendrier calqué sur le forfait Sitegrow choisi
+    // (voir src/features/billing/sitegrowPackages.ts) : un versement par mois de service, au prix
+    // mensuel du forfait, à partir du début du projet. Même garde-fous que generateSchedule().
+    async generateSitegrowSchedule(params: {
+      organizationId: string;
+      grantProjectId: string;
+      clientName: string;
+      programName: string;
+      projectName: string;
+      projectStart: string;
+      projectEnd: string;
+      level: SitegrowLevel;
+      months: number;
+    }): Promise<BillingInstallmentRow[]> {
+      const existing = await repo.listByProject(params.grantProjectId);
+      if (existing.length > 0) throw new Error("Des versements existent déjà pour ce dossier -- utilise « Ajuster les versements restants » pour les modifier.");
+      const lineItems = await lineItemsRepo.listByProject(params.grantProjectId);
+      const billableItems = lineItems.filter((it) => it.included_in_billing);
+      if (billableItems.length === 0) throw new Error("Aucune activité n'est cochée « à facturer » -- coche au moins un poste ci-dessus avant de générer les versements.");
+      const total = billableItems.reduce((sum, it) => sum + Number(it.amount ?? 0), 0);
+      const maxMonths = projectMonths(params.projectStart, params.projectEnd);
+      if (params.months < 1 || params.months > maxMonths) throw new Error(`Le nombre de mois doit être entre 1 et ${maxMonths} (durée du projet).`);
+
+      const plan = buildSitegrowPlan(params.level, params.months, total);
+      const periods = sitegrowMonthlyPeriods(params.projectStart, params.projectEnd, plan.months);
+      const amounts = periods.map(() => plan.monthlyPrice);
       return draftAndInsert({
         organizationId: params.organizationId,
         grantProjectId: params.grantProjectId,

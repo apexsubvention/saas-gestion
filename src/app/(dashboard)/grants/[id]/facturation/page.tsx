@@ -8,6 +8,8 @@ import { billingInstallmentsService } from "@/server/services/billingInstallment
 import { documentsService } from "@/server/services/documents.service";
 import { projectSuppliersService } from "@/server/services/projectSuppliers.service";
 import { suggestInstallmentCount } from "@/features/billing/schedule";
+import { isSitegrowName } from "@/features/billing/sitegrowPackages";
+import { SitegrowScheduleForm } from "./SitegrowScheduleForm";
 import { UploadConventionForm } from "./UploadConventionForm";
 import { LineItemsEditor } from "./LineItemsEditor";
 import { GenerateBillingScheduleForm } from "./GenerateBillingScheduleForm";
@@ -48,6 +50,14 @@ export default async function BillingAidPage({ params }: { params: { id: string 
   const totalAccepted = lineItems.reduce((sum, it) => sum + Number(it.amount ?? 0), 0);
   const lockedCount = installments.filter((r) => r.status === "submitted").length;
   const draftCount = installments.filter((r) => r.status === "draft").length;
+
+  // Jade : client enfant de Sitegrow (ou fournisseur Sitegrow sur le dossier) -- calendrier proposé
+  // selon le forfait Sitegrow le plus proche (voir SitegrowScheduleForm).
+  const parentClientId: string | null = project.clients?.parent_client_id ?? null;
+  const { data: parentClient } = parentClientId
+    ? await supabase.from("clients").select("name").eq("id", parentClientId).maybeSingle()
+    : { data: null };
+  const isSitegrowClient = isSitegrowName(parentClient?.name) || projectSuppliers.some((s) => isSitegrowName(s.name));
 
   const money = (n: number) => new Intl.NumberFormat("fr-CA", { style: "currency", currency: "CAD" }).format(n);
 
@@ -106,6 +116,16 @@ export default async function BillingAidPage({ params }: { params: { id: string 
               Génère le calendrier complet : Apex répartit la durée du projet et le montant total en versements consécutifs et
               rédige un premier brouillon du texte de facture de chacun.
             </p>
+            {isSitegrowClient && projectStart && projectEnd && totalAmount > 0 && (
+              <SitegrowScheduleForm
+                grantProjectId={params.id}
+                totalAmount={totalAmount}
+                projectStart={projectStart}
+                projectEnd={projectEnd}
+                disabled={lineItems.length === 0}
+              />
+            )}
+            {isSitegrowClient && <p className="text-xs text-neutral-500">Ou, répartition égale classique :</p>}
             <GenerateBillingScheduleForm
               grantProjectId={params.id}
               mode="generate"

@@ -12,6 +12,7 @@ import { billingInstallmentsService } from "@/server/services/billingInstallment
 import { logDossierEvent } from "@/server/services/audit";
 import { analyzeConventionActivities } from "@/features/billing/analyzeConventionActivities";
 import { analyzableMime, invoiceAnalysisAvailable, MAX_INVOICE_BYTES } from "@/features/invoices/analyzeInvoice";
+import { SITEGROW_LEVEL_LABELS } from "@/features/billing/sitegrowPackages";
 
 export type BillingActionResult = { error: string | null; ok?: boolean; info?: string | null };
 
@@ -153,6 +154,48 @@ export async function generateBillingScheduleAction(grantProjectId: string, _pre
       kind: "billing_schedule_generated",
       title: `Calendrier de ${count} versement(s) de facturation généré`,
       source: "ai",
+    });
+    refresh(grantProjectId);
+    return { error: null, ok: true };
+  } catch (e) {
+    return { error: formatCaughtError(e) };
+  }
+}
+
+// Jade : clients enfants de Sitegrow -- calendrier calqué sur le forfait Sitegrow (forfait + nombre de
+// mois proposés par Apex, modifiables avant de générer). Voir src/features/billing/sitegrowPackages.ts.
+const sitegrowSchema = z.object({
+  level: z.enum(["essentiel", "optimisation", "domination"]),
+  months: z.coerce.number().int().min(1, "Au moins 1 mois.").max(36, "36 mois maximum."),
+});
+
+export async function generateSitegrowScheduleAction(grantProjectId: string, _prev: BillingActionResult, formData: FormData): Promise<BillingActionResult> {
+  const ctx = await requireOrgContext();
+  const parsed = sitegrowSchema.safeParse({ level: formData.get("level"), months: formData.get("months") });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Forfait invalide." };
+
+  const result = await loadBillingContext(grantProjectId);
+  if (!result.ok) return { error: result.error };
+  const context = result.context;
+  if (!context.projectStart || !context.projectEnd) return { error: "Les dates de début et de fin du projet doivent être connues (entente ou dossier) avant de générer les versements." };
+
+  try {
+    await billingInstallmentsService(context.supabase).generateSitegrowSchedule({
+      organizationId: ctx.organizationId,
+      grantProjectId,
+      clientName: context.clientName,
+      programName: context.programName,
+      projectName: context.project.name,
+      projectStart: context.projectStart,
+      projectEnd: context.projectEnd,
+      level: parsed.data.level,
+      months: parsed.data.months,
+    });
+    await logDossierEvent(context.supabase, ctx, {
+      grant_project_id: grantProjectId,
+      kind: "billing_schedule_generated",
+      title: `Calendrier de ${parsed.data.months} versement(s) généré selon le forfait Sitegrow (${SITEGROW_LEVEL_LABELS[parsed.data.level]})`,
+      source: "manual",
     });
     refresh(grantProjectId);
     return { error: null, ok: true };
