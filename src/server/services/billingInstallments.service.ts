@@ -4,7 +4,7 @@ import { billingLineItemsRepository } from "@/server/repositories/billingLineIte
 import { computeBillingPeriods, splitAmountEvenly } from "@/features/billing/schedule";
 import { draftBillingBatch, type BillingPeriodToGenerate } from "@/features/billing/draftBilling";
 import { describePlan, planHours } from "@/features/billing/hoursPlan";
-import { buildSitegrowPlan, programShortLabel, projectMonths, sitegrowMonthlyPeriods, SITEGROW_LEVEL_LABELS, type SitegrowLevel } from "@/features/billing/sitegrowPackages";
+import { buildSitegrowPlan, programShortLabel, projectMonths, sitegrowMonthlyPeriods, SITEGROW_LEVEL_LABELS, type SitegrowLevel, type SitegrowTier } from "@/features/billing/sitegrowPackages";
 
 function addOneDay(iso: string): string {
   const d = new Date(`${iso}T00:00:00Z`);
@@ -122,9 +122,10 @@ export function billingInstallmentsService(supabase: SupabaseClient) {
       });
     },
 
-    // Jade : clients enfants de Sitegrow -- calendrier calqué sur le forfait Sitegrow choisi
-    // (voir src/features/billing/sitegrowPackages.ts) : un versement par mois de service, au prix
-    // mensuel du forfait, à partir du début du projet. Même garde-fous que generateSchedule().
+    // Jade : clients enfants de Sitegrow -- calendrier calqué sur le forfait Sitegrow (voir
+    // src/features/billing/sitegrowPackages.ts) : une facture par mois au prix du forfait, la
+    // dernière reprend le solde de la subvention (ex. 4 × 2 500 $ + 5 000 $). Total = total à
+    // facturer exactement. Même garde-fous que generateSchedule().
     async generateSitegrowSchedule(params: {
       organizationId: string;
       grantProjectId: string;
@@ -134,8 +135,8 @@ export function billingInstallmentsService(supabase: SupabaseClient) {
       projectStart: string;
       projectEnd: string;
       level: SitegrowLevel;
-      months: number;
-      engagementMonths?: number; // engagement plus long que les mois couverts (2e suggestion)
+      tier: SitegrowTier;
+      monthlyPrice?: number; // prix signé, si différent de la grille
     }): Promise<BillingInstallmentRow[]> {
       const existing = await repo.listByProject(params.grantProjectId);
       if (existing.length > 0) throw new Error("Des versements existent déjà pour ce dossier -- utilise « Ajuster les versements restants » pour les modifier.");
@@ -143,21 +144,18 @@ export function billingInstallmentsService(supabase: SupabaseClient) {
       const billableItems = lineItems.filter((it) => it.included_in_billing);
       if (billableItems.length === 0) throw new Error("Aucune activité n'est cochée « à facturer » -- coche au moins un poste ci-dessus avant de générer les versements.");
       const total = billableItems.reduce((sum, it) => sum + Number(it.amount ?? 0), 0);
-      const maxMonths = projectMonths(params.projectStart, params.projectEnd);
-      if (params.months < 1 || params.months > maxMonths) throw new Error(`Le nombre de mois doit être entre 1 et ${maxMonths} (durée du projet).`);
+      if (total <= 0) throw new Error("Le montant total des activités à facturer doit être supérieur à 0.");
 
-      if (params.engagementMonths != null && (params.engagementMonths < params.months || params.engagementMonths > 36)) {
-        throw new Error("La durée de l'engagement doit être au moins égale au nombre de mois couverts (36 mois maximum).");
-      }
-      const plan = buildSitegrowPlan(params.level, params.months, total, params.engagementMonths);
-      const periods = sitegrowMonthlyPeriods(params.projectStart, params.projectEnd, plan.months);
-      const amounts = periods.map(() => plan.monthlyPrice);
-      // Jade : chaque facture rappelle le forfait et le mois de l'engagement (« mois 2 sur 12 ») --
-      // les mois hors subvention ne sont pas dans ce calendrier (facturés directement au client).
+      const maxMonths = projectMonths(params.projectStart, params.projectEnd);
+      const plan = buildSitegrowPlan(params.level, params.tier, total, maxMonths, params.monthlyPrice);
+      if (plan.amounts.length === 0) throw new Error("Impossible de calculer les versements pour ce forfait.");
+      const periods = sitegrowMonthlyPeriods(params.projectStart, params.projectEnd, plan.amounts.length);
+      const amounts = plan.amounts.slice(0, periods.length);
       const programLabel = programShortLabel(params.programName);
-      const descriptionPrefixes = periods.map(
-        (p) => `${SITEGROW_LEVEL_LABELS[plan.level]} Sitegrow — mois ${p.installment_number} sur ${plan.engagementMonths} de l'engagement (couvert par ${programLabel})`
-      );
+      const descriptionPrefixes = periods.map((p, i) => {
+        const isBalance = i === periods.length - 1 && Math.abs((amounts[i] ?? 0) - plan.monthlyPrice) >= 0.005;
+        return `${SITEGROW_LEVEL_LABELS[plan.level]} Sitegrow — versement ${p.installment_number} sur ${periods.length}${isBalance ? " (solde de la subvention)" : ""}, couvert par ${programLabel}`;
+      });
       return draftAndInsert({
         organizationId: params.organizationId,
         grantProjectId: params.grantProjectId,

@@ -162,17 +162,21 @@ export async function generateBillingScheduleAction(grantProjectId: string, _pre
   }
 }
 
-// Jade : clients enfants de Sitegrow -- calendrier calqué sur le forfait Sitegrow (forfait + nombre de
-// mois proposés par Apex, modifiables avant de générer). Voir src/features/billing/sitegrowPackages.ts.
+// Jade : clients enfants de Sitegrow -- calendrier selon le forfait signé (ou le forfait supérieur) :
+// factures mensuelles au prix du forfait, solde sur la dernière. Voir src/features/billing/sitegrowPackages.ts.
 const sitegrowSchema = z.object({
   level: z.enum(["essentiel", "optimisation", "domination"]),
-  months: z.coerce.number().int().min(1, "Au moins 1 mois.").max(36, "36 mois maximum."),
-  engagement: z.coerce.number().int().min(0).max(36).optional(),
+  tier: z.coerce.number().refine((n) => n === 3 || n === 6 || n === 12, "Engagement invalide."),
+  monthly_price: z.coerce.number().min(0).max(100_000).optional(),
 });
 
 export async function generateSitegrowScheduleAction(grantProjectId: string, _prev: BillingActionResult, formData: FormData): Promise<BillingActionResult> {
   const ctx = await requireOrgContext();
-  const parsed = sitegrowSchema.safeParse({ level: formData.get("level"), months: formData.get("months"), engagement: formData.get("engagement") ?? undefined });
+  const parsed = sitegrowSchema.safeParse({
+    level: formData.get("level"),
+    tier: formData.get("tier"),
+    monthly_price: formData.get("monthly_price") || undefined,
+  });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Forfait invalide." };
 
   const result = await loadBillingContext(grantProjectId);
@@ -190,14 +194,13 @@ export async function generateSitegrowScheduleAction(grantProjectId: string, _pr
       projectStart: context.projectStart,
       projectEnd: context.projectEnd,
       level: parsed.data.level,
-      months: parsed.data.months,
-      // 0 ou absent : engagement = mois couverts (1re suggestion).
-      engagementMonths: parsed.data.engagement && parsed.data.engagement > parsed.data.months ? parsed.data.engagement : undefined,
+      tier: parsed.data.tier as 3 | 6 | 12,
+      monthlyPrice: parsed.data.monthly_price || undefined,
     });
     await logDossierEvent(context.supabase, ctx, {
       grant_project_id: grantProjectId,
       kind: "billing_schedule_generated",
-      title: `Calendrier de ${parsed.data.months} versement(s) généré selon le forfait Sitegrow (${SITEGROW_LEVEL_LABELS[parsed.data.level]}${parsed.data.engagement && parsed.data.engagement > parsed.data.months ? `, engagement ${parsed.data.engagement} mois dont ${parsed.data.engagement - parsed.data.months} hors subvention` : ""})`,
+      title: `Calendrier de facturation généré selon le forfait Sitegrow (${SITEGROW_LEVEL_LABELS[parsed.data.level]}, versements mensuels + solde à la fin)`,
       source: "manual",
     });
     refresh(grantProjectId);

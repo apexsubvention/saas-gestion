@@ -1,16 +1,17 @@
 // Forfaits Sitegrow (offre de services SEO & GEO) -- Jade : pour les clients ENFANTS de Sitegrow
-// (souvent subventionnés par MFOR), le calendrier de versements doit coller le plus possible au
-// forfait réellement pris avec Sitegrow, plutôt qu'à une simple division égale du total.
+// (souvent subventionnés par MFOR), le calendrier de versements suit le forfait réellement signé
+// avec Sitegrow plutôt qu'une simple division égale du total.
 //
-// Règles (choisies par Jade) :
-// - Grille fixe, telle que dans l'offre Sitegrow (prix mensuels, CAD, avant taxes). À mettre à jour
-//   ici si Sitegrow change ses tarifs.
-// - Palier de prix selon la durée : 1 à 5 mois → tarif « engagement 3 mois » ; 6 à 11 mois → tarif
-//   « 6 mois » ; 12 mois et plus → tarif « 12 mois ».
-// - Apex teste chaque forfait avec chaque nombre de mois possible dans la durée du projet et garde
-//   la combinaison dont le total (prix mensuel × mois) est le plus proche du total à facturer.
-//   Égalité : on préfère le total qui ne dépasse pas le budget, puis le plus de mois.
-// Fonctions pures, sans Supabase -- utilisables côté serveur (génération) et client (aperçu).
+// Règles (Jade, 2026-11-20) -- ex. forfait signé 2 500 $/mois, subvention 15 000 $, 5 mois :
+// - Suggestion 1, même forfait avec balance à la fin : une facture par mois au prix du forfait,
+//   la dernière reprend tout le solde de la subvention → 4 × 2 500 $ + 5 000 $.
+// - Suggestion 2, forfait supérieur (vu que c'est subventionné) : même règle avec le prix du
+//   forfait au-dessus, au même palier d'engagement → 4 × 3 500 $ + 1 000 $.
+// - Le total facturé = toujours exactement le total à facturer (subvention), jamais plus.
+// - Si la subvention ne couvre pas tous les mois au prix du forfait, il y a moins de factures
+//   (ex. 10 000 $ à 3 500 $/mois → 2 × 3 500 $ + 3 000 $).
+// Grille fixe, telle que dans l'offre Sitegrow (prix mensuels, CAD, avant taxes) -- à mettre à
+// jour ici si Sitegrow change ses tarifs. Fonctions pures, utilisables serveur et client.
 
 export type SitegrowLevel = "essentiel" | "optimisation" | "domination";
 export type SitegrowTier = 3 | 6 | 12;
@@ -28,20 +29,19 @@ export const SITEGROW_MONTHLY_PRICES: Record<SitegrowLevel, Record<SitegrowTier,
 };
 
 export const SITEGROW_LEVELS: SitegrowLevel[] = ["essentiel", "optimisation", "domination"];
+export const SITEGROW_TIERS: SitegrowTier[] = [3, 6, 12];
 
 export type SitegrowPlan = {
   level: SitegrowLevel;
   tier: SitegrowTier;
-  months: number; // mois couverts par la subvention (= versements du calendrier)
-  engagementMonths: number; // durée de l'engagement Sitegrow (>= months)
-  extraMonths: number; // mois hors subvention, après la fin des mois couverts
   monthlyPrice: number;
-  total: number; // montant couvert par la subvention (months × prix)
-  extraTotal: number; // montant hors subvention, à la charge du client
-  gap: number; // total - budget (négatif = sous le budget)
+  amounts: number[]; // une facture par mois ; la dernière = solde de la subvention
+  balance: number; // montant de la dernière facture (solde)
+  total: number; // = budget
 };
 
 const DAY_MS = 86_400_000;
+const round2 = (n: number) => Math.round(n * 100) / 100;
 
 function parseISO(d: string): Date {
   return new Date(`${d}T00:00:00Z`);
@@ -59,13 +59,6 @@ function sameDayInMonth(start: Date, offset: number): Date {
   return new Date(Date.UTC(y, m, Math.min(start.getUTCDate(), lastDay)));
 }
 
-/** Palier de prix selon le nombre de mois facturés. */
-export function sitegrowTierForMonths(months: number): SitegrowTier {
-  if (months >= 12) return 12;
-  if (months >= 6) return 6;
-  return 3;
-}
-
 /** Nombre de mois (arrondi) couverts par le projet, au moins 1. */
 export function projectMonths(projectStart: string, projectEnd: string): number {
   const days = Math.round((parseISO(projectEnd).getTime() - parseISO(projectStart).getTime()) / DAY_MS) + 1;
@@ -73,54 +66,47 @@ export function projectMonths(projectStart: string, projectEnd: string): number 
   return Math.max(1, Math.round(days / 30.44));
 }
 
-/**
- * `months` = mois couverts par la subvention ; `engagementMonths` (facultatif) = durée totale de
- * l'engagement Sitegrow, plus longue pour un tarif mensuel plus bas -- les mois en surplus sont hors
- * subvention (à la charge du client), même s'ils débordent des dates du projet subventionné.
- */
-export function buildSitegrowPlan(level: SitegrowLevel, months: number, budget: number, engagementMonths?: number): SitegrowPlan {
-  const engagement = Math.max(months, engagementMonths ?? months);
-  const tier = sitegrowTierForMonths(engagement);
-  const monthlyPrice = SITEGROW_MONTHLY_PRICES[level][tier];
-  const total = monthlyPrice * months;
-  const extraMonths = engagement - months;
-  return {
-    level,
-    tier,
-    months,
-    engagementMonths: engagement,
-    extraMonths,
-    monthlyPrice,
-    total,
-    extraTotal: monthlyPrice * extraMonths,
-    gap: Math.round((total - budget) * 100) / 100,
-  };
-}
-
-function isBetter(plan: SitegrowPlan, best: SitegrowPlan): boolean {
-  const d = Math.abs(plan.gap);
-  const bd = Math.abs(best.gap);
-  if (d < bd - 0.005) return true;
-  if (Math.abs(d - bd) > 0.005) return false;
-  const underNow = plan.gap <= 0;
-  const underBest = best.gap <= 0;
-  if (underNow !== underBest) return underNow;
-  return plan.months > best.months;
+/** Palier de prix le plus proche d'une durée d'engagement (1-5 → 3 ; 6-11 → 6 ; 12+ → 12). */
+export function sitegrowTierForMonths(months: number): SitegrowTier {
+  if (months >= 12) return 12;
+  if (months >= 6) return 6;
+  return 3;
 }
 
 /**
- * 2e suggestion (Jade) : même forfait, engagement plus long (6 ou 12 mois) donc moins cher par
- * mois -- les premiers mois sont couverts par la subvention (le plus proche du budget, dans la
- * durée du projet), les suivants sont hors subvention. null si la 1re suggestion est déjà au
- * tarif 12 mois.
+ * Factures mensuelles au prix du forfait, la dernière absorbant le solde : au plus `maxMonths`
+ * factures, total = budget exactement.
  */
-export function chooseLongerSitegrowPlan(base: SitegrowPlan, budget: number, maxMonths: number): SitegrowPlan | null {
-  let best: SitegrowPlan | null = null;
-  for (const engagement of [6, 12] as const) {
-    if (sitegrowTierForMonths(engagement) <= base.tier || engagement <= base.months) continue;
-    for (let m = 1; m <= Math.min(maxMonths, engagement); m++) {
-      const plan = buildSitegrowPlan(base.level, m, budget, engagement);
-      if (!best || isBetter(plan, best) || (Math.abs(Math.abs(plan.gap) - Math.abs(best.gap)) <= 0.005 && plan.monthlyPrice < best.monthlyPrice)) best = plan;
+export function balancedAmounts(monthlyPrice: number, budget: number, maxMonths: number): number[] {
+  if (!(budget > 0) || !(monthlyPrice > 0) || maxMonths < 1) return [];
+  const full = Math.min(maxMonths - 1, Math.floor((budget + 0.005) / monthlyPrice));
+  const amounts = Array.from({ length: full }, () => monthlyPrice);
+  const rest = round2(budget - full * monthlyPrice);
+  if (rest > 0.005) amounts.push(rest);
+  return amounts;
+}
+
+export function buildSitegrowPlan(level: SitegrowLevel, tier: SitegrowTier, budget: number, maxMonths: number, monthlyPrice?: number): SitegrowPlan {
+  const price = monthlyPrice && monthlyPrice > 0 ? monthlyPrice : SITEGROW_MONTHLY_PRICES[level][tier];
+  const amounts = balancedAmounts(price, budget, maxMonths);
+  return { level, tier, monthlyPrice: price, amounts, balance: amounts[amounts.length - 1] ?? 0, total: round2(amounts.reduce((s, a) => s + a, 0)) };
+}
+
+/** Forfait juste au-dessus (null si déjà Domination). */
+export function nextSitegrowLevel(level: SitegrowLevel): SitegrowLevel | null {
+  const i = SITEGROW_LEVELS.indexOf(level);
+  return SITEGROW_LEVELS[i + 1] ?? null;
+}
+
+/** Forfait signé le plus probable quand on ne le connaît pas : prix × mois le plus proche du budget. */
+export function guessSignedSitegrowLevel(budget: number, maxMonths: number, tier: SitegrowTier): SitegrowLevel {
+  let best: SitegrowLevel = "essentiel";
+  let bestGap = Infinity;
+  for (const level of SITEGROW_LEVELS) {
+    const gap = Math.abs(SITEGROW_MONTHLY_PRICES[level][tier] * maxMonths - budget);
+    if (gap < bestGap - 0.005) {
+      best = level;
+      bestGap = gap;
     }
   }
   return best;
@@ -132,34 +118,26 @@ export function programShortLabel(programName: string | null | undefined): strin
   return programName?.trim() || "la subvention";
 }
 
-/** Phrase prête à envoyer au client pour une suggestion. */
-export function describeSitegrowPlan(plan: SitegrowPlan, programLabel: string): string {
-  const money = (n: number) => new Intl.NumberFormat("fr-CA", { style: "currency", currency: "CAD" }).format(n);
-  const tierNote = plan.engagementMonths !== plan.tier ? ` (tarif ${plan.tier} mois)` : "";
-  const base = `${SITEGROW_LEVEL_LABELS[plan.level]}, engagement ${plan.engagementMonths} mois${tierNote} à ${money(plan.monthlyPrice)}/mois`;
-  const covered = plan.months === 1 ? `le premier mois (${money(plan.total)}) est couvert` : `les ${plan.months} ${plan.extraMonths > 0 ? "premiers " : ""}mois (${money(plan.total)}) sont couverts`;
-  if (plan.extraMonths === 0) return `${base} : ${covered} par ${programLabel}.`;
-  const extra = plan.extraMonths === 1 ? `le mois suivant (${money(plan.extraTotal)}) est hors subvention` : `les ${plan.extraMonths} mois suivants (${money(plan.extraTotal)}) sont hors subvention`;
-  return `${base} : ${covered} par ${programLabel} ; ${extra}, à la charge du client.`;
-}
+const money = (n: number) => new Intl.NumberFormat("fr-CA", { style: "currency", currency: "CAD" }).format(n);
 
-/** Forfait + nombre de mois dont le total est le plus proche du budget, sans dépasser la durée du projet. */
-export function chooseSitegrowPlan(budget: number, maxMonths: number): SitegrowPlan | null {
-  if (!(budget > 0) || maxMonths < 1) return null;
-  let best: SitegrowPlan | null = null;
-  for (const level of SITEGROW_LEVELS) {
-    for (let m = 1; m <= maxMonths; m++) {
-      const plan = buildSitegrowPlan(level, m, budget);
-      if (!best || isBetter(plan, best)) best = plan;
-    }
-  }
-  return best;
+/** Phrase prête à envoyer au client, ex. « 4 factures de 2 500 $ et une 5e de 5 000 $ ». */
+export function describeSitegrowPlan(plan: SitegrowPlan, programLabel: string): string {
+  const n = plan.amounts.length;
+  const head = `${SITEGROW_LEVEL_LABELS[plan.level]} à ${money(plan.monthlyPrice)}/mois`;
+  if (n === 0) return `${head} : aucun montant à facturer.`;
+  const fullCount = plan.amounts.filter((a) => Math.abs(a - plan.monthlyPrice) < 0.005).length;
+  const lastIsBalance = Math.abs(plan.balance - plan.monthlyPrice) >= 0.005;
+  let detail: string;
+  if (!lastIsBalance) detail = n === 1 ? `1 facture de ${money(plan.monthlyPrice)}` : `${n} factures de ${money(plan.monthlyPrice)}`;
+  else if (fullCount === 0) detail = `1 facture de ${money(plan.balance)}`;
+  else detail = `${fullCount} facture${fullCount > 1 ? "s" : ""} de ${money(plan.monthlyPrice)} et une ${n}e de ${money(plan.balance)} (solde)`;
+  return `${head} : ${detail}, pour un total de ${money(plan.total)} couvert par ${programLabel}.`;
 }
 
 /**
  * Périodes mensuelles consécutives à partir du début du projet (ex. 21 sept → 20 oct, 21 oct →
- * 20 nov…), comme la facturation Sitegrow « au début de chaque mois de service ». La dernière
- * période ne dépasse jamais la fin du projet, et s'y termine quand on facture tous les mois du projet.
+ * 20 nov…). La dernière ne dépasse jamais la fin du projet, et s'y termine quand on facture tous
+ * les mois du projet.
  */
 export function sitegrowMonthlyPeriods(projectStart: string, projectEnd: string, months: number) {
   const start = parseISO(projectStart);
